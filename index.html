@@ -1,0 +1,2849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Relational N-Back</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #141820;
+    --panel-2: #0f1218;
+    --border-outer: rgba(180, 200, 255, 0.45);
+    --border-inner: rgba(180, 200, 255, 0.18);
+    --cell-fill: rgba(120, 140, 255, 0.10);
+    --cell-active: rgba(120, 200, 255, 0.62);
+    --text: #e6ebff;
+    --muted: rgba(230, 235, 255, 0.55);
+    --good: #51cf66;
+    --bad: #ff6b6b;
+    --cube-size: min(34vmin, 240px);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: radial-gradient(circle at 50% 0%, #121728, var(--bg));
+    color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  button { font-family: inherit; }
+
+  /* ---------- SETTINGS ---------- */
+  .settings-btn {
+    position: fixed; top: 14px; left: 14px; z-index: 30;
+    background: var(--panel); border: 1px solid var(--border-outer);
+    color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;
+  }
+
+  .settings {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 340px;
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border-right: 1px solid var(--border-outer);
+    padding: 56px 18px 18px; transform: translateX(-100%);
+    transition: transform .28s ease; z-index: 29; overflow-y: auto;
+  }
+  .settings.open { transform: translateX(0); }
+  .settings h2 { margin: 0 0 4px; font-size: 17px; }
+  .settings h3 {
+    margin: 20px 0 8px; font-size: 11px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--border-inner); padding-bottom: 6px;
+  }
+  .setting-group { margin-bottom: 12px; }
+  .settings label { display: block; margin-bottom: 5px; font-size: 13px; opacity: .85; }
+  select, input[type=number], input[type=text], input[type=file] {
+    width: 100%; padding: 7px; background: #0e121a; color: var(--text);
+    border: 1px solid var(--border-inner); border-radius: 6px; font-size: 13px;
+  }
+  input[type=file] { padding: 5px; font-size: 11px; }
+  select:disabled, input:disabled { opacity: .4; cursor: not-allowed; }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
+  .pair { display: flex; gap: 8px; }
+  .pair > div { flex: 1; }
+
+  .mode-toggle { display: flex; gap: 6px; margin-bottom: 4px; }
+  .mode-toggle button {
+    flex: 1; padding: 9px 6px; border-radius: 8px; cursor: pointer; font-size: 13px;
+    background: var(--panel-2); border: 1px solid var(--border-inner); color: var(--muted);
+  }
+  .mode-toggle button.on {
+    background: #2b4a8a; border-color: #4d7fd6; color: var(--text); font-weight: 600;
+  }
+
+  /* stream mode rows */
+  .stream-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .stream-row .swatch { width: 9px; height: 22px; border-radius: 3px; flex: none; }
+  .stream-row .nm { flex: 1; font-size: 13px; }
+  .stream-row select { width: 108px; flex: none; padding: 5px; font-size: 12px; }
+
+  /* progression state readout */
+  .ladder { font-size: 12.5px; line-height: 1.9; }
+  .ladder .k { color: var(--muted); display: inline-block; width: 108px; }
+  .ladder b { font-variant-numeric: tabular-nums; }
+  .next-up {
+    margin-top: 10px; padding: 9px 11px; border-radius: 8px;
+    background: rgba(77, 127, 214, .13); border: 1px solid rgba(77, 127, 214, .4);
+    font-size: 12px; line-height: 1.5;
+  }
+  .next-up b { color: #8ab4ff; }
+
+  /* keybind editor */
+  .kb-stream {
+    margin: 12px 0 5px; font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .kb-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .kb-row .kb-glyph { width: 24px; text-align: center; font-weight: 700; flex: none; }
+  .kb-row .kb-label { flex: 1; font-size: 12.5px; }
+  .kb-key {
+    width: 70px; flex: none; padding: 4px 6px; font-size: 11px; text-align: center;
+    background: #0e121a; border: 1px solid var(--border-inner); border-radius: 5px;
+    color: var(--text); cursor: pointer; font-family: ui-monospace, monospace;
+  }
+  .kb-key.custom { border-color: #4d7fd6; color: #8ab4ff; }
+  .kb-key.capturing { border-color: #4d7fd6; background: #1b2740; color: #8ab4ff; }
+  .kb-key.clash { border-color: var(--bad); color: var(--bad); }
+  #keybindDetails summary {
+    cursor: pointer; font-size: 12.5px; color: var(--muted); padding: 2px 0;
+  }
+
+  /* ---------- HUD ---------- */
+  .hud {
+    position: fixed; top: 14px; right: 14px; z-index: 10;
+    font-size: 13px; text-align: right; min-width: 210px;
+  }
+  .hud .mode-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .hud .row { display: flex; justify-content: flex-end; gap: 8px; color: var(--muted); }
+  .hud .row b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .hud .load {
+    margin-top: 6px; font-size: 11px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .hud .load b { font-size: 19px; color: #8ab4ff; letter-spacing: 0; }
+  .speed-wrap { margin-top: 8px; }
+  .speed-labels {
+    display: flex; justify-content: space-between; font-size: 10px; color: var(--muted);
+    margin-bottom: 3px; font-variant-numeric: tabular-nums;
+  }
+  .progress-track {
+    height: 5px; background: rgba(255,255,255,.09);
+    border-radius: 3px; overflow: hidden;
+  }
+  .progress-fill { display: block; height: 100%; width: 0%; background: #8ab4ff; transition: width .35s; }
+  .hud .next { margin-top: 6px; font-size: 11px; color: var(--muted); max-width: 240px; }
+  .hud .next b { color: #8ab4ff; font-weight: 600; }
+
+  /* ---------- SCENE ---------- */
+  .scene {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; perspective: 1400px;
+    padding: 54px 0 62px; overflow-y: auto;
+  }
+
+  /* The stage reserves the GIZMO's footprint, not the cube's — the arms reach
+     ~0.85 × cube-size from centre, so a stage sized to the cube clips the badges. */
+  .cube-stage {
+    width: calc(var(--cube-size) * 1.7); height: calc(var(--cube-size) * 1.7);
+    display: flex; align-items: center; justify-content: center;
+    flex: none; margin-bottom: 6px;
+  }
+
+  .cube-wrapper {
+    width: var(--cube-size); height: var(--cube-size); transform-style: preserve-3d;
+    transform: rotateX(-24deg) rotateY(-28deg);
+    transform-origin: center center; pointer-events: none;
+  }
+  .cube-wrapper.spinning { animation: spin var(--spin-speed, 60s) linear infinite; }
+
+  @keyframes spin {
+    from { transform: rotateX(-30deg) rotateY(0deg); }
+    to   { transform: rotateX(330deg) rotateY(360deg); }
+  }
+
+  .grid-cube { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
+
+  .cell { position: absolute; transform-style: preserve-3d; }
+  .cell-face {
+    position: absolute; width: 100%; height: 100%;
+    background: var(--cell-fill); border: 1px solid var(--border-inner);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1px; line-height: 1; color: var(--text); user-select: none;
+  }
+  .cell-face .g { font-size: 26px; line-height: 1; }
+  .cell-face .q { font-size: 9px; letter-spacing: 1px; line-height: 1; opacity: .95; }
+  .cell.active .cell-face { background: var(--cell-active); }
+
+  /* Gate-closed (compare-only) trial. Border STYLE is the only channel no stimulus
+     dimension uses — colour, size and glyph are all taken. */
+  .cell.gate-closed .cell-face {
+    border: 2px dashed #ff922b !important;
+    box-shadow: 0 0 14px 2px rgba(255,146,43,.6) !important;
+  }
+  .gate-banner {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    z-index: 18; pointer-events: none; text-align: center;
+    font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+    color: #ff922b; opacity: 0; transition: opacity .12s;
+  }
+  .gate-banner.show { opacity: .95; }
+
+  /* Retro-cue: which pair of items to report on, revealed after the stimulus. */
+  .retro-cue {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    z-index: 19; pointer-events: none; text-align: center; display: none;
+  }
+  .retro-cue.show { display: block; }
+  .retro-cue .pair {
+    font-size: 40px; font-weight: 700; color: #8ab4ff; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 22px rgba(138,180,255,.55);
+  }
+  .retro-cue .cap {
+    font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--muted); margin-top: 6px;
+  }
+
+  /* ---------- SLOT VISIBILITY ----------
+     Inline styles from the colour stream deliberately beat these rules, so an active
+     cell shows its colour when that stream is on and the highlight fill when it isn't.
+     The glow and the text colour are class-only, so they apply either way. */
+  .vis-contrast .cell-face, .vis-guides .cell-face {
+    background: rgba(120, 140, 255, .025);
+    border-color: rgba(180, 200, 255, .085);
+  }
+  .vis-contrast .cell.active .cell-face,
+  .vis-guides   .cell.active .cell-face,
+  .vis-solo     .cell.active .cell-face {
+    background: #7ad7ff;
+    border-color: #f2fbff;
+    box-shadow: 0 0 16px 2px rgba(122, 215, 255, .85);
+    color: #06202e;
+  }
+  /* Hidden, not display:none — the cells must keep their layout boxes. */
+  .vis-solo .cell { visibility: hidden; }
+  .vis-solo .cell.active { visibility: visible; }
+
+  .cube-frame {
+    position: absolute; inset: 0; transform-style: preserve-3d;
+    pointer-events: none; display: none;
+  }
+  .vis-contrast .cube-frame, .vis-guides .cube-frame, .vis-solo .cube-frame { display: block; }
+  .frame-face {
+    position: absolute; inset: 0;
+    border: 1px solid rgba(180, 200, 255, .30);
+  }
+
+  /* Axis rails through the active slot, coloured with the same gradient as the
+     gizmo arms they point at. Two crossed planes each, so they never vanish edge-on. */
+  .guides { position: absolute; inset: 0; transform-style: preserve-3d;
+            pointer-events: none; display: none; }
+  .vis-guides .guides { display: block; }
+  /* Thicker and brighter than the 2px gizmo shafts, which share this palette —
+     otherwise the rails read as more gizmo arms rather than as slot indicators. */
+  .rail {
+    position: absolute; height: 4px; border-radius: 2px;
+    transform-origin: 50% 50%; opacity: .95;
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, .35));
+  }
+
+  /* ---------- AXIS GIZMO ---------- */
+  .gizmo {
+    position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+    transform-style: preserve-3d; pointer-events: none;
+  }
+  .gizmo.hidden { display: none; }
+  .arm { position: absolute; transform-style: preserve-3d; }
+  .shaft {
+    position: absolute; height: 2px; top: -1px; left: 0;
+    transform-origin: 0 50%; opacity: .75;
+  }
+  .head {
+    position: absolute; transform-origin: 0 50%;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+  }
+  .badge { position: absolute; transform-style: preserve-3d; }
+  .badge-face {
+    position: absolute; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; border-radius: 4px;
+    background: #0b0d10; user-select: none;
+    /* Opaque + no backfaces: otherwise the letters on the far side of the badge
+       show through mirrored, which is exactly the cue that has to stay legible. */
+    backface-visibility: hidden;
+  }
+  .arm.flash .badge-face { background: currentColor; color: #0b0d10 !important; }
+  .gizmo.letters-only .shaft, .gizmo.letters-only .head { display: none; }
+
+  /* ---------- RESPONSE DECK ---------- */
+  .deck {
+    display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+    padding: 0 16px; max-width: 980px; z-index: 20;
+  }
+  .deck-group {
+    display: flex; flex-direction: column; gap: 5px;
+    padding: 8px 10px 9px; border: 1px solid var(--border-inner);
+    border-radius: 10px; background: rgba(20, 24, 32, .55);
+  }
+  .deck-group > .title {
+    font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--muted); text-align: center;
+  }
+  .deck-group .btns { display: flex; gap: 5px; }
+
+  .rbtn {
+    position: relative; min-width: 46px; padding: 7px 9px 15px;
+    background: var(--panel); border: 1px solid var(--btn-color, var(--border-outer));
+    color: var(--text); border-radius: 8px; cursor: pointer;
+    font-size: 14px; line-height: 1.1; text-align: center;
+    transition: background .08s, transform .08s;
+  }
+  .rbtn:active { transform: translateY(1px); }
+  .rbtn .glyph { color: var(--btn-color, var(--text)); font-weight: 700; }
+  .rbtn .kbd {
+    position: absolute; left: 0; right: 0; bottom: 3px;
+    font-size: 8.5px; letter-spacing: .05em; color: var(--muted);
+  }
+  .rbtn.hit  { background: rgba(81, 207, 102, .38); }
+  .rbtn.miss { background: rgba(255, 107, 107, .38); }
+  .rbtn.reveal { box-shadow: inset 0 0 0 2px var(--btn-color, #fff); }
+
+  /* ---------- CONTROLS ---------- */
+  .controls {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; z-index: 21;
+  }
+  .controls button {
+    padding: 8px 18px; background: var(--panel); border: 1px solid var(--border-outer);
+    color: var(--text); border-radius: 8px; cursor: pointer; font-size: 13px;
+  }
+  .controls button.primary { background: #2b4a8a; border-color: #4d7fd6; }
+
+  /* ---------- MODAL ---------- */
+  .modal {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(4, 6, 10, .78); z-index: 50; padding: 20px;
+  }
+  .modal.open { display: flex; }
+  .modal-box {
+    background: var(--panel); border: 1px solid var(--border-outer);
+    border-radius: 14px; padding: 24px; max-width: 480px; width: 100%;
+    max-height: 88vh; overflow-y: auto;
+  }
+  .modal-box h2 { margin: 0 0 6px; font-size: 20px; }
+  .modal-box p { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+  .modal-box .cta {
+    width: 100%; margin-top: 16px; padding: 11px; font-size: 14px;
+    background: #2b4a8a; border: 1px solid #4d7fd6; color: var(--text);
+    border-radius: 8px; cursor: pointer;
+  }
+
+  .glyph-map { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 8px; }
+  .glyph-map .gm-cell {
+    padding: 14px 10px; border: 1px solid var(--border-inner);
+    border-radius: 10px; text-align: center; background: var(--panel-2);
+  }
+  .glyph-map .gm-cell .set { font-size: 22px; font-weight: 700; }
+  .glyph-map .gm-cell .items { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .bars { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; }
+  .bar-row { display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
+  .bar-row .nm { width: 96px; flex: none; }
+  .bar-row .track { flex: 1; height: 9px; background: rgba(255,255,255,.08); border-radius: 5px; overflow: hidden; }
+  /* display:block matters — these are spans, and width/height are ignored on
+     non-replaced inline elements, which renders every bar empty. */
+  .bar-row .fill { display: block; height: 100%; border-radius: 5px; }
+  .bar-row .val { width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+  .bar-detail { margin: -3px 0 5px 105px; font-size: 11px; color: var(--muted); }
+  .verdict { text-align: center; font-size: 15px; margin: 14px 0 2px; }
+  .verdict.up { color: var(--good); }
+  .verdict.down { color: var(--bad); }
+  .milestone-banner {
+    margin-top: 10px; padding: 12px; border-radius: 10px; text-align: center;
+    background: rgba(81, 207, 102, .12); border: 1px solid rgba(81, 207, 102, .45);
+  }
+  .milestone-banner .t { font-size: 15px; color: var(--good); font-weight: 600; }
+  .milestone-banner .s { font-size: 12.5px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+
+  .glyph-legend {
+    position: fixed; bottom: 14px; left: 14px; z-index: 15;
+    font-size: 11px; color: var(--muted); line-height: 1.6; display: none;
+  }
+  .glyph-legend.show { display: block; }
+  .glyph-legend b { color: var(--text); }
+
+  @media (max-width: 700px) {
+    :root { --cube-size: min(32vmin, 185px); }
+    .rbtn { min-width: 40px; padding: 6px 6px 14px; font-size: 13px; }
+    .hud { font-size: 12px; min-width: 165px; }
+  }
+</style>
+</head>
+<body>
+
+<button class="settings-btn" id="settingsBtn">⚙ Settings</button>
+
+<aside class="settings" id="settingsPanel">
+  <h2>Relational N-Back</h2>
+  <div class="hint"><a href="https://discord.gg/brain" style="color:#8ab4ff">Mindbuilding Discord</a></div>
+
+  <h3>Mode</h3>
+  <div class="mode-toggle">
+    <button id="modeProgression">Progression</button>
+    <button id="modeFree">Free Play</button>
+  </div>
+  <div class="hint" id="modeHint"></div>
+
+  <!-- ============ PROGRESSION ============ -->
+  <div id="progressionPane">
+    <h3>Where you are</h3>
+    <div class="ladder" id="ladderState"></div>
+    <div class="next-up" id="nextUp"></div>
+
+    <h3>Feedback</h3>
+    <div class="setting-group">
+      <select id="feedbackMode">
+        <option value="reveal">Immediate + reveal answers</option>
+        <option value="immediate">Immediate only</option>
+        <option value="off">None (test conditions)</option>
+      </select>
+    </div>
+
+    <h3>Speed ladder</h3>
+    <div class="setting-group">
+      <label>Adaptation</label>
+      <select id="adaptMode">
+        <option value="bayes">Bayesian staircase</option>
+        <option value="fixed">Fixed steps</option>
+      </select>
+      <div class="hint" id="adaptHint"></div>
+    </div>
+    <div class="setting-group pair">
+      <div>
+        <label>Start (s)</label>
+        <input type="number" id="startInterval" value="5" min="2" max="15" step="0.1" />
+      </div>
+      <div>
+        <label>Target (s)</label>
+        <input type="number" id="targetInterval" value="3" min="1" max="10" step="0.1" />
+      </div>
+    </div>
+    <div class="setting-group">
+      <label>Step per block (s)</label>
+      <input type="number" id="intervalStep" value="0.25" min="0.05" max="2" step="0.05" />
+    </div>
+    <div class="hint">Beat a block and the interval drops one step. Reach the target and
+      you clear the milestone — the interval resets and the next difficulty comes in.</div>
+
+    <h3>Rotation ladder</h3>
+    <div class="setting-group pair">
+      <div>
+        <label>Slowest (s/turn)</label>
+        <input type="number" id="spinStart" value="100" min="10" max="300" step="5" />
+      </div>
+      <div>
+        <label>Fastest (s/turn)</label>
+        <input type="number" id="spinEnd" value="20" min="5" max="200" step="5" />
+      </div>
+    </div>
+    <div class="setting-group">
+      <label>Step (s)</label>
+      <input type="number" id="spinStep" value="10" min="1" max="50" step="1" />
+    </div>
+    <div class="hint" id="spinLadderHint"></div>
+
+    <h3>N ladder</h3>
+    <div class="setting-group pair">
+      <div>
+        <label>Max N</label>
+        <input type="number" id="nMax" value="3" min="1" max="9" />
+      </div>
+      <div>
+        <label>N after new stimulus</label>
+        <input type="number" id="nAfterStimulus" value="2" min="1" max="5" />
+      </div>
+    </div>
+
+    <h3>Trials</h3>
+    <div class="setting-group">
+      <label>Trials per block</label>
+      <input type="number" id="blockLengthP" value="20" min="5" max="80" />
+    </div>
+
+    <h3>Reset</h3>
+    <div class="setting-group">
+      <button class="rbtn" id="resetProgress" style="width:100%;padding:8px">Reset all progress</button>
+    </div>
+  </div>
+
+  <!-- ============ FREE PLAY ============ -->
+  <div id="freePane" style="display:none">
+    <h3>Streams</h3>
+    <div id="streamRows"></div>
+    <div class="hint">
+      <b>Identity</b> = "same as N ago?" &nbsp;·&nbsp; <b>Relational</b> = "which way did it
+      move from N ago?"
+    </div>
+
+    <h3>Task</h3>
+    <div class="setting-group">
+      <label>N</label>
+      <input type="number" id="nValue" value="2" min="1" max="9" />
+    </div>
+    <div class="setting-group">
+      <label>Stimulus interval (ms)</label>
+      <input type="number" id="intervalMs" value="2500" min="800" max="10000" step="100" />
+    </div>
+    <div class="setting-group">
+      <label>Trials per block</label>
+      <input type="number" id="blockLengthF" value="20" min="5" max="80" />
+    </div>
+    <div class="setting-group">
+      <label>Feedback</label>
+      <select id="feedbackModeF">
+        <option value="reveal">Immediate + reveal answers</option>
+        <option value="immediate">Immediate only</option>
+        <option value="off">None (test conditions)</option>
+      </select>
+    </div>
+
+    <h3>Advanced mechanics</h3>
+    <div class="setting-group">
+      <label><input type="checkbox" id="metaOn" style="width:auto"> Meta-relations
+        (2nd order)</label>
+      <div class="hint">Report how this move relates to the move you reported N trials
+        ago — <b>same</b>, <b>opposite</b>, or a <b>different axis</b> — instead of
+        which way it went. Forces every move to be axis-aligned, otherwise
+        "same/opposite" has no answer for a diagonal. Punishing above N=2.</div>
+    </div>
+    <div class="setting-group">
+      <label>Gate closing (compare-only trials)</label>
+      <select id="gateOn">
+        <option value="0">Off</option>
+        <option value="0.2">20% of trials</option>
+        <option value="0.3">30% of trials</option>
+        <option value="0.4">40% of trials</option>
+      </select>
+      <div class="hint">Dashed orange cells must be <b>judged but not remembered</b> —
+        they never become anyone's N-back item. Trains holding the gate shut, which
+        ordinary N-back never asks for.</div>
+    </div>
+    <div class="setting-group">
+      <label>Retro-cue (output gating)</label>
+      <select id="retroOn">
+        <option value="0">Off</option>
+        <option value="2">2 lags</option>
+        <option value="3">3 lags</option>
+      </select>
+      <div class="hint">The stimulus vanishes, then a cue names <em>which</em> adjacent
+        pair to report. You must hold every recent item, not just the one N-back would
+        have picked. Overrides N, can't combine with meta-relations, and forces the
+        interval to at least 1.30s so there is time to answer after the cue.</div>
+    </div>
+    <div class="setting-group">
+      <label>Lure rate: <span id="lureVal">20</span>%</label>
+      <input type="number" id="lureRateF" value="20" min="10" max="50" step="5" />
+      <div class="hint">Share of trials that match N±1 but not N — familiarity says
+        yes, recollection says no.</div>
+    </div>
+
+    <h3>Cube</h3>
+    <div class="setting-group">
+      <label>Dimension</label>
+      <select id="cubeDimension">
+        <option value="3">3 × 3 × 3 (27)</option>
+        <option value="4">4 × 4 × 4 (64)</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label><input type="checkbox" id="rotationOn" style="width:auto"> Rotate cube</label>
+    </div>
+    <div class="setting-group">
+      <label>Rotation period (seconds)</label>
+      <input type="number" id="rotationSpeed" value="60" min="5" max="300" />
+    </div>
+    <div class="setting-group">
+      <label>Reference frame</label>
+      <select id="frameMode">
+        <option value="cube">Cube only (allocentric)</option>
+        <option value="screen">Screen only (egocentric)</option>
+        <option value="both">Both at once</option>
+      </select>
+      <div class="hint">Screen frame projects the movement through the cube's live
+        rotation — you answer in what you <em>see</em>. <b>Both</b> asks for the same
+        movement in each frame simultaneously.</div>
+    </div>
+  </div>
+
+  <h3>Display</h3>
+  <div class="setting-group">
+    <label>Slot visibility</label>
+    <select id="cellVis">
+      <option value="lattice">Lattice — every cell drawn</option>
+      <option value="contrast">Contrast — inactive cells faded</option>
+      <option value="guides">Guides — + axis rails through the slot</option>
+      <option value="solo">Solo — only the lit cell</option>
+    </select>
+    <div class="hint" id="cellVisHint"></div>
+  </div>
+  <div class="setting-group">
+    <label>Axis gizmo</label>
+    <select id="gizmoMode">
+      <option value="full">Arrows + letters</option>
+      <option value="letters">Letters only</option>
+      <option value="off">Off (hard mode)</option>
+    </select>
+  </div>
+
+  <h3>Keybinds</h3>
+  <details id="keybindDetails">
+    <summary>Show all bindings</summary>
+    <div id="keybindList"></div>
+    <button class="rbtn" id="resetKeybinds" style="width:100%;padding:8px;margin-top:12px">
+      Reset to defaults</button>
+  </details>
+  <div class="hint">Click a key to rebind, then press the new one.
+    <b>Esc</b> cancels, <b>Backspace</b> restores the default. Bindings apply in both
+    modes and are saved.</div>
+
+  <h3>Data</h3>
+  <div class="setting-group">
+    <label>Today: <span id="minutesToday">0</span> min &nbsp;·&nbsp; Best load:
+      <span id="bestLoad">0</span></label>
+  </div>
+  <div class="setting-group">
+    <label>Tester label (goes in the export)</label>
+    <input type="text" id="testerLabel" placeholder="e.g. alex" />
+  </div>
+  <div class="setting-group pair">
+    <div><button class="rbtn" id="exportJson" style="width:100%;padding:8px">Download
+      JSON</button></div>
+    <div><button class="rbtn" id="copyJson" style="width:100%;padding:8px">Copy
+      JSON</button></div>
+  </div>
+  <div class="setting-group">
+    <label>Restore from a downloaded file</label>
+    <input type="file" id="importJson" accept="application/json,.json" />
+  </div>
+  <div class="hint" id="dataStatus"></div>
+</aside>
+
+<div class="hud">
+  <div class="mode-name" id="hudMode">—</div>
+  <div class="row"><span>N</span><b id="hudN">1</b><span>·</span><span id="hudSpinLabel">still</span><span>·</span><span>trial</span><b id="hudTrial">0/20</b></div>
+  <div class="row"><span>block</span><b id="hudAcc">—</b></div>
+  <div class="load">Load <b id="hudLoad">0</b></div>
+  <div class="speed-wrap" id="speedWrap">
+    <div class="speed-labels"><span id="speedNow">5.00s</span><span id="speedGoal">→ 3.00s</span></div>
+    <div class="progress-track"><span class="progress-fill" id="hudProgress"></span></div>
+  </div>
+  <div class="next" id="hudNext"></div>
+</div>
+
+<main class="scene">
+  <div class="cube-stage">
+    <div class="cube-wrapper" id="cubeWrapper" style="--spin-speed:60s">
+      <div class="grid-cube" id="gridCube"></div>
+      <div class="gizmo" id="gizmo"></div>
+    </div>
+  </div>
+  <div class="deck" id="deck"></div>
+</main>
+
+<div class="glyph-legend" id="glyphLegend"></div>
+<div class="gate-banner" id="gateBanner">do not update</div>
+<div class="retro-cue" id="retroCue">
+  <div class="pair" id="retroPair"></div>
+  <div class="cap">report this move</div>
+</div>
+
+<div class="controls">
+  <button id="startBtn" class="primary">Start block</button>
+  <button id="stopBtn">Stop</button>
+</div>
+
+<div class="modal" id="modal"><div class="modal-box" id="modalBox"></div></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   1. CONSTANTS
+   ============================================================ */
+
+/* Six cube axes. `vec` is in CSS 3D space: +X right, +Y DOWN, +Z toward viewer. */
+const AXES = [
+  { id:'north', letter:'N', name:'North', vec:[ 0,-1, 0], color:'#4dabf7', key:'w' },
+  { id:'south', letter:'S', name:'South', vec:[ 0, 1, 0], color:'#ff6b6b', key:'s' },
+  { id:'east',  letter:'E', name:'East',  vec:[ 1, 0, 0], color:'#51cf66', key:'d' },
+  { id:'west',  letter:'W', name:'West',  vec:[-1, 0, 0], color:'#fcc419', key:'a' },
+  { id:'above', letter:'A', name:'Above', vec:[ 0, 0, 1], color:'#cc5de8', key:'e' },
+  { id:'below', letter:'B', name:'Below', vec:[ 0, 0,-1], color:'#ff922b', key:'q' },
+];
+const AXIS = Object.fromEntries(AXES.map(a => [a.id, a]));
+
+/* Transform that maps the element's local +X onto each axis direction. */
+const AXIS_ORIENT = {
+  east:  '',
+  west:  'rotateY(180deg)',
+  south: 'rotateZ(90deg)',
+  north: 'rotateZ(-90deg)',
+  above: 'rotateY(-90deg)',
+  below: 'rotateY(90deg)',
+};
+
+/* Stimulus pools. Every pool is ORDERED so a relational judgement is well defined. */
+const PITCHES = [220, 293.66, 392, 523.25];                 // A3 D4 G4 C5, low → high
+const TIMBRES = ['sine', 'triangle', 'square', 'sawtooth']; // dull → bright
+const PANS    = [-0.9, -0.3, 0.3, 0.9];                     // left → right
+const COLORS  = ['#ff4d4d','#ff9f1a','#ffe14d','#4ddb6f','#4d9fff']; // warm → cool
+const SIZES   = [15, 22, 30, 40];                           // small → large
+const COUNTS  = [1, 2, 3, 4];                               // few → many
+
+const GLYPH_SETS = {
+  '123': ['1','2','3','4','5'],
+  'ABC': ['A','B','C','D','E'],
+  'αβγ': ['α','β','γ','δ','ε'],
+  'IV' : ['I','II','III','IV','V'],
+};
+const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
+
+/* Stamped into every block and into the export. Testers who pick the file up at
+   different times will be on different snapshots, and without this you cannot tell
+   which build produced which numbers. */
+const BUILD = '2026-08-05.1';
+
+const TARGET_RATE = 0.28;  // forced identity matches
+const EPS         = 0.20;  // "no movement on this axis" threshold, unit-normalised
+const LURE_MIN = 0.10, LURE_MAX = 0.50;   // beyond ~0.5 the lure becomes the norm
+const LURE_MIN_TRIALS = 4;                // don't adapt the rate on 1–2 noisy trials
+const RETRO_MIN_RESPONSE = 700;           // ms left to answer after the cue appears
+const RETRO_MIN_INTERVAL = 1300;          // below this a retro trial can't be answered
+
+/* ---------- Stream registry ----------
+   Each stream declares its channels (= response buttons) for each mode. */
+const STREAMS = {
+  position: {
+    label: 'Position', color: '#8ab4ff',
+    identity:   [{ id:'pos', glyph:'●', label:'Same', key:' ' }],
+    relational: AXES.map(a => ({ id:a.id, glyph:a.letter, label:a.name, key:a.key, color:a.color })),
+    /* Second-order judgement: how this move relates to the PREVIOUS move, rather
+       than where it went. Three channels, not six — you only need to hold the
+       direction you derived n trials ago, so response load stays low while the
+       memory load is what actually rises. */
+    meta: [
+      { id:'meta-same', glyph:'⇉', label:'Same direction',  key:'w', color:'#51cf66' },
+      { id:'meta-opp',  glyph:'⇄', label:'Opposite',        key:'s', color:'#ff6b6b' },
+      { id:'meta-diff', glyph:'⤢', label:'Different axis',  key:'d', color:'#fcc419' },
+    ],
+    /* Screen-frame twins. Separate channels so "both frames" can ask for the same
+       movement twice, once per reference frame. */
+    relationalScreen: [
+      { id:'s-north', glyph:'↑', label:'Screen up',    key:'i', color:'#4dabf7' },
+      { id:'s-south', glyph:'↓', label:'Screen down',  key:'k', color:'#ff6b6b' },
+      { id:'s-east',  glyph:'→', label:'Screen right', key:'l', color:'#51cf66' },
+      { id:'s-west',  glyph:'←', label:'Screen left',  key:'j', color:'#fcc419' },
+      { id:'s-near',  glyph:'⊕', label:'Toward you',   key:'o', color:'#cc5de8' },
+      { id:'s-far',   glyph:'⊖', label:'Away from you',key:'u', color:'#ff922b' },
+    ],
+  },
+  pitch: {
+    label: 'Tone', color: '#7ee0d0',
+    identity:   [{ id:'pitch', glyph:'♪', label:'Same', key:'j' }],
+    relational: [{ id:'pitch-up', glyph:'♪↑', label:'Higher', key:'u' },
+                 { id:'pitch-down', glyph:'♪↓', label:'Lower', key:'j' }],
+  },
+  color: {
+    label: 'Colour', color: '#ffb74d',
+    identity:   [{ id:'color', glyph:'■', label:'Same', key:'k' }],
+    relational: [{ id:'color-warm', glyph:'■↑', label:'Warmer', key:'i' },
+                 { id:'color-cool', glyph:'■↓', label:'Cooler', key:'k' }],
+  },
+  glyph: {
+    label: 'Glyph', color: '#aed581',
+    identity:   [{ id:'glyph', glyph:'✦', label:'Same', key:'l' }],
+    relational: [{ id:'glyph-west',  glyph:'←', label:'Set left',  key:'arrowleft' },
+                 { id:'glyph-east',  glyph:'→', label:'Set right', key:'arrowright' },
+                 { id:'glyph-north', glyph:'↑', label:'Set up',    key:'arrowup' },
+                 { id:'glyph-south', glyph:'↓', label:'Set down',  key:'arrowdown' },
+                 { id:'glyph-up',    glyph:'+', label:'Rank up',   key:'o' },
+                 { id:'glyph-down',  glyph:'−', label:'Rank down', key:'p' }],
+  },
+  pan: {
+    label: 'Stereo', color: '#4dd0e1',
+    identity:   [{ id:'pan', glyph:'◉', label:'Same', key:'n' }],
+    relational: [{ id:'pan-left', glyph:'◀', label:'Left', key:'b' },
+                 { id:'pan-right', glyph:'▶', label:'Right', key:'n' }],
+  },
+  timbre: {
+    label: 'Timbre', color: '#b39ddb',
+    identity:   [{ id:'timbre', glyph:'◍', label:'Same', key:'h' }],
+    relational: [{ id:'timbre-up', glyph:'◍↑', label:'Brighter', key:'y' },
+                 { id:'timbre-down', glyph:'◍↓', label:'Duller', key:'h' }],
+  },
+  size: {
+    label: 'Size', color: '#f06292',
+    identity:   [{ id:'size', glyph:'⬍', label:'Same', key:';' }],
+    relational: [{ id:'size-up', glyph:'⬆', label:'Bigger', key:'.' },
+                 { id:'size-down', glyph:'⬇', label:'Smaller', key:',' }],
+  },
+  quantity: {
+    label: 'Quantity', color: '#ff8a65',
+    identity:   [{ id:'qty', glyph:'#', label:'Same', key:'m' }],
+    relational: [{ id:'qty-up', glyph:'#↑', label:'More', key:'m' },
+                 { id:'qty-down', glyph:'#↓', label:'Fewer', key:'v' }],
+  },
+};
+const STREAM_KEYS = Object.keys(STREAMS);
+
+/* Extra scoring buckets that aren't user-configurable streams. */
+const EXTRA_LABELS = { position2: 'Position (screen)' };
+const labelFor = k => (STREAMS[k] ? STREAMS[k].label : EXTRA_LABELS[k]) || k;
+const colorFor = k => (STREAMS[k] ? STREAMS[k].color : '#9ccc65');
+
+/* Keys are assigned dynamically from this pool when a preferred key collides —
+   enabling many streams at once (or "both frames") otherwise double-books keys. */
+const KEY_POOL = ('qwertyuiopasdfghjkl;zxcvbnm,./1234567890').split('');
+
+/* Every response channel in the app, tagged with the stream + mode slot it lives in.
+   This is the list the keybind editor walks. */
+const CHANNELS = STREAM_KEYS.flatMap(k =>
+  ['identity', 'relational', 'relationalScreen'].flatMap(mode =>
+    (STREAMS[k][mode] || []).map(c => ({ ...c, stream: k, mode }))));
+const CHANNEL_BY_ID = Object.fromEntries(CHANNELS.map(c => [c.id, c]));
+
+/* Two channels only clash if they can be on screen simultaneously. A stream is in
+   exactly one mode at a time, so `pitch` (identity) and `pitch-down` (relational)
+   sharing J is deliberate, not a conflict. The one exception is position, whose cube
+   and screen channels are both live in "both frames" mode. */
+function canCoOccur(a, b) {
+  if (!a || !b) return false;
+  if (a.stream !== b.stream) return true;
+  if (a.mode === b.mode) return true;
+  return a.stream === 'position' &&
+         [a.mode, b.mode].sort().join('|') === 'relational|relationalScreen';
+}
+
+let keyBinds = {};                                   // channelId -> key (persisted)
+const effectiveKey = id => keyBinds[id] || (CHANNEL_BY_ID[id] || {}).key;
+
+/* Rebinding swaps with whatever held the key, but only among channels that could
+   actually be active together — otherwise a harmless shared default gets clobbered. */
+function rebind(id, key) {
+  const me = CHANNEL_BY_ID[id], old = effectiveKey(id);
+  CHANNELS.forEach(c => {
+    if (c.id !== id && effectiveKey(c.id) === key && canCoOccur(me, c)) keyBinds[c.id] = old;
+  });
+  keyBinds[id] = key;
+  buildDeck(); renderKeybinds(); saveProgress();
+}
+
+function clearBind(id) {
+  delete keyBinds[id];
+  buildDeck(); renderKeybinds(); saveProgress();
+}
+
+/* ============================================================
+   2. PROGRESSION LADDER
+
+   An odometer. The interval is the fastest-rolling digit; when it reaches the
+   target it carries into the next digit up:
+
+       interval  →  rotation speed  →  N  →  number of stimuli
+
+   Order of introduction: position is relational from the very first block. Every
+   stream added after it enters as an identity judgement, except size and quantity
+   — the two magnitude dimensions — which are relational and come last.
+   ============================================================ */
+
+const PROG_STREAMS = [
+  { key:'position', mode:'relational' },
+  { key:'pitch',    mode:'identity'   },
+  { key:'color',    mode:'identity'   },
+  { key:'glyph',    mode:'identity'   },
+  { key:'pan',      mode:'identity'   },
+  { key:'timbre',   mode:'identity'   },
+  { key:'size',     mode:'relational' },
+  { key:'quantity', mode:'relational' },
+];
+
+const ADVANCE_AT = 0.85;   // block score that earns a speed-up (fixed-step mode)
+const DEMOTE_AT  = 0.70;   // block score that forces a slow-down (fixed-step mode)
+
+/* ============================================================
+   2a. BAYESIAN ADAPTIVE STAIRCASE
+
+   A QUEST/ZEST-style grid posterior over the player's speed threshold, replacing the
+   fixed ±0.25s rule. Estimating the threshold directly means the interval is placed
+   where it is most informative instead of walked there, and — the bigger win — the
+   posterior CARRIES ACROSS milestones, so clearing one no longer discards every block
+   of evidence and drops you back to 5.00s.
+
+   The grid is over T = log10(interval) at which the player scores `pTarget`. Working
+   in the threshold parameter rather than the curve's midpoint keeps every quantity
+   here directly interpretable: T is a number of milliseconds you can print.
+
+   Chance correction (§9) is what makes one model work at every milestone: because a
+   passive player scores 0 and a perfect one 1 regardless of stream count or N, the
+   guess rate drops out and there is no per-configuration constant to keep in sync.
+   ============================================================ */
+
+const STAIR = {
+  /* The grid must extend well past the prior's mass in BOTH directions: truncating a
+     tail biases the posterior mean toward the surviving side, which showed up as a
+     fresh player being placed at 3.99s when the prior said 5.00s. */
+  lo: 2.85, hi: 4.20, steps: 136,   // log10 ms: 708ms … 15.8s
+  beta: 6.0,                        // slope, log10 units
+  lapse: 0.03,                      // attention lapses; without it one bad block bites hard
+  pTarget: 0.80,                    // performance the interval is placed at
+  /* Posterior tempering. The threshold MOVES as the player learns, so an untempered
+     posterior gets steadily overconfident and lags reality. Swept empirically: 1.00
+     lags a fast learner by 40%, 0.92 by 27%, 0.85 by 13% — and past 0.85 the returns
+     collapse while estimate noise and bias keep climbing. */
+  forget: 0.85,
+  clearAt: 0.90,                    // posterior mass below target needed to clear
+  priorSigma: 0.22,                 // ±1σ ≈ 3.0s … 8.3s for a 5s prior
+  carryWiden: 1.6,                  // variance inflation when the task changes
+  carryShift: { spin: 0.04, n: 0.12, stimulus: 0.15 },   // log10 ms, harder ⇒ slower
+};
+
+const T_GRID = Array.from({ length: STAIR.steps }, (_, i) =>
+  STAIR.lo + (STAIR.hi - STAIR.lo) * i / (STAIR.steps - 1));
+const T_STEP = (STAIR.hi - STAIR.lo) / (STAIR.steps - 1);
+
+/* Offset that makes psi(T) == pTarget exactly, so the grid parameter IS the threshold. */
+const STAIR_C = Math.log(STAIR.pTarget / ((1 - STAIR.lapse) - STAIR.pTarget));
+const psi = (x, T) => (1 - STAIR.lapse) /
+                      (1 + Math.exp(-(STAIR.beta * (x - T) + STAIR_C)));
+
+let stairLog = null;      // unnormalised log posterior over T_GRID
+
+function stairInit(thresholdMs, sigma) {
+  const c = Math.log10(thresholdMs);
+  const s = sigma || STAIR.priorSigma;
+  stairLog = T_GRID.map(t => -0.5 * ((t - c) / s) ** 2);
+  stairNormalise();
+}
+
+function stairNormalise() {
+  const m = Math.max(...stairLog);
+  let sum = 0;
+  const p = stairLog.map(l => { const e = Math.exp(l - m); sum += e; return e; });
+  stairLog = p.map(v => Math.log(Math.max(v / sum, 1e-300)));
+  return p.map(v => v / sum);
+}
+
+const stairPost = () => stairNormalise();
+
+function stairMeanT() {
+  const p = stairPost();
+  return T_GRID.reduce((s, t, i) => s + t * p[i], 0);
+}
+
+const stairThresholdMs = () => Math.pow(10, stairMeanT());
+
+/* Temper the posterior: p^f, renormalised. f<1 widens. Used both for forgetting
+   (the threshold drifts as the player learns) and for carry-time uncertainty. */
+function stairTemper(f) {
+  stairNormalise();
+  stairLog = stairLog.map(l => l * f);
+  stairNormalise();
+}
+
+/* One block = one observation of k successes in n trials at intensity x. */
+function stairObserve(x, k, n) {
+  if (!stairLog) stairInit(tune.startInterval);
+  stairLog = stairLog.map((l, i) => {
+    const p = Math.min(1 - 1e-6, Math.max(1e-6, psi(x, T_GRID[i])));
+    return l + k * Math.log(p) + (n - k) * Math.log(1 - p);
+  });
+  stairTemper(STAIR.forget);
+}
+
+/* Place the next block where the fitted curve predicts pTarget — i.e. at the
+   threshold itself, which is what the grid parameter already is. */
+function stairNextInterval() {
+  const ms = Math.pow(10, stairMeanT());
+  const lo = Math.max(700, tune.targetInterval * 0.75);
+  return Math.round(Math.min(tune.maxInterval, Math.max(lo, ms)) / 10) * 10;
+}
+
+/* Milestone criterion: enough posterior mass at or below the target interval. */
+function stairMassBelow(ms) {
+  const p = stairPost(), xt = Math.log10(ms);
+  return T_GRID.reduce((s, t, i) => s + (t <= xt ? p[i] : 0), 0);
+}
+const stairCleared = ms => stairMassBelow(ms) >= STAIR.clearAt;
+
+/* Central credible interval, for the report card. */
+function stairCI(mass) {
+  const p = stairPost(), tail = (1 - (mass || 0.9)) / 2;
+  let c = 0, lo = T_GRID[0], hi = T_GRID[T_GRID.length - 1];
+  for (let i = 0; i < p.length; i++) {
+    const prev = c; c += p[i];
+    if (prev < tail && c >= tail) lo = T_GRID[i];
+    if (prev < 1 - tail && c >= 1 - tail) { hi = T_GRID[i]; break; }
+  }
+  return [Math.pow(10, lo), Math.pow(10, hi)];
+}
+
+/* Shift the whole posterior along the grid by `s` log10-units, linearly
+   interpolated. Mass pushed off the end is dropped and renormalised away. */
+function stairShift(s) {
+  const p = stairPost(), cells = s / T_STEP;
+  const out = T_GRID.map((_, i) => {
+    const src = i - cells, f = Math.floor(src), frac = src - f;
+    let v = 0;
+    if (f >= 0 && f < p.length) v += p[f] * (1 - frac);
+    if (f + 1 >= 0 && f + 1 < p.length) v += p[f + 1] * frac;
+    return v;
+  });
+  const sum = out.reduce((a, b) => a + b, 0) || 1;
+  stairLog = out.map(v => Math.log(Math.max(v / sum, 1e-300)));
+}
+
+/* Carry across a milestone: the new task is harder, so the threshold moves slower —
+   and we are less certain about it than we were a moment ago. */
+function stairCarry(kind, backwards) {
+  const s = STAIR.carryShift[kind] || 0.1;
+  stairShift(backwards ? -s : s);
+  stairTemper(1 / STAIR.carryWiden);
+}
+
+/* Which digit of the odometer is about to roll, so carry can size the shift. */
+function carryKind(p) {
+  const levels = spinLevels();
+  if (p.spinLevel === 0) return p.n < 2 ? 'n' : 'stimulus';   // rotation entering = major
+  if (p.spinLevel < levels.length - 1) return 'spin';
+  if (p.n < tune.nMax) return 'n';
+  return 'stimulus';
+}
+
+/* Pooled chance-corrected judgment rate. The displayed block score is a weakest-link
+   blend (0.6·mean + 0.4·min), which is NOT a proportion and has no business in a
+   binomial likelihood — so the staircase gets this instead. */
+function pooledRate() {
+  const ts = Object.values(state.tally).filter(t => t.total);
+  if (!ts.length) return 0;
+  const ok = ts.reduce((s, t) => s + t.ok, 0);
+  const tot = ts.reduce((s, t) => s + t.total, 0);
+  /* Weight each stream's own chance level by how many judgments it contributed. */
+  const chance = ts.reduce((s, t) => s + chanceOf(t) * t.total, 0) / tot;
+  if (chance >= 0.999) return 0;
+  return Math.max(0, (ok / tot - chance) / (1 - chance));
+}
+
+/* Rotation periods in seconds/turn, slowest → fastest. Index 0 is a still cube. */
+function spinLevels() {
+  const out = [0];
+  const { spinStart, spinEnd, spinStep } = tune;
+  for (let s = spinStart; s >= spinEnd - 1e-9; s -= spinStep) out.push(Math.round(s));
+  if (out.length === 1) out.push(spinStart);
+  return out;
+}
+
+/* The carry rules, exactly as laid out:
+     · still cube: N climbs 1 → 2
+     · then rotation is introduced and N resets to 1
+     · rotation speeds up step by step at fixed N
+     · at top rotation speed: N + 1, rotation back to slowest
+     · past max N: add a stimulus, N back to `nAfterStimulus`, rotation to slowest */
+function advanceLadder(p) {
+  const levels = spinLevels();
+  if (p.spinLevel === 0) {
+    if (p.n < 2) p.n++;
+    else { p.spinLevel = 1; p.n = 1; }
+  } else if (p.spinLevel < levels.length - 1) {
+    p.spinLevel++;
+  } else if (p.n < tune.nMax) {
+    p.n++; p.spinLevel = 1;
+  } else if (p.streamCount < PROG_STREAMS.length) {
+    p.streamCount++; p.n = Math.min(tune.nAfterStimulus, tune.nMax); p.spinLevel = 1;
+  } else {
+    return false;                     // ladder complete
+  }
+  p.interval = tune.startInterval;
+  return true;
+}
+
+function regressLadder(p) {
+  const levels = spinLevels();
+  if (p.spinLevel === 0) {
+    if (p.n > 1) p.n--; else return false;
+  } else if (p.spinLevel > 1) {
+    p.spinLevel--;
+  } else if (p.n > 1) {
+    p.n--; p.spinLevel = levels.length - 1;
+  } else if (p.streamCount > 1) {
+    p.streamCount--; p.n = tune.nMax; p.spinLevel = levels.length - 1;
+  } else {
+    p.spinLevel = 0; p.n = 2;
+  }
+  p.interval = tune.startInterval;
+  return true;
+}
+
+/* What clearing the current milestone will unlock. Drives the "next up" line, which
+   is the whole point of the ladder feeling intuitive — you always know the goal. */
+function describeNext(p) {
+  const levels = spinLevels();
+  if (p.spinLevel === 0) {
+    if (p.n < 2) return { what: `N rises to 2`, why: 'still no rotation — just a longer gap to hold' };
+    return { what: `the cube starts rotating`, why: `slowly, one turn per ${levels[1]}s — and N drops back to 1` };
+  }
+  if (p.spinLevel < levels.length - 1)
+    return { what: `rotation speeds up to ${levels[p.spinLevel + 1]}s per turn`, why: 'same N, less stable frame' };
+  if (p.n < tune.nMax)
+    return { what: `N rises to ${p.n + 1}`, why: 'rotation resets to slowest' };
+  if (p.streamCount < PROG_STREAMS.length) {
+    const nx = PROG_STREAMS[p.streamCount];
+    return { what: `${STREAMS[nx.key].label} joins (${nx.mode})`,
+             why: `N drops to ${Math.min(tune.nAfterStimulus, tune.nMax)}, rotation resets` };
+  }
+  return { what: 'the ladder is complete', why: 'switch to Free Play to keep pushing Load' };
+}
+
+/* Position on the ladder, found by replaying it from the start. Cheaper than a
+   closed-form index and impossible to get out of sync with advanceLadder. */
+function ladderPosition() {
+  const start = { streamCount:1, n:1, spinLevel:0, interval:tune.startInterval };
+  const same = (a, b) => a.streamCount === b.streamCount && a.n === b.n && a.spinLevel === b.spinLevel;
+  const p = { ...start };
+  let index = 0, total = 0, found = -1;
+  for (let i = 0; i < 5000; i++) {
+    if (same(p, prog)) found = index;
+    total = ++index;
+    if (!advanceLadder(p)) break;
+  }
+  return { index: (found < 0 ? 0 : found) + 1, total };
+}
+
+/* ============================================================
+   3. STATE
+   ============================================================ */
+
+const cfg = {
+  mode: 'progression',                 // 'progression' | 'free'
+  n: 1,
+  streams: { position: 'relational' },
+  dim: 3,
+  rotation: false,
+  spin: 60,
+  frame: 'cube',                       // 'cube' | 'screen' | 'both'
+  interval: 5000,
+  blockLength: 20,
+  gizmo: 'full',
+  cellVis: 'lattice',
+  feedback: 'reveal',
+  lureRate: 0.20,
+  meta: false,        // second-order relational judgements
+  gate: 0,            // fraction of compare-only (gate-closed) trials
+  retro: 0,           // 0 = off, else how many lags the post-cue can name
+};
+
+/* Free Play keeps its own settings so switching modes doesn't clobber either one. */
+const freeCfg = {
+  n: 2, streams: { position: 'relational' }, dim: 3, rotation: false,
+  spin: 60, frame: 'cube', interval: 2500, blockLength: 20, feedback: 'reveal',
+  lureRate: 0.20, meta: false, gate: 0, retro: 0,
+};
+
+const tune = {
+  adapt: 'bayes',                    // 'bayes' | 'fixed'
+  startInterval: 5000, targetInterval: 3000, intervalStep: 250, maxInterval: 6500,
+  spinStart: 100, spinEnd: 20, spinStep: 10,
+  nMax: 3, nAfterStimulus: 2, blockLength: 20,
+};
+
+let prog = { streamCount: 1, n: 1, spinLevel: 0, interval: 5000, lureRate: 0.20 };
+
+const state = {
+  running: false, timer: null,
+  history: [],            // every trial shown
+  chain: [],              // only trials the gate ADMITTED — this is what n-back counts
+  judgments: [], presses: new Set(),
+  trial: 0, scored: 0, tally: {},
+  lureTally: null,        // {ok,total,empty} restricted to lure trials
+  cued: true,             // false while a retro-cue trial is still hiding its cue
+  cueTimer: null,
+  stimAt: 0,              // when the response window opened, for reaction times
+  presses_log: [],        // {trial, ch, rt, ok} for every press in the block
+  glyphMap: null, cells: [],
+  sessionStart: null, keyIndex: {},
+};
+
+let progress = loadProgress();
+
+/* ============================================================
+   4. DOM
+   ============================================================ */
+
+const $ = id => document.getElementById(id);
+const gridCube = $('gridCube'), cubeWrapper = $('cubeWrapper'), gizmoEl = $('gizmo');
+const deckEl = $('deck'), modalEl = $('modal'), modalBox = $('modalBox');
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+/* ============================================================
+   5. PERSISTENCE
+   ============================================================ */
+
+const STORE_KEY = 'rnb.progress.v2';
+
+function loadProgress() {
+  const blank = { version:2, bestLoad:0, dailyMinutes:{}, blocks:[] };
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return blank;
+    const p = Object.assign(blank, JSON.parse(raw));
+    if (p.prog) Object.assign(prog, p.prog);
+    if (p.tune) Object.assign(tune, p.tune);
+    if (p.freeCfg) Object.assign(freeCfg, p.freeCfg);
+    if (p.keyBinds) keyBinds = p.keyBinds;
+    /* Only accept a posterior that matches the current grid, so changing STAIR.steps
+       can never silently reinterpret an old array against a different grid. */
+    if (Array.isArray(p.stair) && p.stair.length === STAIR.steps) stairLog = p.stair.slice();
+    if (p.display) { cfg.gizmo = p.display.gizmo || cfg.gizmo;
+                     cfg.cellVis = p.display.cellVis || cfg.cellVis; }
+    if (p.mode) cfg.mode = p.mode;
+    return p;
+  } catch (e) { return blank; }
+}
+
+function saveProgress() {
+  if (progress.blocks.length > 500) progress.blocks = progress.blocks.slice(-500);
+  progress.build = BUILD;
+  progress.prog = prog; progress.tune = tune;
+  progress.freeCfg = freeCfg; progress.mode = cfg.mode;
+  progress.keyBinds = keyBinds;
+  progress.display = { gizmo: cfg.gizmo, cellVis: cfg.cellVis };
+  progress.stair = stairLog ? stairLog.map(v => +v.toFixed(4)) : null;
+
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(progress));
+    progress.saveWarning = null;
+  } catch (e) {
+    /* Out of quota. Shed the bulkiest thing (raw per-press logs on older blocks)
+       and retry rather than silently losing every block from here on — an invisible
+       stop would quietly wipe out a whole test round. */
+    try {
+      const keep = 25;
+      progress.blocks.forEach((b, i) => {
+        if (i < progress.blocks.length - keep) delete b.presses;
+      });
+      localStorage.setItem(STORE_KEY, JSON.stringify(progress));
+      progress.saveWarning = 'storage full — dropped raw press logs from older blocks';
+    } catch (e2) {
+      try {
+        progress.blocks = progress.blocks.slice(-100);
+        localStorage.setItem(STORE_KEY, JSON.stringify(progress));
+        progress.saveWarning = 'storage full — kept only the last 100 blocks';
+      } catch (e3) {
+        progress.saveWarning = 'could not save — export your JSON before closing';
+      }
+    }
+    renderDataPanel();
+  }
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+function addMinutes(ms) {
+  const d = today();
+  progress.dailyMinutes[d] = (progress.dailyMinutes[d] || 0) + ms / 60000;
+  saveProgress();
+  renderDataPanel();
+}
+
+/* ============================================================
+   6. CUBE + GIZMO GEOMETRY
+   ============================================================ */
+
+/* Six outward-facing planes, so content is legible from any viewing angle. */
+function addFaces(parent, size, cls, html) {
+  const rot = ['rotateY(0deg)','rotateY(180deg)','rotateY(90deg)',
+               'rotateY(-90deg)','rotateX(90deg)','rotateX(-90deg)'];
+  return rot.map(r => {
+    const f = document.createElement('div');
+    f.className = cls;
+    f.style.transform = `${r} translateZ(${size / 2}px)`;
+    if (html != null) f.innerHTML = html;
+    parent.appendChild(f);
+    return f;
+  });
+}
+
+function buildCube(dim) {
+  gridCube.innerHTML = '';
+  state.cells = [];
+  const size = gridCube.clientWidth || 240;
+  const cellSize = size / dim;
+  const off = (dim - 1) / 2;
+
+  for (let x = 0; x < dim; x++)
+    for (let y = 0; y < dim; y++)
+      for (let z = 0; z < dim; z++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.style.width = cell.style.height = cellSize + 'px';
+        cell.style.left = cell.style.top = `calc(50% - ${cellSize / 2}px)`;
+        cell.style.transform =
+          `translate3d(${(x-off)*cellSize}px, ${(y-off)*cellSize}px, ${(z-off)*cellSize}px)`;
+        addFaces(cell, cellSize, 'cell-face', '');
+        gridCube.appendChild(cell);
+        state.cells.push({ el: cell, x, y, z });
+      }
+
+  buildCubeFrame(size);
+  buildGuides(size);
+  buildGizmo();
+  applyCellVis();
+}
+
+/* Outer wireframe box. Once the lattice is faded or hidden there is nothing left to
+   give the space scale, so the bounds have to be drawn explicitly. */
+function buildCubeFrame(size) {
+  const frame = document.createElement('div');
+  frame.className = 'cube-frame';
+  ['rotateY(0deg)','rotateY(180deg)','rotateY(90deg)',
+   'rotateY(-90deg)','rotateX(90deg)','rotateX(-90deg)'].forEach(r => {
+    const f = document.createElement('div');
+    f.className = 'frame-face';
+    f.style.transform = `${r} translateZ(${size / 2}px)`;
+    frame.appendChild(f);
+  });
+  gridCube.appendChild(frame);
+}
+
+/* Three rails through the active slot, one per axis, each running the full width of
+   the cube. The gradient runs between the two axis colours, so a rail reads as
+   "this slot sits here on the West→East line". */
+const RAIL_AXES = [
+  { orient: '',                 grad: ['#fcc419', '#51cf66'] },  // X: W → E
+  { orient: 'rotateZ(90deg)',   grad: ['#4dabf7', '#ff6b6b'] },  // Y: N → S
+  { orient: 'rotateY(-90deg)',  grad: ['#ff922b', '#cc5de8'] },  // Z: B → A
+];
+
+function buildGuides(size) {
+  const g = document.createElement('div');
+  g.className = 'guides';
+  state.rails = [];
+  RAIL_AXES.forEach(ax => {
+    const pair = [0, 90].map(roll => {
+      const r = document.createElement('div');
+      r.className = 'rail';
+      r.style.width = size + 'px';
+      r.style.left = `calc(50% - ${size / 2}px)`;
+      r.style.top = 'calc(50% - 2px)';
+      r.style.background = `linear-gradient(to right, ${ax.grad[0]}, ${ax.grad[1]})`;
+      g.appendChild(r);
+      return { el: r, roll, orient: ax.orient };
+    });
+    state.rails.push(pair);
+  });
+  gridCube.appendChild(g);
+}
+
+/* Slide the rails onto the lit cell. Translate first, then orient, so each rail
+   pivots about the slot centre rather than the cube centre. */
+function positionGuides(cellIdx) {
+  if (!state.rails) return;
+  const dim = cfg.dim, size = gridCube.clientWidth || 240;
+  const cs = size / dim, off = (dim - 1) / 2;
+  const c = state.cells[cellIdx];
+  const p = [(c.x - off) * cs, (c.y - off) * cs, (c.z - off) * cs];
+  /* Each rail spans its own axis, so it is only offset along the other two. */
+  const offsets = [[0, p[1], p[2]], [p[0], 0, p[2]], [p[0], p[1], 0]];
+  state.rails.forEach((pair, i) => {
+    const [tx, ty, tz] = offsets[i];
+    pair.forEach(r => {
+      r.el.style.transform =
+        `translate3d(${tx}px, ${ty}px, ${tz}px) ${r.orient} rotateX(${r.roll}deg)`;
+    });
+  });
+}
+
+const CELL_VIS_HINT = {
+  lattice:  'Every cell drawn faintly. Most spatial context, hardest to read at a glance.',
+  contrast: 'Inactive cells nearly invisible; the lit slot is opaque and glows.',
+  guides:   'Adds three coloured rails through the lit slot, one per axis — read its position straight off them.',
+  solo:     'Only the lit cell and the cube outline. Clearest, but you supply the lattice from memory.',
+};
+
+function applyCellVis() {
+  ['lattice','contrast','guides','solo'].forEach(v =>
+    gridCube.classList.toggle('vis-' + v, cfg.cellVis === v));
+  /* Sync the control here too, so cube, hint and select can never disagree. */
+  const sel = $('cellVis'), h = $('cellVisHint');
+  if (sel) sel.value = cfg.cellVis;
+  if (h) h.textContent = CELL_VIS_HINT[cfg.cellVis] || '';
+}
+
+function buildGizmo() {
+  gizmoEl.innerHTML = '';
+  const cubeSize = gridCube.clientWidth || 240;
+  const L = cubeSize * 0.62, HEAD = cubeSize * 0.10, BADGE = 26;
+
+  AXES.forEach(ax => {
+    const arm = document.createElement('div');
+    arm.className = 'arm';
+    arm.dataset.axis = ax.id;
+    arm.style.color = ax.color;
+    arm.style.transform = AXIS_ORIENT[ax.id];   // local +X now points along this axis
+
+    /* Shaft: two planes crossed at 90° about the arm, so it never vanishes edge-on. */
+    [0, 90].forEach(roll => {
+      const s = document.createElement('div');
+      s.className = 'shaft';
+      s.style.width = L + 'px';
+      s.style.background = ax.color;
+      s.style.transform = `rotateX(${roll}deg)`;
+      arm.appendChild(s);
+
+      const h = document.createElement('div');
+      h.className = 'head';
+      h.style.width = HEAD + 'px';
+      h.style.height = HEAD * 0.85 + 'px';
+      h.style.top = `${-HEAD * 0.425}px`;
+      h.style.left = L + 'px';
+      h.style.background = ax.color;
+      h.style.transform = `rotateX(${roll}deg)`;
+      arm.appendChild(h);
+    });
+
+    const badge = document.createElement('div');
+    badge.className = 'badge';
+    badge.style.width = badge.style.height = BADGE + 'px';
+    badge.style.left = `${L + HEAD}px`;
+    badge.style.top = `${-BADGE / 2}px`;
+    badge.style.transform = invertOrient(ax.id);   // keep the letter upright
+    const faces = addFaces(badge, BADGE, 'badge-face', ax.letter);
+    faces.forEach(f => { f.style.color = ax.color; f.style.border = `1px solid ${ax.color}`; });
+    arm.appendChild(badge);
+
+    gizmoEl.appendChild(arm);
+  });
+  applyGizmoMode();
+}
+
+function invertOrient(id) {
+  return ({
+    east: '', west: 'rotateY(-180deg)', south: 'rotateZ(-90deg)',
+    north: 'rotateZ(90deg)', above: 'rotateY(90deg)', below: 'rotateY(-90deg)',
+  })[id];
+}
+
+function applyGizmoMode() {
+  gizmoEl.classList.toggle('hidden', cfg.gizmo === 'off');
+  gizmoEl.classList.toggle('letters-only', cfg.gizmo === 'letters');
+}
+
+function flashArm(axisId) {
+  const arm = gizmoEl.querySelector(`.arm[data-axis="${axisId}"]`);
+  if (!arm) return;
+  arm.classList.add('flash');
+  setTimeout(() => arm.classList.remove('flash'), 200);
+}
+
+function applyRotation() {
+  cubeWrapper.classList.toggle('spinning', cfg.rotation);
+  cubeWrapper.style.setProperty('--spin-speed', cfg.spin + 's');
+}
+
+/* ============================================================
+   7. REFERENCE FRAME
+   ============================================================ */
+
+/* Live rotation matrix of the spinning wrapper. getComputedStyle returns the
+   interpolated matrix mid-animation, so this is exact rather than re-derived. */
+function currentMatrix() {
+  const t = getComputedStyle(cubeWrapper).transform;
+  if (!t || t === 'none') return null;
+  try { return new DOMMatrixReadOnly(t); } catch (e) { return null; }
+}
+
+function projectScreen(d, matrix) {
+  if (!matrix) return d;
+  const p = matrix.transformPoint({ x: d[0], y: d[1], z: d[2], w: 0 });
+  return [p.x, p.y, p.z];
+}
+
+function normalise(v) {
+  const m = Math.hypot(v[0], v[1], v[2]);
+  return m < 1e-6 ? [0, 0, 0] : [v[0]/m, v[1]/m, v[2]/m];
+}
+
+/* ============================================================
+   8. TRIAL GENERATION
+   ============================================================ */
+
+const randInt = n => Math.floor(Math.random() * n);
+const pick = a => a[randInt(a.length)];
+
+/* Lure budget for the trial being sampled. Decided ONCE per trial and assigned to a
+   single stream: letting every active stream roll independently makes the observed
+   rate compound with stream count (30% configured read as 44% with two streams), so
+   the axis would mean something different at every milestone. */
+let usedLure = false;
+let lureTarget = null;
+
+/* Index sampler with controlled target and lure rates. */
+function sampleIndex(streamKey, len, nbackIdx, lureIdxs) {
+  /* Lure is checked BEFORE the target-match roll. A lure is by definition not an
+     n-back match, so rolling for a match first would silently eat the lure on 28% of
+     the trials that were chosen to carry one. */
+  const lures = (lureIdxs || []).filter(i => i != null && i !== nbackIdx);
+  if (lures.length && lureTarget === streamKey) {
+    lureTarget = null; usedLure = true;
+    return pick(lures);
+  }
+  if (nbackIdx != null && Math.random() < TARGET_RATE) return nbackIdx;
+  let i, guard = 0;
+  do { i = randInt(len); guard++; } while (i === nbackIdx && guard < 20 && len > 1);
+  return i;
+}
+
+/* Counts back through the ADMITTED chain, not every trial shown. With gating on,
+   a compare-only trial never becomes anybody's n-back item. */
+function backAt(k) {
+  const c = state.chain;
+  return k >= 1 && c.length >= k ? c[c.length - k] : null;
+}
+
+/* Cells reachable from `from` by a single-axis move — meta-relations needs every
+   delta to be cardinal, or "same/opposite/different" has no defined answer for a
+   diagonal move and the task stops being about memory. */
+function cardinalNeighbours(fromIdx) {
+  const f = state.cells[fromIdx];
+  return state.cells.map((c, i) => ({ c, i })).filter(({ c }) => {
+    const d = [c.x - f.x, c.y - f.y, c.z - f.z];
+    const nz = d.filter(v => v !== 0).length;
+    return nz === 1;
+  }).map(({ i }) => i);
+}
+
+/* Choose the next cell by which meta-relation it should realise, uniformly over the
+   types actually reachable from here. `A` is the previous move as [axis, sign]. */
+function pickMetaTarget(fromIdx, A) {
+  const neigh = cardinalNeighbours(fromIdx);
+  if (!A || !neigh.length) return neigh.length ? pick(neigh) : randInt(state.cells.length);
+  const f = state.cells[fromIdx];
+  const byType = { same: [], opp: [], diff: [] };
+  neigh.forEach(i => {
+    const c = state.cells[i];
+    const d = [c.x - f.x, c.y - f.y, c.z - f.z];
+    const ax = d.findIndex(v => v !== 0);
+    if (ax === A[0]) (Math.sign(d[ax]) === A[1] ? byType.same : byType.opp).push(i);
+    else byType.diff.push(i);
+  });
+  /* "Same" means continuing straight, which a wall blocks about half the time, so
+     uniform-over-available leaves it at ~11%. Over-weight it when it IS reachable to
+     pull the three answers closer together. */
+  const W = { same: 3, opp: 1, diff: 1 };
+  const avail = ['same', 'opp', 'diff'].filter(k => byType[k].length);
+  let r = Math.random() * avail.reduce((s, k) => s + W[k], 0);
+  const type = avail.find(k => (r -= W[k]) < 0) || avail[avail.length - 1];
+  return pick(byType[type]);
+}
+
+function sampleTrial() {
+  const n = cfg.n;
+  const nb = backAt(n);
+  const lureA = backAt(n - 1), lureB = backAt(n + 1);
+  const rel = k => cfg.streams[k] === 'relational';
+  const on  = k => cfg.streams[k] && cfg.streams[k] !== 'off';
+  const t = {};
+  usedLure = false;
+  /* One lure per trial at most, on a randomly chosen stream that can actually carry
+     one. Relational feature streams sample freely and have no lure concept, so
+     targeting them would silently waste the trial's lure budget. */
+  const eligible = STREAM_KEYS.filter(k =>
+    on(k) && (cfg.streams[k] === 'identity' || k === 'position'));
+  lureTarget = (eligible.length && Math.random() < cfg.lureRate) ? pick(eligible) : null;
+
+  /* Identity mode needs forced matches (1/27 is far too rare otherwise);
+     relational mode is dense by construction, so sample freely. */
+  if (cfg.meta && rel('position') && nb) {
+    /* Every delta cardinal, so both first-order directions are unambiguous — and the
+       target is chosen by RELATION type, not by neighbour. Sampling neighbours
+       uniformly yields same 5% / opposite 28% / different 66%, because four of six
+       directions leave the axis and walls block continuing straight; "always answer
+       different" would then score 66%. */
+    t.cellIdx = pickMetaTarget(nb.cellIdx, nb.pair ? cardinalOf(nb.pair[0], nb.pair[1]) : null);
+  } else if (rel('position') && nb && lureTarget === 'position') {
+    /* Relational lure: make the move from the (n−1)-back item clean and cardinal,
+       so mis-counting your lag yields a confident WRONG answer rather than noise.
+       Without this the lure axis would do nothing until identity streams appear. */
+    const cand = lureA ? cardinalNeighbours(lureA.cellIdx)
+                          .filter(i => i !== nb.cellIdx) : [];
+    if (cand.length) { t.cellIdx = pick(cand); usedLure = true; lureTarget = null; }
+    else t.cellIdx = randInt(state.cells.length);
+  } else if (rel('position') || !on('position')) {
+    t.cellIdx = randInt(state.cells.length);
+  } else {
+    t.cellIdx = sampleIndex('position', state.cells.length, nb ? nb.cellIdx : null,
+                            [lureA && lureA.cellIdx, lureB && lureB.cellIdx]);
+  }
+
+  const feature = (key, pool) => {
+    if (!on(key)) return null;
+    if (rel(key)) return randInt(pool.length);
+    return sampleIndex(key, pool.length, nb ? nb[key] : null,
+                       [lureA && lureA[key], lureB && lureB[key]]);
+  };
+
+  t.pitch    = feature('pitch',    PITCHES);
+  t.timbre   = feature('timbre',   TIMBRES);
+  t.pan      = feature('pan',      PANS);
+  t.color    = feature('color',    COLORS);
+  t.size     = feature('size',     SIZES);
+  t.quantity = feature('quantity', COUNTS);
+
+  if (on('glyph')) {
+    if (rel('glyph')) {
+      t.glyphSet = randInt(GLYPH_SET_KEYS.length);
+      t.glyphIdx = randInt(5);
+    } else {
+      /* Glyph builds its value from two fields, so it can't use sampleIndex — it
+         needs its own lure branch, or targeting it silently wastes the trial's
+         lure budget. */
+      const cands = [lureA, lureB].filter(x => x && x.glyphSet != null &&
+        !(nb && x.glyphSet === nb.glyphSet && x.glyphIdx === nb.glyphIdx));
+      if (lureTarget === 'glyph' && cands.length) {
+        const L = pick(cands);
+        t.glyphSet = L.glyphSet; t.glyphIdx = L.glyphIdx;
+        lureTarget = null; usedLure = true;
+      } else {
+        const same = nb && nb.glyphSet != null && Math.random() < TARGET_RATE;
+        t.glyphSet = same ? nb.glyphSet : randInt(GLYPH_SET_KEYS.length);
+        t.glyphIdx = same ? nb.glyphIdx : randInt(5);
+      }
+    }
+  } else { t.glyphSet = null; t.glyphIdx = null; }
+
+  t.isLure = usedLure;
+  /* Gate: a compare-only trial must still be judged, but never joins the chain.
+     Never close the gate before there is a chain to protect. */
+  t.gate = (cfg.gate > 0 && state.chain.length > cfg.n && Math.random() < cfg.gate)
+    ? 'compare' : 'update';
+  return t;
+}
+
+function renderTrial(t) {
+  clearCells();
+  const cell = state.cells[t.cellIdx];
+  cell.el.classList.add('active');
+  if (t.gate === 'compare') cell.el.classList.add('gate-closed');
+  $('gateBanner').classList.toggle('show', t.gate === 'compare');
+  positionGuides(t.cellIdx);
+  const faces = cell.el.querySelectorAll('.cell-face');
+
+  const glyphChar = t.glyphSet != null ? GLYPH_SETS[GLYPH_SET_KEYS[t.glyphSet]][t.glyphIdx] : null;
+
+  /* The SIZES ladder is tuned for a roomy cell; a 4³ cube (or a small viewport) makes
+     cells small enough that the largest size plus a quantity row overflows the face.
+     Scale the whole ladder rather than clamping it — clamping would collapse adjacent
+     size levels into each other and make the size judgement unanswerable. */
+  const cellPx = (gridCube.clientWidth || 240) / cfg.dim;
+  const maxFont = (cellPx - 4) / (t.quantity != null ? 1.4 : 1.1);
+  const scale = Math.min(1, maxFont / SIZES[SIZES.length - 1]);
+  const fontSize = (t.size != null ? SIZES[t.size] : 26) * scale;
+
+  /* Quantity gets its own marker row rather than repeating the glyph — repeating a
+     multi-character glyph like "III" three times is unreadable. */
+  let html = '';
+  if (glyphChar) html += `<span class="g" style="font-size:${fontSize}px">${glyphChar}</span>`;
+  if (t.quantity != null) {
+    const dots = '●'.repeat(COUNTS[t.quantity]);
+    const qs = glyphChar ? Math.max(7, fontSize * 0.32) : Math.max(9, fontSize * 0.55);
+    html += `<span class="q" style="font-size:${qs}px">${dots}</span>`;
+  }
+  if (!glyphChar && t.quantity == null && t.size != null)
+    html = `<span class="g" style="font-size:${fontSize}px">●</span>`;
+
+  faces.forEach(f => {
+    if (t.color != null) f.style.background = COLORS[t.color];
+    f.innerHTML = html;
+  });
+
+  if (t.pitch != null || t.timbre != null || t.pan != null) playTone(t);
+  t.matrix = currentMatrix();
+}
+
+function clearCells() {
+  $('gateBanner').classList.remove('show');
+  state.cells.forEach(c => {
+    c.el.classList.remove('active', 'gate-closed');
+    c.el.querySelectorAll('.cell-face').forEach(f => {
+      f.style.background = ''; f.innerHTML = '';
+    });
+  });
+}
+
+function playTone(t) {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = t.timbre != null ? TIMBRES[t.timbre] : 'sine';
+  osc.frequency.value = t.pitch != null ? PITCHES[t.pitch] : 330;
+  gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.09, audioCtx.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.30);
+
+  let tail = gain;
+  if (t.pan != null && audioCtx.createStereoPanner) {
+    const p = audioCtx.createStereoPanner();
+    p.pan.value = PANS[t.pan];
+    gain.connect(p); tail = p;
+  }
+  osc.connect(gain); tail.connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.32);
+}
+
+/* ============================================================
+   9. JUDGMENTS
+   ============================================================ */
+
+/* Cardinal direction between two cells as [axis, sign], or null if not axis-aligned. */
+function cardinalOf(a, b) {
+  const ca = state.cells[a.cellIdx], cb = state.cells[b.cellIdx];
+  const d = [cb.x - ca.x, cb.y - ca.y, cb.z - ca.z];
+  const nz = d.map((v, i) => [v, i]).filter(([v]) => v !== 0);
+  return nz.length === 1 ? [nz[0][1], Math.sign(nz[0][0])] : null;
+}
+
+function buildJudgments(a, b, extra) {
+  const js = [];
+  const mode = k => cfg.streams[k] || 'off';
+  const push = (stream, options, correct) => js.push({ stream, options, correct });
+  const axisJ = (stream, v, ids) => {
+    push(stream, [ids[0], ids[1]], v > EPS ? [ids[0]] : v < -EPS ? [ids[1]] : []);
+  };
+
+  /* --- position --- */
+  if (cfg.meta && mode('position') === 'relational') {
+    /* Second order: how does this move relate to the previous one? Only defined
+       once there IS a previous move, so the first comparison of a block is skipped. */
+    const prev = extra && extra.metaPrev;
+    if (prev) {
+      const A = cardinalOf(prev[0], prev[1]), B = cardinalOf(a, b);
+      if (A && B) {
+        const same = A[0] === B[0] && A[1] === B[1];
+        const opp  = A[0] === B[0] && A[1] !== B[1];
+        push('position', ['meta-same', 'meta-opp', 'meta-diff'],
+             [same ? 'meta-same' : opp ? 'meta-opp' : 'meta-diff']);
+      }
+    }
+  } else if (mode('position') === 'identity') {
+    push('position', ['pos'], a.cellIdx === b.cellIdx ? ['pos'] : []);
+  } else if (mode('position') === 'relational') {
+    const ca = state.cells[a.cellIdx], cb = state.cells[b.cellIdx];
+    const raw = [cb.x - ca.x, cb.y - ca.y, cb.z - ca.z];
+
+    if (cfg.frame === 'cube' || cfg.frame === 'both') {
+      const v = normalise(raw);
+      axisJ('position', v[0], ['east', 'west']);
+      axisJ('position', v[1], ['south', 'north']);
+      axisJ('position', v[2], ['above', 'below']);
+    }
+    if (cfg.frame === 'screen' || cfg.frame === 'both') {
+      const v = normalise(projectScreen(raw, b.matrix));
+      axisJ('position2', v[0], ['s-east', 's-west']);
+      axisJ('position2', v[1], ['s-south', 's-north']);
+      axisJ('position2', v[2], ['s-near', 's-far']);
+    }
+  }
+
+  /* --- ordered scalar features --- */
+  const scalar = (key, idCommon, idUp, idDown) => {
+    const m = mode(key);
+    if (m === 'off' || a[key] == null || b[key] == null) return;
+    if (m === 'identity') push(key, [idCommon], a[key] === b[key] ? [idCommon] : []);
+    else push(key, [idUp, idDown], b[key] > a[key] ? [idUp] : b[key] < a[key] ? [idDown] : []);
+  };
+  scalar('pitch',    'pitch',  'pitch-up',   'pitch-down');
+  scalar('timbre',   'timbre', 'timbre-up',  'timbre-down');
+  scalar('pan',      'pan',    'pan-right',  'pan-left');
+  scalar('color',    'color',  'color-cool', 'color-warm');  // pool runs warm → cool
+  scalar('size',     'size',   'size-up',    'size-down');
+  scalar('quantity', 'qty',    'qty-up',     'qty-down');
+
+  /* --- glyph: identity, or movement across the 2×2 set map + rank --- */
+  const gm = mode('glyph');
+  if (gm !== 'off' && a.glyphSet != null && b.glyphSet != null) {
+    if (gm === 'identity') {
+      const same = a.glyphSet === b.glyphSet && a.glyphIdx === b.glyphIdx;
+      push('glyph', ['glyph'], same ? ['glyph'] : []);
+    } else {
+      const pa = state.glyphMap[GLYPH_SET_KEYS[a.glyphSet]];
+      const pb = state.glyphMap[GLYPH_SET_KEYS[b.glyphSet]];
+      push('glyph', ['glyph-east','glyph-west'],
+        pb.x > pa.x ? ['glyph-east'] : pb.x < pa.x ? ['glyph-west'] : []);
+      push('glyph', ['glyph-south','glyph-north'],
+        pb.y > pa.y ? ['glyph-south'] : pb.y < pa.y ? ['glyph-north'] : []);
+      push('glyph', ['glyph-up','glyph-down'],
+        b.glyphIdx > a.glyphIdx ? ['glyph-up'] : b.glyphIdx < a.glyphIdx ? ['glyph-down'] : []);
+    }
+  }
+  return js;
+}
+
+function scoreInterval() {
+  if (!state.judgments.length) return;
+  state.judgments.forEach(j => {
+    const t = state.tally[j.stream] ||
+      (state.tally[j.stream] = { ok:0, total:0, empty:0, sigs:{}, hit:0, miss:0, fa:0, cr:0 });
+    if (!j.correct.length) t.empty++;
+    /* Histogram of correct-answer patterns. Chance is the best CONSTANT strategy,
+       which is "always answer the most common thing" — that equals the never-press
+       rate only when a never-press answer exists. Meta-relations always has exactly
+       one correct answer, so its true chance is the modal answer's share (~2/3),
+       not 0. */
+    const sig = j.correct.slice().sort().join('|');
+    t.sigs[sig] = (t.sigs[sig] || 0) + 1;
+    let exact = true;
+    j.options.forEach(o => {
+      const target = j.correct.includes(o);
+      const pressed = state.presses.has(o);
+      if (target && pressed) t.hit++;
+      else if (target && !pressed) { t.miss++; exact = false; }
+      else if (!target && pressed) { t.fa++; exact = false; }
+      else t.cr++;
+    });
+    t.total++;
+    if (exact) t.ok++;
+  });
+
+  /* Lure trials get their own tally. Adapting the lure rate on OVERALL accuracy
+     would just re-measure what the interval staircase already measures, and the two
+     would fight over the same evidence; lure resistance is a separate signal. */
+  if (state.currentTrial && state.currentTrial.isLure) {
+    const lt = state.lureTally || (state.lureTally = { ok:0, total:0, empty:0, sigs:{} });
+    state.judgments.forEach(j => {
+      if (!j.correct.length) lt.empty++;
+      const sig = j.correct.slice().sort().join('|');
+      lt.sigs[sig] = (lt.sigs[sig] || 0) + 1;
+      const exact = j.options.every(o => j.correct.includes(o) === state.presses.has(o));
+      lt.total++;
+      if (exact) lt.ok++;
+    });
+  }
+  state.scored++;
+}
+
+/* Chance-corrected accuracy restricted to lure trials. */
+function lureScore() {
+  const lt = state.lureTally;
+  if (!lt || lt.total < LURE_MIN_TRIALS) return null;
+  const chance = chanceOf(lt);
+  if (chance >= 0.999) return 0;
+  return Math.max(0, (lt.ok / lt.total - chance) / (1 - chance));
+}
+
+/* Raw accuracy: the fraction of judgments answered exactly right. Intuitive, but its
+   chance level moves with the stream — pressing nothing scores ~72% on an identity
+   stream (28% target rate) and ~33% on a 3-way relational axis. */
+const rawAcc = t => t.total ? t.ok / t.total : 0;
+
+/* Chance-corrected score, on a scale where "never press" = 0 and perfect = 1.
+   `empty/total` IS the score a passive player would get, measured from the block's
+   own base rates — so one fixed threshold means the same thing at every milestone. */
+const chanceOf = t => !t.total ? 1
+  : Math.max(...Object.values(t.sigs || { '': t.empty })) / t.total;
+
+function streamScore(t) {
+  if (!t.total) return 0;
+  const chance = chanceOf(t);
+  if (chance >= 0.999) return 0;
+  return Math.max(0, (rawAcc(t) - chance) / (1 - chance));
+}
+
+/* Mostly the mean, partly the weakest stream, so you can't win by abandoning one. */
+function blockScore() {
+  const scores = Object.values(state.tally).filter(t => t.total).map(streamScore);
+  if (!scores.length) return 0;
+  const mean = scores.reduce((s, a) => s + a, 0) / scores.length;
+  return 0.6 * mean + 0.4 * Math.min(...scores);
+}
+
+/* ============================================================
+   10. RESPONSE DECK
+   ============================================================ */
+
+/* Groups shown on the deck, in order. Position splits per reference frame. */
+function deckGroups() {
+  const groups = [];
+  STREAM_KEYS.forEach(k => {
+    const m = cfg.streams[k];
+    if (m !== 'identity' && m !== 'relational') return;
+    const spec = STREAMS[k];
+
+    if (k === 'position' && m === 'relational' && cfg.meta) {
+      groups.push({ key:'position', label:'Move vs. previous move ↺',
+                    color: spec.color, channels: spec.meta });
+    } else if (k === 'position' && m === 'relational') {
+      const both = cfg.frame === 'both';
+      if (cfg.frame === 'cube' || both)
+        groups.push({ key:'position', label:'Position' + (both ? ' · cube' : ''),
+                      color: spec.color, channels: spec.relational });
+      if (cfg.frame === 'screen' || both)
+        groups.push({ key:'position2', label:'Position' + (both ? ' · screen' : ' · screen'),
+                      color:'#9ccc65', channels: spec.relationalScreen });
+    } else {
+      groups.push({ key:k, label: spec.label + (m === 'relational' ? ' ↔' : ' ='),
+                    color: spec.color, channels: spec[m] });
+    }
+  });
+  return groups;
+}
+
+/* Custom bind wins, then the built-in default, then the pool. The pool pass is the
+   runtime guarantee: whatever the user configures, no two live buttons share a key. */
+function assignKeys(groups) {
+  const used = new Set(), map = new Map();
+  const all = groups.flatMap(g => g.channels);
+  const claim = (c, k) => { if (k && !used.has(k)) { used.add(k); map.set(c.id, k); } };
+
+  all.forEach(c => claim(c, keyBinds[c.id]));
+  all.forEach(c => { if (!map.has(c.id)) claim(c, c.key); });
+  all.forEach(c => { if (!map.has(c.id)) claim(c, KEY_POOL.find(k => !used.has(k))); });
+  return map;
+}
+
+const keyLabel = k => !k ? '—' : k === ' ' ? 'Spc'
+  : k.startsWith('arrow') ? ({arrowleft:'←',arrowright:'→',arrowup:'↑',arrowdown:'↓'})[k]
+  : k.toUpperCase();
+
+function buildDeck() {
+  deckEl.innerHTML = '';
+  state.keyIndex = {};
+  const groups = deckGroups();
+  const keys = assignKeys(groups);
+
+  groups.forEach(g => {
+    const group = document.createElement('div');
+    group.className = 'deck-group';
+    group.style.borderColor = g.color + '55';
+    const title = document.createElement('div');
+    title.className = 'title';
+    title.textContent = g.label;
+    group.appendChild(title);
+
+    const btns = document.createElement('div');
+    btns.className = 'btns';
+    g.channels.forEach(c => {
+      const key = keys.get(c.id);
+      state.keyIndex[key] = c.id;
+
+      const b = document.createElement('button');
+      b.className = 'rbtn';
+      b.dataset.channel = c.id;
+      b.style.setProperty('--btn-color', c.color || g.color);
+      b.title = `${g.label}: ${c.label}`;
+      b.innerHTML = `<span class="glyph">${c.glyph}</span>` +
+                    `<span class="kbd">${keyLabel(key)}</span>`;
+      b.onclick = () => press(c.id);
+      btns.appendChild(b);
+    });
+    group.appendChild(btns);
+    deckEl.appendChild(group);
+  });
+}
+
+function press(channelId) {
+  if (!state.running || state.presses.has(channelId)) return;
+  if (!state.cued) return;        // retro-cue trial: no answering before the cue
+  state.presses.add(channelId);
+
+  const btn = deckEl.querySelector(`[data-channel="${channelId}"]`);
+  if (AXIS[channelId]) flashArm(channelId);
+
+  const j = state.judgments.find(x => x.options.includes(channelId));
+  const ok = !!(j && j.correct.includes(channelId));
+
+  /* Logged regardless of the feedback setting — RT cannot be reconstructed later. */
+  state.presses_log.push({
+    t: state.trial, ch: channelId, ok,
+    rt: state.stimAt ? Math.round(performance.now() - state.stimAt) : null,
+  });
+
+  if (cfg.feedback !== 'off' && btn) {
+    btn.classList.add(ok ? 'hit' : 'miss');
+    setTimeout(() => btn.classList.remove('hit', 'miss'), 260);
+  }
+}
+
+function revealAnswers() {
+  if (cfg.feedback !== 'reveal') return;
+  state.judgments.forEach(j => j.correct.forEach(id => {
+    const btn = deckEl.querySelector(`[data-channel="${id}"]`);
+    if (btn) { btn.classList.add('reveal'); setTimeout(() => btn.classList.remove('reveal'), 500); }
+    if (AXIS[id]) flashArm(id);
+  }));
+}
+
+/* ============================================================
+   11. BLOCK LOOP
+   ============================================================ */
+
+const RETRO_LABEL = k => k === 0 ? 'now ← 1' : `${k} ← ${k + 1}`;
+
+function showRetroCue(k) {
+  $('retroPair').textContent = RETRO_LABEL(k);
+  $('retroCue').classList.add('show');
+}
+
+function tick() {
+  clearTimeout(state.cueTimer);
+  $('retroCue').classList.remove('show');
+
+  if (state.judgments.length) { scoreInterval(); revealAnswers(); }
+  if (state.scored >= cfg.blockLength) { endBlock(); return; }
+
+  const t = sampleTrial();
+  renderTrial(t);
+  state.history.push(t);
+  state.currentTrial = t;
+  state.trial++;
+
+  const C = state.chain;
+  let pair = null;
+
+  if (cfg.retro > 0) {
+    /* Post-cue names WHICH adjacent pair to report, chosen now but revealed only
+       after the stimulus clears — so every recent item must be held, not just the
+       one the n-back rule would have picked. */
+    const S = C.concat([t]);
+    const maxK = Math.min(cfg.retro - 1, S.length - 2);
+    if (maxK >= 0) {
+      t.retroK = randInt(maxK + 1);
+      pair = [S[S.length - t.retroK - 2], S[S.length - t.retroK - 1]];
+    }
+  } else {
+    const partner = C[C.length - cfg.n];
+    if (partner) pair = [partner, t];
+  }
+
+  /* Meta compares this move against the move the PARTNER made — not the move made
+     on the previous trial. At n≥2 those differ, and using the latter would score a
+     completely different question than the one being asked. */
+  const extra = pair && cfg.meta ? { metaPrev: pair[0].pair } : null;
+  state.judgments = pair ? buildJudgments(pair[0], pair[1], extra) : [];
+  t.pair = pair;
+
+  state.presses.clear();
+
+  if (cfg.retro > 0 && pair) {
+    state.cued = false;
+    /* Show the stimulus long enough to encode, but always leave a real response
+       window after the cue — otherwise a short interval makes the trial literally
+       unanswerable, since presses are locked until the cue appears. */
+    const delay = Math.max(300, Math.min(cfg.interval * 0.45, cfg.interval - RETRO_MIN_RESPONSE));
+    state.cueTimer = setTimeout(() => {
+      clearCells();
+      showRetroCue(t.retroK);
+      state.cued = true;
+      /* RT is measured from the CUE on these trials — that is when the response
+         window actually opens, so timing from the stimulus would measure the delay. */
+      state.stimAt = performance.now();
+    }, delay);
+  } else {
+    state.cued = true;
+    state.stimAt = performance.now();
+  }
+
+  if (t.gate !== 'compare') C.push(t);
+  updateHUD();
+}
+
+function startBlock() {
+  stopBlock(true);
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  state.history = []; state.chain = []; state.judgments = []; state.presses.clear();
+  state.trial = 0; state.scored = 0; state.tally = {};
+  state.lureTally = null; state.currentTrial = null; state.cued = true;
+  state.presses_log = []; state.stimAt = 0;
+  clearTimeout(state.cueTimer);
+  $('retroCue').classList.remove('show');
+  state.sessionStart = Date.now();
+  state.running = true;
+
+  if (cfg.streams.glyph === 'relational' && !state.glyphMap) shuffleGlyphMap();
+
+  updateHUD();
+  tick();
+  state.timer = setInterval(tick, cfg.interval);
+}
+
+function stopBlock(silent) {
+  clearInterval(state.timer);
+  clearTimeout(state.cueTimer);
+  state.timer = null;
+  state.running = false;
+  state.cued = true;
+  $('retroCue').classList.remove('show');
+  clearCells();
+  if (state.sessionStart) {
+    addMinutes(Date.now() - state.sessionStart);
+    state.sessionStart = null;
+  }
+  if (!silent) { state.judgments = []; updateHUD(); }
+}
+
+function endBlock() {
+  const score = blockScore();
+  const load = computeLoad();
+  stopBlock(true);
+
+  let verdict = 'hold', headline = '', detail = '', milestone = null;
+
+  /* ---- Interference axis, adapted independently of speed ----
+     Ratchet rather than a second staircase: two staircases both targeting 80% on the
+     same block would double-count the same improvement and overshoot. Scoring this
+     on lure trials ONLY keeps the two axes reading different evidence. */
+  const ls = lureScore();
+  let lureNote = '';
+  if (cfg.mode === 'progression' && ls != null) {
+    const before = prog.lureRate;
+    if (ls >= 0.80) prog.lureRate = Math.min(LURE_MAX, prog.lureRate + 0.05);
+    else if (ls <= 0.55) prog.lureRate = Math.max(LURE_MIN, prog.lureRate - 0.05);
+    if (prog.lureRate !== before)
+      lureNote = `Lure rate ${prog.lureRate > before ? '↑' : '↓'} ` +
+                 `${Math.round(prog.lureRate * 100)}% (resisted ${Math.round(ls * 100)}%)`;
+  }
+
+  if (cfg.mode === 'progression' && tune.adapt === 'bayes') {
+    /* ---- Bayesian staircase ---- */
+    const n = state.scored, k = Math.round(pooledRate() * n);
+    stairObserve(Math.log10(cfg.interval), k, n);
+
+    const conf = stairMassBelow(tune.targetInterval);
+    const est = stairThresholdMs(), ci = stairCI(0.9);
+    const fmt = ms => (ms / 1000).toFixed(2) + 's';
+
+    if (stairCleared(tune.targetInterval)) {
+      verdict = 'up';
+      const kind = carryKind(prog);
+      milestone = describeNext(prog);
+      if (!advanceLadder(prog)) {
+        milestone = null; headline = 'Ladder complete';
+        detail = 'Switch to Free Play to keep pushing.';
+      } else {
+        stairCarry(kind);
+        prog.interval = stairNextInterval();
+      }
+    } else if (est > tune.maxInterval) {
+      /* Estimated threshold has fallen off the slow end — step back a milestone. */
+      verdict = 'down';
+      regressLadder(prog);
+      stairCarry(carryKind(prog), true);
+      prog.interval = stairNextInterval();
+      headline = 'Stepped back a milestone';
+      detail = `Your threshold is estimated at ${fmt(est)}, past the slowest interval.`;
+    } else {
+      prog.interval = stairNextInterval();
+      verdict = score >= ADVANCE_AT ? 'up' : score <= DEMOTE_AT ? 'down' : 'hold';
+      headline = `Next block at ${fmt(prog.interval)}`;
+      detail = `Threshold estimate <b>${fmt(est)}</b> ` +
+               `<span style="opacity:.6">(90% CI ${fmt(ci[0])}–${fmt(ci[1])})</span> · ` +
+               `<b>${Math.round(conf * 100)}%</b> confident it's under ` +
+               `${fmt(tune.targetInterval)} — need ${Math.round(STAIR.clearAt * 100)}%.`;
+    }
+    applyProgression();
+  } else if (cfg.mode === 'progression') {
+    if (score >= ADVANCE_AT) {
+      verdict = 'up';
+      if (prog.interval <= tune.targetInterval + 1e-6) {
+        /* Already at target speed and just held it — the milestone is proven, so
+           carry into the next digit. (Carrying on the step that merely *reaches*
+           the target would mean never actually playing a block at it.) */
+        const nx = describeNext(prog);
+        milestone = nx;
+        if (!advanceLadder(prog)) { prog.interval = tune.targetInterval; milestone = null;
+          headline = 'Ladder complete'; detail = 'Switch to Free Play to keep pushing.'; }
+      } else {
+        prog.interval = Math.max(tune.targetInterval, prog.interval - tune.intervalStep);
+        headline = `Faster — ${(prog.interval / 1000).toFixed(2)}s per stimulus`;
+        const left = Math.ceil((prog.interval - tune.targetInterval) / tune.intervalStep);
+        detail = left > 0
+          ? `${left} more step${left > 1 ? 's' : ''}, then hold ${(tune.targetInterval / 1000).toFixed(2)}s to clear this milestone.`
+          : `Hold ${(tune.targetInterval / 1000).toFixed(2)}s for one block to clear this milestone.`;
+      }
+    } else if (score <= DEMOTE_AT) {
+      verdict = 'down';
+      prog.interval += tune.intervalStep;
+      if (prog.interval > tune.maxInterval) {
+        regressLadder(prog);
+        headline = 'Stepped back a milestone';
+        detail = 'You were at the slowest interval and still under 70%.';
+      } else {
+        headline = `Slower — ${(prog.interval / 1000).toFixed(2)}s per stimulus`;
+        detail = 'Interval eased off. Same milestone.';
+      }
+    } else {
+      headline = `Holding at ${(prog.interval / 1000).toFixed(2)}s`;
+      detail = `Score ${Math.round(ADVANCE_AT * 100)}% or better speeds you up.`;
+    }
+    applyProgression();
+  } else {
+    /* Free Play adapts N the classic way and leaves everything else alone. */
+    if (score >= ADVANCE_AT) { freeCfg.n = Math.min(9, freeCfg.n + 1); verdict = 'up';
+      headline = `N rises to ${freeCfg.n}`; }
+    else if (score <= DEMOTE_AT) { freeCfg.n = Math.max(1, freeCfg.n - 1); verdict = 'down';
+      headline = `N falls to ${freeCfg.n}`; }
+    else headline = `N holds at ${freeCfg.n}`;
+    cfg.n = freeCfg.n;
+    $('nValue').value = freeCfg.n;
+  }
+
+  if (score >= ADVANCE_AT) progress.bestLoad = Math.max(progress.bestLoad || 0, load);
+  const rts = state.presses_log.map(p => p.rt).filter(r => r != null).sort((a, b) => a - b);
+  const median = rts.length ? rts[rts.length >> 1] : null;
+
+  progress.blocks.push({
+    ts: Date.now(), build: BUILD, mode: cfg.mode, n: cfg.n, load, score,
+    lureScore: ls, lureTrials: state.lureTally ? state.lureTally.total : 0,
+    ladder: cfg.mode === 'progression' ? { ...prog } : null,
+    /* Full config snapshot: a score is meaningless without knowing what produced it,
+       and settings drift between blocks. */
+    cfg: {
+      streams: { ...cfg.streams }, dim: cfg.dim, frame: cfg.frame,
+      interval: cfg.interval, blockLength: cfg.blockLength, rotation: cfg.rotation,
+      spin: cfg.spin, feedback: cfg.feedback, lureRate: cfg.lureRate,
+      meta: cfg.meta, gate: cfg.gate, retro: cfg.retro, cellVis: cfg.cellVis,
+      gizmo: cfg.gizmo,
+    },
+    streams: Object.fromEntries(Object.entries(state.tally)
+      .map(([k, t]) => [k, { score: streamScore(t), raw: rawAcc(t), chance: chanceOf(t),
+                             hit:t.hit, miss:t.miss, fa:t.fa, cr:t.cr }])),
+    rt: { n: rts.length, median, mean: rts.length
+            ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length) : null },
+    presses: state.presses_log,
+  });
+  saveProgress();
+
+  if (lureNote) detail += (detail ? '<br>' : '') +
+    `<span style="color:#ff922b">${lureNote}</span>`;
+  showReport(score, verdict, headline, detail, milestone, load);
+  syncSettingsUI();
+  updateHUD();
+}
+
+/* ============================================================
+   12. LOAD SCORE
+   ============================================================ */
+
+function computeLoad() {
+  let load = 10 * cfg.n;
+  STREAM_KEYS.forEach(k => {
+    if (cfg.streams[k] === 'identity') load += 4;
+    else if (cfg.streams[k] === 'relational') load += 9;
+  });
+  if (cfg.dim === 4) load += 12;
+  /* Capped: unbounded, this term dwarfs every other axis and lets Free Play inflate
+     Load with a silly interval instead of actual difficulty. */
+  load += Math.min(30, Math.max(0, 12 * (2500 / cfg.interval - 1)));
+  if (cfg.rotation) load += 6 + 600 / cfg.spin;
+  if (cfg.frame === 'screen') load += 20;
+  if (cfg.frame === 'both') load += 34;
+  return Math.round(load);
+}
+
+/* ============================================================
+   13. APPLYING THE LADDER
+   ============================================================ */
+
+function applyProgression() {
+  const levels = spinLevels();
+  prog.spinLevel = Math.min(prog.spinLevel, levels.length - 1);
+  prog.streamCount = Math.min(prog.streamCount, PROG_STREAMS.length);
+  prog.n = Math.max(1, prog.n);
+  prog.lureRate = Math.min(LURE_MAX, Math.max(LURE_MIN, prog.lureRate ?? 0.20));
+  /* The staircase is allowed to place below the target — a player who is already
+     past it should not be held back while the posterior catches up. */
+  const floor = tune.adapt === 'bayes'
+    ? Math.max(600, tune.targetInterval * 0.75) : tune.targetInterval;
+  prog.interval = Math.min(Math.max(prog.interval, floor), tune.maxInterval);
+
+  cfg.streams = {};
+  STREAM_KEYS.forEach(k => cfg.streams[k] = 'off');
+  PROG_STREAMS.slice(0, prog.streamCount).forEach(s => cfg.streams[s.key] = s.mode);
+
+  cfg.n = prog.n;
+  cfg.interval = prog.interval;
+  cfg.lureRate = prog.lureRate;
+  cfg.meta = false; cfg.gate = 0; cfg.retro = 0;   // Free Play only, for now
+  cfg.dim = 3;
+  cfg.frame = 'cube';
+  cfg.rotation = prog.spinLevel > 0;
+  cfg.spin = prog.spinLevel > 0 ? levels[prog.spinLevel] : 60;
+  cfg.blockLength = tune.blockLength;
+
+  if (cfg.streams.glyph === 'relational' && !state.glyphMap) shuffleGlyphMap();
+  onConfigChanged();
+}
+
+function applyFree() {
+  cfg.streams = { ...freeCfg.streams };
+  cfg.n = freeCfg.n;
+  cfg.interval = freeCfg.interval;
+  cfg.dim = freeCfg.dim;
+  cfg.frame = freeCfg.frame;
+  cfg.rotation = freeCfg.rotation;
+  cfg.spin = freeCfg.spin;
+  cfg.blockLength = freeCfg.blockLength;
+  cfg.feedback = freeCfg.feedback;
+  cfg.lureRate = freeCfg.lureRate;
+  cfg.meta = !!freeCfg.meta;
+  cfg.gate = freeCfg.gate;
+  /* Meta and retro-cue ask incompatible questions of the same trial — meta needs a
+     fixed n-back pairing to have a "previous move" at all. */
+  cfg.retro = cfg.meta ? 0 : freeCfg.retro;
+  /* A retro trial spends its first stretch showing the stimulus and locks responses
+     until the cue, so it needs a floor the plain task doesn't. */
+  if (cfg.retro > 0) cfg.interval = Math.max(RETRO_MIN_INTERVAL, cfg.interval);
+  onConfigChanged(true);
+}
+
+function setMode(mode) {
+  if (state.running) stopBlock(true);
+  cfg.mode = mode;
+  $('modeProgression').classList.toggle('on', mode === 'progression');
+  $('modeFree').classList.toggle('on', mode === 'free');
+  $('progressionPane').style.display = mode === 'progression' ? '' : 'none';
+  $('freePane').style.display = mode === 'free' ? '' : 'none';
+  $('modeHint').textContent = mode === 'progression'
+    ? 'One ladder, driven by your accuracy. Speed adapts every block; clearing the target speed unlocks the next difficulty.'
+    : 'Everything unlocked and manual. N still adapts each block; Load scores the setup.';
+  if (mode === 'progression') applyProgression(); else applyFree();
+  buildCube(cfg.dim);
+  syncSettingsUI();
+  updateHUD();
+  saveProgress();
+}
+
+/* ============================================================
+   14. HUD + REPORT
+   ============================================================ */
+
+function spinLabel() {
+  if (!cfg.rotation) return 'still';
+  return `${cfg.spin}s/turn`;
+}
+
+function updateHUD() {
+  const isProg = cfg.mode === 'progression';
+  const pos = isProg ? ladderPosition() : null;
+
+  $('hudMode').textContent = isProg
+    ? `Milestone ${pos.index} / ${pos.total}`
+    : 'Free Play';
+  $('hudN').textContent = cfg.n;
+  $('hudSpinLabel').textContent = spinLabel();
+  $('hudTrial').textContent = `${state.scored}/${cfg.blockLength}`;
+  $('hudLoad').textContent = computeLoad();
+  $('hudAcc').textContent = Object.keys(state.tally).length
+    ? Math.round(blockScore() * 100) + '%' : '—';
+
+  if (isProg) {
+    $('speedWrap').style.display = '';
+    $('speedNow').textContent = (prog.interval / 1000).toFixed(2) + 's';
+    let done;
+    if (tune.adapt === 'bayes' && stairLog) {
+      /* Progress is posterior confidence, not distance along a track — with a
+         staircase the interval can move either way and still be progress. */
+      const conf = stairMassBelow(tune.targetInterval);
+      done = conf / STAIR.clearAt;
+      $('speedGoal').textContent =
+        `≈${(stairThresholdMs() / 1000).toFixed(2)}s · ${Math.round(conf * 100)}%`;
+    } else {
+      $('speedGoal').textContent = '→ ' + (tune.targetInterval / 1000).toFixed(2) + 's';
+      const span = Math.max(1, tune.startInterval - tune.targetInterval);
+      done = (tune.startInterval - prog.interval) / span;
+    }
+    $('hudProgress').style.width = Math.max(0, Math.min(1, done)) * 100 + '%';
+    const nx = describeNext(prog);
+    $('hudNext').innerHTML = `next: <b>${nx.what}</b>`;
+  } else {
+    $('speedWrap').style.display = 'none';
+    $('hudNext').textContent = '';
+  }
+}
+
+const barColor = a => a >= 0.85 ? '#51cf66' : a >= 0.7 ? '#fcc419' : '#ff6b6b';
+
+function showReport(score, verdict, headline, detail, milestone, load) {
+  const rows = Object.entries(state.tally).map(([k, t]) => {
+    const s = streamScore(t);
+    return `<div class="bar-row">
+      <span class="nm">${labelFor(k)}</span>
+      <span class="track"><span class="fill" style="width:${(s*100).toFixed(0)}%;background:${barColor(s)}"></span></span>
+      <span class="val">${Math.round(s*100)}%</span>
+    </div>
+    <div class="bar-detail">${t.hit} hit · ${t.miss} miss · ${t.fa} false alarm ·
+      ${Math.round(rawAcc(t)*100)}% raw</div>`;
+  }).join('');
+
+  const mBanner = milestone ? `
+    <div class="milestone-banner">
+      <div class="t">★ Milestone cleared</div>
+      <div class="s">Now: <b style="color:#e6ebff">${milestone.what}</b><br>${milestone.why}</div>
+    </div>` : '';
+
+  modalBox.innerHTML = `
+    <h2>Block complete</h2>
+    <p>Score <b style="color:${barColor(score)}">${Math.round(score*100)}%</b> ·
+       Load <b>${load}</b> · N ${cfg.n} · ${spinLabel()}</p>
+    <div class="bars">${rows || '<p>No scored judgments.</p>'}</div>
+    ${headline ? `<div class="verdict ${verdict}">${headline}</div>` : ''}
+    ${detail ? `<p style="text-align:center;margin:6px 0 0;font-size:12px">${detail}</p>` : ''}
+    ${mBanner}
+    <p style="margin-top:14px;font-size:12px">
+      Bars are chance-corrected: 0% is what you'd score by never pressing, 100% is
+      flawless. The block score blends the average across streams with your weakest
+      stream, so an abandoned stream costs you either way.</p>
+    <button class="cta" id="modalClose">Continue</button>`;
+  modalEl.classList.add('open');
+  $('modalClose').onclick = () => modalEl.classList.remove('open');
+}
+
+/* ============================================================
+   15. GLYPH MAP
+   ============================================================ */
+
+/* ONE layout, generated once per session and used by both the intro and the scorer. */
+function shuffleGlyphMap() {
+  const pos = [{x:0,y:0},{x:1,y:0},{x:0,y:1},{x:1,y:1}];
+  const keys = [...GLYPH_SET_KEYS].sort(() => Math.random() - 0.5);
+  state.glyphMap = {};
+  keys.forEach((k, i) => { state.glyphMap[k] = pos[i]; });
+  renderGlyphLegend();
+}
+
+function glyphMapHTML() {
+  const grid = [null, null, null, null];
+  Object.entries(state.glyphMap).forEach(([k, p]) => { grid[p.y * 2 + p.x] = k; });
+  return `<div class="glyph-map">` + grid.map(k =>
+    `<div class="gm-cell"><div class="set">${k}</div>
+     <div class="items">${GLYPH_SETS[k].join(' ')}</div></div>`).join('') + `</div>`;
+}
+
+function renderGlyphLegend() {
+  const el = $('glyphLegend');
+  const show = state.glyphMap && cfg.streams.glyph === 'relational' && cfg.feedback === 'reveal';
+  el.classList.toggle('show', !!show);
+  if (!show) return;
+  const grid = [null, null, null, null];
+  Object.entries(state.glyphMap).forEach(([k, p]) => { grid[p.y * 2 + p.x] = k; });
+  el.innerHTML = `set map<br><b>${grid[0]}</b> &nbsp;<b>${grid[1]}</b><br><b>${grid[2]}</b> &nbsp;<b>${grid[3]}</b>`;
+}
+
+/* Blocking intro — the map must be memorised before trials begin. */
+function showGlyphIntro(then) {
+  shuffleGlyphMap();
+  modalBox.innerHTML = `
+    <h2>Symbol map</h2>
+    <p>These four sets sit on a 2×2 map, reshuffled every session. You will report
+       movement <em>across this map</em> — not which set it was.</p>
+    ${glyphMapHTML()}
+    <p>Within a set, <b>+</b> / <b>−</b> report rank movement (1→5, A→E, …).</p>
+    <button class="cta" id="modalClose">I have it — begin</button>`;
+  modalEl.classList.add('open');
+  $('modalClose').onclick = () => { modalEl.classList.remove('open'); then(); };
+}
+
+/* ============================================================
+   16. SETTINGS UI
+   ============================================================ */
+
+function renderStreamRows() {
+  const wrap = $('streamRows');
+  wrap.innerHTML = '';
+  STREAM_KEYS.forEach(k => {
+    const spec = STREAMS[k];
+    const row = document.createElement('div');
+    row.className = 'stream-row';
+    row.innerHTML = `<span class="swatch" style="background:${spec.color}"></span>
+      <span class="nm">${spec.label}</span>
+      <select data-stream="${k}">
+        <option value="off">Off</option>
+        <option value="identity">Identity</option>
+        <option value="relational">Relational</option>
+      </select>`;
+    const sel = row.querySelector('select');
+    sel.value = freeCfg.streams[k] || 'off';
+    sel.onchange = () => { freeCfg.streams[k] = sel.value; applyFree(); updateHUD(); saveProgress(); };
+    wrap.appendChild(row);
+  });
+}
+
+let capturingId = null;
+
+function renderKeybinds() {
+  capturingId = null;
+  const wrap = $('keybindList');
+  wrap.innerHTML = '';
+
+  STREAM_KEYS.forEach(k => {
+    const spec = STREAMS[k];
+    const head = document.createElement('div');
+    head.className = 'kb-stream';
+    head.innerHTML = `<span style="color:${spec.color}">■</span> ${spec.label}`;
+    wrap.appendChild(head);
+
+    ['identity', 'relational', 'relationalScreen'].forEach(mode => {
+      (spec[mode] || []).forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'kb-row';
+        row.innerHTML =
+          `<span class="kb-glyph" style="color:${c.color || spec.color}">${c.glyph}</span>
+           <span class="kb-label">${c.label}${
+             mode === 'relationalScreen' ? ' <span style="opacity:.45">screen</span>' :
+             mode === 'identity' ? ' <span style="opacity:.45">id</span>' : ''}</span>`;
+
+        /* For a channel that's live right now, show the key that ACTUALLY works —
+           assignKeys may have bumped it off its preferred key to keep the live deck
+           unambiguous. Dormant channels show their configured key instead. */
+        const live = runtimeKey(c.id);
+        const bumped = live && live !== effectiveKey(c.id);
+        if (!live) row.style.opacity = '.5';
+
+        const btn = document.createElement('button');
+        btn.className = 'kb-key' + (keyBinds[c.id] ? ' custom' : '') + (bumped ? ' clash' : '');
+        btn.dataset.id = c.id;
+        btn.textContent = keyLabel(live || effectiveKey(c.id));
+        if (bumped) btn.title = `Wanted ${keyLabel(effectiveKey(c.id))}, but another ` +
+          `active button already has it — using ${keyLabel(live)} instead.`;
+        else if (!live) btn.title = 'This stream is not active right now.';
+        btn.onclick = () => {
+          wrap.querySelectorAll('.kb-key.capturing').forEach(b => {
+            b.classList.remove('capturing');
+            b.textContent = keyLabel(effectiveKey(b.dataset.id));
+          });
+          capturingId = c.id;
+          btn.classList.add('capturing');
+          btn.textContent = 'press…';
+        };
+        row.appendChild(btn);
+        wrap.appendChild(row);
+      });
+    });
+  });
+}
+
+/* The key a channel responds to right now, or undefined if its stream is dormant. */
+function runtimeKey(id) {
+  for (const k in state.keyIndex) if (state.keyIndex[k] === id) return k;
+  return undefined;
+}
+
+function renderLadderState() {
+  const levels = spinLevels();
+  const active = PROG_STREAMS.slice(0, prog.streamCount);
+  const pos = ladderPosition();
+  $('ladderState').innerHTML = `
+    <div><span class="k">Milestone</span><b>${pos.index}</b> of ${pos.total}</div>
+    <div><span class="k">Stimuli</span><b>${active.length}</b> — ${
+      active.map(s => `${STREAMS[s.key].label}<span style="opacity:.5">·${s.mode === 'relational' ? 'rel' : 'id'}</span>`).join(', ')}</div>
+    <div><span class="k">N</span><b>${prog.n}</b></div>
+    <div><span class="k">Rotation</span><b>${prog.spinLevel === 0 ? 'still' : levels[prog.spinLevel] + 's/turn'}</b>${
+      prog.spinLevel > 0 ? ` <span style="opacity:.5">(step ${prog.spinLevel}/${levels.length - 1})</span>` : ''}</div>
+    <div><span class="k">Interval</span><b>${(prog.interval / 1000).toFixed(2)}s</b>
+      <span style="opacity:.5">→ ${(tune.targetInterval / 1000).toFixed(2)}s</span></div>
+    <div><span class="k">Lure rate</span><b>${Math.round((prog.lureRate ?? 0.2) * 100)}%</b>
+      <span style="opacity:.5">adapts on lure trials only</span></div>` +
+    (tune.adapt === 'bayes' && stairLog ? `
+    <div><span class="k">Threshold</span><b>${(stairThresholdMs() / 1000).toFixed(2)}s</b>
+      <span style="opacity:.5">90% CI ${stairCI(0.9).map(v => (v / 1000).toFixed(2)).join('–')}s</span></div>
+    <div><span class="k">Confidence</span><b>${Math.round(stairMassBelow(tune.targetInterval) * 100)}%</b>
+      <span style="opacity:.5">below target · need ${Math.round(STAIR.clearAt * 100)}%</span></div>` : '');
+
+  $('adaptHint').textContent = tune.adapt === 'bayes'
+    ? 'Estimates your speed threshold and places each block where it learns most. Carries what it knows across milestones instead of restarting at the top.'
+    : 'Walks the interval down one fixed step per good block, resetting to the start at every milestone.';
+
+  const nx = describeNext(prog);
+  $('nextUp').innerHTML = `Clear this milestone and <b>${nx.what}</b>.<br>
+    <span style="opacity:.75">${nx.why}</span>`;
+
+  $('spinLadderHint').textContent =
+    `${levels.length - 1} rotation steps: ${levels.slice(1).join('s, ')}s per turn.`;
+}
+
+function syncSettingsUI() {
+  $('feedbackMode').value = cfg.feedback;
+  $('feedbackModeF').value = freeCfg.feedback;
+  $('adaptMode').value = tune.adapt;
+  $('startInterval').value = tune.startInterval / 1000;
+  $('targetInterval').value = tune.targetInterval / 1000;
+  $('intervalStep').value = tune.intervalStep / 1000;
+  $('spinStart').value = tune.spinStart;
+  $('spinEnd').value = tune.spinEnd;
+  $('spinStep').value = tune.spinStep;
+  $('nMax').value = tune.nMax;
+  $('nAfterStimulus').value = tune.nAfterStimulus;
+  $('blockLengthP').value = tune.blockLength;
+
+  $('nValue').value = freeCfg.n;
+  $('intervalMs').value = freeCfg.interval;
+  $('blockLengthF').value = freeCfg.blockLength;
+  $('cubeDimension').value = freeCfg.dim;
+  $('rotationOn').checked = freeCfg.rotation;
+  $('rotationSpeed').value = freeCfg.spin;
+  $('frameMode').value = freeCfg.frame;
+  $('metaOn').checked = !!freeCfg.meta;
+  $('gateOn').value = String(freeCfg.gate || 0);
+  $('retroOn').value = String(freeCfg.retro || 0);
+  $('retroOn').disabled = !!freeCfg.meta;
+  $('testerLabel').value = progress.tester || '';
+  $('lureRateF').value = Math.round(freeCfg.lureRate * 100);
+  $('lureVal').textContent = Math.round(freeCfg.lureRate * 100);
+  $('gizmoMode').value = cfg.gizmo;
+  $('cellVis').value = cfg.cellVis;
+  applyCellVis();
+
+  renderStreamRows();
+  renderLadderState();
+  renderKeybinds();
+}
+
+function onConfigChanged(rebuildCube) {
+  if (rebuildCube) buildCube(cfg.dim);
+  applyRotation();
+  applyGizmoMode();
+  buildDeck();
+  renderGlyphLegend();
+  renderKeybinds();   // live/dormant state changes with the active streams
+  updateHUD();        // single place, so the readout can never drift from cfg
+}
+
+function renderDataPanel() {
+  $('minutesToday').textContent = Math.floor(progress.dailyMinutes[today()] || 0);
+  $('bestLoad').textContent = progress.bestLoad || 0;
+  const st = $('dataStatus');
+  if (!st) return;
+  const n = progress.blocks.length;
+  const days = Object.keys(progress.dailyMinutes || {}).length;
+  st.innerHTML = `Build <b>${BUILD}</b> · ${n} block${n === 1 ? '' : 's'} recorded` +
+    ` over ${days} day${days === 1 ? '' : 's'}` +
+    (progress.saveWarning ? `<br><span style="color:#ff6b6b">${progress.saveWarning}</span>` : '');
+}
+
+/* ---- export / import ---- */
+
+function exportPayload() {
+  return JSON.stringify({
+    build: BUILD,
+    tester: progress.tester || '',
+    exportedAt: new Date().toISOString(),
+    timezoneOffsetMin: new Date().getTimezoneOffset(),
+    data: progress,
+  }, null, 1);
+}
+
+function downloadJSON() {
+  const label = (progress.tester || 'tester').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase();
+  const name = `rnb-${label}-${today()}.json`;
+  const blob = new Blob([exportPayload()], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return name;
+}
+
+function importJSON(text) {
+  const parsed = JSON.parse(text);
+  const data = parsed && parsed.data ? parsed.data : parsed;
+  if (!data || !Array.isArray(data.blocks)) throw new Error('not a Relational N-Back export');
+  progress = data;
+  if (progress.prog) Object.assign(prog, progress.prog);
+  if (progress.tune) Object.assign(tune, progress.tune);
+  if (progress.freeCfg) Object.assign(freeCfg, progress.freeCfg);
+  if (progress.keyBinds) keyBinds = progress.keyBinds;
+  if (Array.isArray(progress.stair) && progress.stair.length === STAIR.steps)
+    stairLog = progress.stair.slice();
+  if (progress.display) {
+    cfg.gizmo = progress.display.gizmo || cfg.gizmo;
+    cfg.cellVis = progress.display.cellVis || cfg.cellVis;
+  }
+  setMode(progress.mode || 'progression');
+  renderDataPanel();
+  return progress.blocks.length;
+}
+
+/* ============================================================
+   17. WIRING
+   ============================================================ */
+
+$('settingsBtn').onclick = () => $('settingsPanel').classList.toggle('open');
+$('modeProgression').onclick = () => setMode('progression');
+$('modeFree').onclick = () => setMode('free');
+
+/* --- progression tunables --- */
+const numIn = (id, apply) => $(id).oninput = e => {
+  const v = parseFloat(e.target.value);
+  if (!isFinite(v)) return;
+  apply(v);
+  if (cfg.mode === 'progression') applyProgression();
+  renderLadderState(); updateHUD(); saveProgress();
+};
+numIn('startInterval',  v => { tune.startInterval = Math.max(1000, v * 1000);
+                               tune.maxInterval = tune.startInterval + 1500; });
+numIn('targetInterval', v => tune.targetInterval = Math.max(500, v * 1000));
+numIn('intervalStep',   v => tune.intervalStep = Math.max(50, v * 1000));
+numIn('spinStart',      v => tune.spinStart = Math.max(5, v));
+numIn('spinEnd',        v => tune.spinEnd = Math.max(3, v));
+numIn('spinStep',       v => tune.spinStep = Math.max(1, v));
+numIn('nMax',           v => tune.nMax = Math.max(1, Math.round(v)));
+numIn('nAfterStimulus', v => tune.nAfterStimulus = Math.max(1, Math.round(v)));
+numIn('blockLengthP',   v => tune.blockLength = Math.max(5, Math.round(v)));
+
+$('feedbackMode').onchange = e => {
+  cfg.feedback = e.target.value; renderGlyphLegend(); saveProgress();
+};
+
+$('adaptMode').onchange = e => {
+  tune.adapt = e.target.value;
+  if (tune.adapt === 'bayes' && !stairLog) stairInit(prog.interval || tune.startInterval);
+  applyProgression(); renderLadderState(); updateHUD(); saveProgress();
+};
+
+$('resetProgress').onclick = () => {
+  if (!confirm('Erase the ladder, all history and settings? This cannot be undone.')) return;
+  localStorage.removeItem(STORE_KEY);
+  prog = { streamCount:1, n:1, spinLevel:0, interval:5000 };
+  progress = { version:2, bestLoad:0, dailyMinutes:{}, blocks:[] };
+  keyBinds = {};
+  stairInit(tune.startInterval);
+  setMode('progression');
+  renderDataPanel();
+};
+
+/* --- session data --- */
+$('testerLabel').oninput = e => { progress.tester = e.target.value.slice(0, 40); saveProgress(); };
+
+$('exportJson').onclick = () => {
+  const name = downloadJSON();
+  $('dataStatus').innerHTML = `Saved <b>${name}</b> — send that file over.`;
+};
+
+$('copyJson').onclick = async () => {
+  const txt = exportPayload();
+  try {
+    await navigator.clipboard.writeText(txt);
+    $('dataStatus').textContent = `Copied ${Math.round(txt.length / 1024)} KB to clipboard.`;
+  } catch (e) {
+    /* Clipboard needs a secure context; file:// and some browsers refuse it. */
+    $('dataStatus').innerHTML =
+      `Clipboard blocked here — use <b>Download JSON</b> instead.`;
+  }
+};
+
+$('importJson').onchange = e => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  if (!confirm('Replace ALL local progress with the contents of this file?')) {
+    e.target.value = ''; return;
+  }
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const n = importJSON(String(r.result));
+      $('dataStatus').innerHTML = `Restored <b>${n}</b> blocks from ${file.name}.`;
+    } catch (err) {
+      $('dataStatus').innerHTML = `<span style="color:#ff6b6b">Import failed: ${err.message}</span>`;
+    }
+    e.target.value = '';
+  };
+  r.readAsText(file);
+};
+
+$('resetKeybinds').onclick = () => {
+  keyBinds = {};
+  buildDeck(); renderKeybinds(); saveProgress();
+};
+
+/* --- free play --- */
+const freeIn = (id, apply, rebuild) => $(id).oninput = e => {
+  const v = parseFloat(e.target.value);
+  if (!isFinite(v)) return;
+  apply(v); applyFree(); if (rebuild) buildCube(cfg.dim); updateHUD(); saveProgress();
+};
+freeIn('nValue',        v => freeCfg.n = Math.max(1, Math.round(v)));
+freeIn('intervalMs',    v => freeCfg.interval = Math.max(500, v));
+freeIn('blockLengthF',  v => freeCfg.blockLength = Math.max(5, Math.round(v)));
+freeIn('rotationSpeed', v => freeCfg.spin = Math.max(5, v));
+
+freeIn('lureRateF',     v => freeCfg.lureRate = Math.min(LURE_MAX, Math.max(LURE_MIN, v / 100)));
+$('metaOn').onchange  = e => { freeCfg.meta = e.target.checked; applyFree(); syncSettingsUI(); updateHUD(); saveProgress(); };
+$('gateOn').onchange  = e => { freeCfg.gate = +e.target.value; applyFree(); updateHUD(); saveProgress(); };
+$('retroOn').onchange = e => { freeCfg.retro = +e.target.value; applyFree(); syncSettingsUI(); updateHUD(); saveProgress(); };
+
+$('cubeDimension').onchange = e => { freeCfg.dim = +e.target.value; applyFree(); buildCube(cfg.dim); updateHUD(); saveProgress(); };
+$('rotationOn').onchange    = e => { freeCfg.rotation = e.target.checked; applyFree(); updateHUD(); saveProgress(); };
+$('frameMode').onchange     = e => { freeCfg.frame = e.target.value; applyFree(); updateHUD(); saveProgress(); };
+$('feedbackModeF').onchange = e => { freeCfg.feedback = e.target.value; cfg.feedback = e.target.value; renderGlyphLegend(); saveProgress(); };
+/* --- display (shared by both modes) --- */
+$('gizmoMode').onchange = e => { cfg.gizmo = e.target.value; applyGizmoMode(); saveProgress(); };
+$('cellVis').onchange   = e => { cfg.cellVis = e.target.value; applyCellVis(); saveProgress(); };
+
+/* --- run controls --- */
+$('startBtn').onclick = () => {
+  $('settingsPanel').classList.remove('open');
+  if (cfg.streams.glyph === 'relational') showGlyphIntro(startBlock);
+  else startBlock();
+};
+$('stopBtn').onclick = () => stopBlock(false);
+
+document.addEventListener('keydown', e => {
+  /* Rebinding swallows the next key, whatever it is — including keys that would
+     otherwise be responses or shortcuts. */
+  if (capturingId) {
+    e.preventDefault(); e.stopPropagation();
+    const id = capturingId, k = e.key.toLowerCase();
+    if (k === 'escape') { renderKeybinds(); return; }
+    capturingId = null;
+    if (k === 'backspace' || k === 'delete') clearBind(id); else rebind(id, k);
+    return;
+  }
+  /* e.target can be `document` (no .matches), which would throw and swallow the
+     keypress. Guard on Element before testing. */
+  if (e.target instanceof Element && e.target.closest('input, select, textarea')) return;
+  const k = e.key.toLowerCase();
+  const ch = state.keyIndex[k];
+  if (ch) { e.preventDefault(); press(ch); return; }
+  if (k === 'enter' && !state.running) { e.preventDefault(); $('startBtn').click(); }
+  if (k === 'escape') { e.preventDefault(); stopBlock(false); }
+});
+
+/* Debounced: cube size is vmin-based so a resize must rebuild, but mobile browsers
+   fire this continuously as the address bar hides, and each rebuild drops the
+   on-screen stimulus. */
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    buildCube(cfg.dim);
+    const cur = state.history[state.history.length - 1];
+    if (state.running && cur) state.cells[cur.cellIdx].el.classList.add('active');
+  }, 160);
+});
+
+/* ============================================================
+   18. BOOT
+   ============================================================ */
+
+buildCube(3);
+if (!stairLog) stairInit(prog.interval || tune.startInterval);
+if (tune.adapt === 'bayes') prog.interval = stairNextInterval();
+setMode(cfg.mode);
+renderDataPanel();
+</script>
+</body>
+</html>
