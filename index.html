@@ -1,556 +1,1785 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>3D N-Back Cube</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8" />
+<title>Relational N-Back</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #141820;
+    --panel-2: #0f1218;
+    --border-outer: rgba(180, 200, 255, 0.45);
+    --border-inner: rgba(180, 200, 255, 0.18);
+    --cell-fill: rgba(120, 140, 255, 0.10);
+    --cell-active: rgba(120, 200, 255, 0.62);
+    --text: #e6ebff;
+    --muted: rgba(230, 235, 255, 0.55);
+    --good: #51cf66;
+    --bad: #ff6b6b;
+    --cube-size: min(34vmin, 240px);
+  }
 
-  <style>
-    :root {
-      --bg: #0b0d10;
-      --panel: #141820;
-      --border-outer: rgba(180, 200, 255, 0.45);
-      --border-inner: rgba(180, 200, 255, 0.2);
-      --cell-fill: rgba(120, 140, 255, 0.1);
-      --cell-active: rgba(120, 200, 255, 0.6);
-      --text: #e6ebff;
-      --cube-size: 220px;
-    }
+  * { box-sizing: border-box; }
 
-    * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle at 50% 0%, #121728, var(--bg));
+    color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+  }
 
-    body {
-      margin: 0;
-      background: radial-gradient(circle at top, #101420, var(--bg));
-      color: var(--text);
-      font-family: system-ui, sans-serif;
-      height: 100vh;
-      overflow: hidden;
-    }
+  button { font-family: inherit; }
 
-    /* ---------- SETTINGS ---------- */
-    .settings-btn {
-      position: fixed;
-      top: 16px;
-      left: 16px;
-      z-index: 30;
-      background: var(--panel);
-      border: 1px solid var(--border-outer);
-      color: var(--text);
-      padding: 8px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-    }
+  /* ---------- SETTINGS ---------- */
+  .settings-btn {
+    position: fixed; top: 14px; left: 14px; z-index: 30;
+    background: var(--panel); border: 1px solid var(--border-outer);
+    color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;
+  }
 
-    .settings {
-      position: fixed;
-      top: 0;
-      left: 0;
-      height: 100vh;
-      width: 320px;
-      background: linear-gradient(180deg, #141820, #0f1218);
-      border-right: 1px solid var(--border-outer);
-      padding: 20px;
-      transform: translateX(-100%);
-      transition: transform 0.3s ease;
-      z-index: 29;
-      overflow-y: auto;
-    }
+  .settings {
+    position: fixed; top: 0; left: 0; height: 100vh; width: 340px;
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border-right: 1px solid var(--border-outer);
+    padding: 56px 18px 18px; transform: translateX(-100%);
+    transition: transform .28s ease; z-index: 29; overflow-y: auto;
+  }
+  .settings.open { transform: translateX(0); }
+  .settings h2 { margin: 0 0 4px; font-size: 17px; }
+  .settings h3 {
+    margin: 20px 0 8px; font-size: 11px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--border-inner); padding-bottom: 6px;
+  }
+  .setting-group { margin-bottom: 12px; }
+  .settings label { display: block; margin-bottom: 5px; font-size: 13px; opacity: .85; }
+  select, input[type=number] {
+    width: 100%; padding: 7px; background: #0e121a; color: var(--text);
+    border: 1px solid var(--border-inner); border-radius: 6px; font-size: 13px;
+  }
+  select:disabled, input:disabled { opacity: .4; cursor: not-allowed; }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
+  .pair { display: flex; gap: 8px; }
+  .pair > div { flex: 1; }
 
-    .settings.open { transform: translateX(0); }
+  .mode-toggle { display: flex; gap: 6px; margin-bottom: 4px; }
+  .mode-toggle button {
+    flex: 1; padding: 9px 6px; border-radius: 8px; cursor: pointer; font-size: 13px;
+    background: var(--panel-2); border: 1px solid var(--border-inner); color: var(--muted);
+  }
+  .mode-toggle button.on {
+    background: #2b4a8a; border-color: #4d7fd6; color: var(--text); font-weight: 600;
+  }
 
-    .settings h2 { margin-top: 0; font-size: 18px; }
+  /* stream mode rows */
+  .stream-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .stream-row .swatch { width: 9px; height: 22px; border-radius: 3px; flex: none; }
+  .stream-row .nm { flex: 1; font-size: 13px; }
+  .stream-row select { width: 108px; flex: none; padding: 5px; font-size: 12px; }
 
-    .setting-group { margin-bottom: 14px; }
+  /* progression state readout */
+  .ladder { font-size: 12.5px; line-height: 1.9; }
+  .ladder .k { color: var(--muted); display: inline-block; width: 108px; }
+  .ladder b { font-variant-numeric: tabular-nums; }
+  .next-up {
+    margin-top: 10px; padding: 9px 11px; border-radius: 8px;
+    background: rgba(77, 127, 214, .13); border: 1px solid rgba(77, 127, 214, .4);
+    font-size: 12px; line-height: 1.5;
+  }
+  .next-up b { color: #8ab4ff; }
 
-    label { display: block; margin-bottom: 6px; opacity: 0.85; }
+  /* ---------- HUD ---------- */
+  .hud {
+    position: fixed; top: 14px; right: 14px; z-index: 10;
+    font-size: 13px; text-align: right; min-width: 210px;
+  }
+  .hud .mode-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .hud .row { display: flex; justify-content: flex-end; gap: 8px; color: var(--muted); }
+  .hud .row b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .hud .load {
+    margin-top: 6px; font-size: 11px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .hud .load b { font-size: 19px; color: #8ab4ff; letter-spacing: 0; }
+  .speed-wrap { margin-top: 8px; }
+  .speed-labels {
+    display: flex; justify-content: space-between; font-size: 10px; color: var(--muted);
+    margin-bottom: 3px; font-variant-numeric: tabular-nums;
+  }
+  .progress-track {
+    height: 5px; background: rgba(255,255,255,.09);
+    border-radius: 3px; overflow: hidden;
+  }
+  .progress-fill { display: block; height: 100%; width: 0%; background: #8ab4ff; transition: width .35s; }
+  .hud .next { margin-top: 6px; font-size: 11px; color: var(--muted); max-width: 240px; }
+  .hud .next b { color: #8ab4ff; font-weight: 600; }
 
-    select, input[type=number] {
-      width: 100%;
-      padding: 8px;
-      background: #0e121a;
-      color: var(--text);
-      border: 1px solid var(--border-inner);
-      border-radius: 6px;
-    }
+  /* ---------- SCENE ---------- */
+  .scene {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; perspective: 1400px;
+    padding: 54px 0 62px; overflow-y: auto;
+  }
 
-    /* ---------- HUD ---------- */
-    .hud {
-      position: fixed;
-      top: 16px;
-      right: 16px;
-      font-size: 14px;
-      text-align: right;
-      opacity: 0.9;
-      z-index: 10;
-    }
+  /* The stage reserves the GIZMO's footprint, not the cube's — the arms reach
+     ~0.85 × cube-size from centre, so a stage sized to the cube clips the badges. */
+  .cube-stage {
+    width: calc(var(--cube-size) * 1.7); height: calc(var(--cube-size) * 1.7);
+    display: flex; align-items: center; justify-content: center;
+    flex: none; margin-bottom: 6px;
+  }
 
-    /* ---------- SCENE ---------- */
-    .scene {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      perspective: 1200px;
-    }
+  .cube-wrapper {
+    width: var(--cube-size); height: var(--cube-size); transform-style: preserve-3d;
+    transform: rotateX(-24deg) rotateY(-28deg);
+    transform-origin: center center; pointer-events: none;
+  }
+  .cube-wrapper.spinning { animation: spin var(--spin-speed, 60s) linear infinite; }
 
-    .cube-wrapper {
-      width: var(--cube-size);
-      height: var(--cube-size);
-      transform-style: preserve-3d;
-      animation: spin var(--spin-speed) linear infinite;
-      transform-origin: center center;
-      pointer-events: none;
-    }
+  @keyframes spin {
+    from { transform: rotateX(-30deg) rotateY(0deg); }
+    to   { transform: rotateX(330deg) rotateY(360deg); }
+  }
 
-    @keyframes spin {
-      from { transform: rotateX(-30deg) rotateY(0deg); }
-      to   { transform: rotateX(330deg) rotateY(360deg); }
-    }
+  .grid-cube { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
 
-    .grid-cube {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      transform-style: preserve-3d;
-    }
+  .cell { position: absolute; transform-style: preserve-3d; }
+  .cell-face {
+    position: absolute; width: 100%; height: 100%;
+    background: var(--cell-fill); border: 1px solid var(--border-inner);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1px; line-height: 1; color: var(--text); user-select: none;
+  }
+  .cell-face .g { font-size: 26px; line-height: 1; }
+  .cell-face .q { font-size: 9px; letter-spacing: 1px; line-height: 1; opacity: .95; }
+  .cell.active .cell-face { background: var(--cell-active); }
 
-    .cell {
-      position: absolute;
-      transform-style: preserve-3d;
-    }
+  /* ---------- AXIS GIZMO ---------- */
+  .gizmo {
+    position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+    transform-style: preserve-3d; pointer-events: none;
+  }
+  .gizmo.hidden { display: none; }
+  .arm { position: absolute; transform-style: preserve-3d; }
+  .shaft {
+    position: absolute; height: 2px; top: -1px; left: 0;
+    transform-origin: 0 50%; opacity: .75;
+  }
+  .head {
+    position: absolute; transform-origin: 0 50%;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+  }
+  .badge { position: absolute; transform-style: preserve-3d; }
+  .badge-face {
+    position: absolute; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; border-radius: 4px;
+    background: #0b0d10; user-select: none;
+    /* Opaque + no backfaces: otherwise the letters on the far side of the badge
+       show through mirrored, which is exactly the cue that has to stay legible. */
+    backface-visibility: hidden;
+  }
+  .arm.flash .badge-face { background: currentColor; color: #0b0d10 !important; }
+  .gizmo.letters-only .shaft, .gizmo.letters-only .head { display: none; }
 
-    .cell-face {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      background: var(--cell-fill);
-      border: 1px solid var(--border-inner);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 28px;
-      color: var(--text);
-      user-select: none;
-    }
+  /* ---------- RESPONSE DECK ---------- */
+  .deck {
+    display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+    padding: 0 16px; max-width: 980px; z-index: 20;
+  }
+  .deck-group {
+    display: flex; flex-direction: column; gap: 5px;
+    padding: 8px 10px 9px; border: 1px solid var(--border-inner);
+    border-radius: 10px; background: rgba(20, 24, 32, .55);
+  }
+  .deck-group > .title {
+    font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--muted); text-align: center;
+  }
+  .deck-group .btns { display: flex; gap: 5px; }
 
-    .cell.active .cell-face { background: var(--cell-active); }
+  .rbtn {
+    position: relative; min-width: 46px; padding: 7px 9px 15px;
+    background: var(--panel); border: 1px solid var(--btn-color, var(--border-outer));
+    color: var(--text); border-radius: 8px; cursor: pointer;
+    font-size: 14px; line-height: 1.1; text-align: center;
+    transition: background .08s, transform .08s;
+  }
+  .rbtn:active { transform: translateY(1px); }
+  .rbtn .glyph { color: var(--btn-color, var(--text)); font-weight: 700; }
+  .rbtn .kbd {
+    position: absolute; left: 0; right: 0; bottom: 3px;
+    font-size: 8.5px; letter-spacing: .05em; color: var(--muted);
+  }
+  .rbtn.hit  { background: rgba(81, 207, 102, .38); }
+  .rbtn.miss { background: rgba(255, 107, 107, .38); }
+  .rbtn.reveal { box-shadow: inset 0 0 0 2px var(--btn-color, #fff); }
 
-    /* ---------- UI ---------- */
-    .ui {
-      margin-top: 28px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      z-index: 20;
-    }
+  /* ---------- CONTROLS ---------- */
+  .controls {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; z-index: 21;
+  }
+  .controls button {
+    padding: 8px 18px; background: var(--panel); border: 1px solid var(--border-outer);
+    color: var(--text); border-radius: 8px; cursor: pointer; font-size: 13px;
+  }
+  .controls button.primary { background: #2b4a8a; border-color: #4d7fd6; }
 
-    .ui button {
-      padding: 8px 12px;
-      background: var(--panel);
-      border: 1px solid var(--border-outer);
-      color: var(--text);
-      border-radius: 8px;
-      cursor: pointer;
-    }
-  </style>
+  /* ---------- MODAL ---------- */
+  .modal {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(4, 6, 10, .78); z-index: 50; padding: 20px;
+  }
+  .modal.open { display: flex; }
+  .modal-box {
+    background: var(--panel); border: 1px solid var(--border-outer);
+    border-radius: 14px; padding: 24px; max-width: 480px; width: 100%;
+    max-height: 88vh; overflow-y: auto;
+  }
+  .modal-box h2 { margin: 0 0 6px; font-size: 20px; }
+  .modal-box p { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+  .modal-box .cta {
+    width: 100%; margin-top: 16px; padding: 11px; font-size: 14px;
+    background: #2b4a8a; border: 1px solid #4d7fd6; color: var(--text);
+    border-radius: 8px; cursor: pointer;
+  }
+
+  .glyph-map { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 8px; }
+  .glyph-map .gm-cell {
+    padding: 14px 10px; border: 1px solid var(--border-inner);
+    border-radius: 10px; text-align: center; background: var(--panel-2);
+  }
+  .glyph-map .gm-cell .set { font-size: 22px; font-weight: 700; }
+  .glyph-map .gm-cell .items { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .bars { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; }
+  .bar-row { display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
+  .bar-row .nm { width: 96px; flex: none; }
+  .bar-row .track { flex: 1; height: 9px; background: rgba(255,255,255,.08); border-radius: 5px; overflow: hidden; }
+  /* display:block matters — these are spans, and width/height are ignored on
+     non-replaced inline elements, which renders every bar empty. */
+  .bar-row .fill { display: block; height: 100%; border-radius: 5px; }
+  .bar-row .val { width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+  .bar-detail { margin: -3px 0 5px 105px; font-size: 11px; color: var(--muted); }
+  .verdict { text-align: center; font-size: 15px; margin: 14px 0 2px; }
+  .verdict.up { color: var(--good); }
+  .verdict.down { color: var(--bad); }
+  .milestone-banner {
+    margin-top: 10px; padding: 12px; border-radius: 10px; text-align: center;
+    background: rgba(81, 207, 102, .12); border: 1px solid rgba(81, 207, 102, .45);
+  }
+  .milestone-banner .t { font-size: 15px; color: var(--good); font-weight: 600; }
+  .milestone-banner .s { font-size: 12.5px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+
+  .glyph-legend {
+    position: fixed; bottom: 14px; left: 14px; z-index: 15;
+    font-size: 11px; color: var(--muted); line-height: 1.6; display: none;
+  }
+  .glyph-legend.show { display: block; }
+  .glyph-legend b { color: var(--text); }
+
+  @media (max-width: 700px) {
+    :root { --cube-size: min(32vmin, 185px); }
+    .rbtn { min-width: 40px; padding: 6px 6px 14px; font-size: 13px; }
+    .hud { font-size: 12px; min-width: 165px; }
+  }
+</style>
 </head>
 <body>
 
-<button class="settings-btn">⚙ Settings</button>
+<button class="settings-btn" id="settingsBtn">⚙ Settings</button>
 
 <aside class="settings" id="settingsPanel">
-  <h2>Settings</h2>
-<div class="setting group">
-  <a href="https://discord.gg/brain">Mindbuilding discord</a>
-</div>
-  <div class="setting-group">
-    
-    <label>Cube Dimension</label>
-    <select id="cubeDimension">
-      <option value="3">3 × 3 × 3</option>
-      <option value="4">4 × 4 × 4</option>
-    </select>
+  <h2>Relational N-Back</h2>
+  <div class="hint"><a href="https://discord.gg/brain" style="color:#8ab4ff">Mindbuilding Discord</a></div>
+
+  <h3>Mode</h3>
+  <div class="mode-toggle">
+    <button id="modeProgression">Progression</button>
+    <button id="modeFree">Free Play</button>
+  </div>
+  <div class="hint" id="modeHint"></div>
+
+  <!-- ============ PROGRESSION ============ -->
+  <div id="progressionPane">
+    <h3>Where you are</h3>
+    <div class="ladder" id="ladderState"></div>
+    <div class="next-up" id="nextUp"></div>
+
+    <h3>Feedback</h3>
+    <div class="setting-group">
+      <select id="feedbackMode">
+        <option value="reveal">Immediate + reveal answers</option>
+        <option value="immediate">Immediate only</option>
+        <option value="off">None (test conditions)</option>
+      </select>
+    </div>
+
+    <h3>Speed ladder</h3>
+    <div class="setting-group pair">
+      <div>
+        <label>Start (s)</label>
+        <input type="number" id="startInterval" value="5" min="2" max="15" step="0.1" />
+      </div>
+      <div>
+        <label>Target (s)</label>
+        <input type="number" id="targetInterval" value="3" min="1" max="10" step="0.1" />
+      </div>
+    </div>
+    <div class="setting-group">
+      <label>Step per block (s)</label>
+      <input type="number" id="intervalStep" value="0.25" min="0.05" max="2" step="0.05" />
+    </div>
+    <div class="hint">Beat a block and the interval drops one step. Reach the target and
+      you clear the milestone — the interval resets and the next difficulty comes in.</div>
+
+    <h3>Rotation ladder</h3>
+    <div class="setting-group pair">
+      <div>
+        <label>Slowest (s/turn)</label>
+        <input type="number" id="spinStart" value="100" min="10" max="300" step="5" />
+      </div>
+      <div>
+        <label>Fastest (s/turn)</label>
+        <input type="number" id="spinEnd" value="20" min="5" max="200" step="5" />
+      </div>
+    </div>
+    <div class="setting-group">
+      <label>Step (s)</label>
+      <input type="number" id="spinStep" value="10" min="1" max="50" step="1" />
+    </div>
+    <div class="hint" id="spinLadderHint"></div>
+
+    <h3>N ladder</h3>
+    <div class="setting-group pair">
+      <div>
+        <label>Max N</label>
+        <input type="number" id="nMax" value="3" min="1" max="9" />
+      </div>
+      <div>
+        <label>N after new stimulus</label>
+        <input type="number" id="nAfterStimulus" value="2" min="1" max="5" />
+      </div>
+    </div>
+
+    <h3>Trials</h3>
+    <div class="setting-group">
+      <label>Trials per block</label>
+      <input type="number" id="blockLengthP" value="20" min="5" max="80" />
+    </div>
+
+    <h3>Reset</h3>
+    <div class="setting-group">
+      <button class="rbtn" id="resetProgress" style="width:100%;padding:8px">Reset all progress</button>
+    </div>
   </div>
 
-  <div class="setting-group">
-    <label>Rotation Speed (seconds)</label>
-    <input type="number" id="rotationSpeed" value="18" min="5" />
+  <!-- ============ FREE PLAY ============ -->
+  <div id="freePane" style="display:none">
+    <h3>Streams</h3>
+    <div id="streamRows"></div>
+    <div class="hint">
+      <b>Identity</b> = "same as N ago?" &nbsp;·&nbsp; <b>Relational</b> = "which way did it
+      move from N ago?"
+    </div>
+
+    <h3>Task</h3>
+    <div class="setting-group">
+      <label>N</label>
+      <input type="number" id="nValue" value="2" min="1" max="9" />
+    </div>
+    <div class="setting-group">
+      <label>Stimulus interval (ms)</label>
+      <input type="number" id="intervalMs" value="2500" min="800" max="10000" step="100" />
+    </div>
+    <div class="setting-group">
+      <label>Trials per block</label>
+      <input type="number" id="blockLengthF" value="20" min="5" max="80" />
+    </div>
+    <div class="setting-group">
+      <label>Feedback</label>
+      <select id="feedbackModeF">
+        <option value="reveal">Immediate + reveal answers</option>
+        <option value="immediate">Immediate only</option>
+        <option value="off">None (test conditions)</option>
+      </select>
+    </div>
+
+    <h3>Cube</h3>
+    <div class="setting-group">
+      <label>Dimension</label>
+      <select id="cubeDimension">
+        <option value="3">3 × 3 × 3 (27)</option>
+        <option value="4">4 × 4 × 4 (64)</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label><input type="checkbox" id="rotationOn" style="width:auto"> Rotate cube</label>
+    </div>
+    <div class="setting-group">
+      <label>Rotation period (seconds)</label>
+      <input type="number" id="rotationSpeed" value="60" min="5" max="300" />
+    </div>
+    <div class="setting-group">
+      <label>Axis gizmo</label>
+      <select id="gizmoMode">
+        <option value="full">Arrows + letters</option>
+        <option value="letters">Letters only</option>
+        <option value="off">Off (hard mode)</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label>Reference frame</label>
+      <select id="frameMode">
+        <option value="cube">Cube only (allocentric)</option>
+        <option value="screen">Screen only (egocentric)</option>
+        <option value="both">Both at once</option>
+      </select>
+      <div class="hint">Screen frame projects the movement through the cube's live
+        rotation — you answer in what you <em>see</em>. <b>Both</b> asks for the same
+        movement in each frame simultaneously.</div>
+    </div>
   </div>
 
+  <h3>Data</h3>
   <div class="setting-group">
-    <label>Stimulus Interval (ms)</label>
-    <input type="number" id="intervalMs" value="2500" min="500" />
+    <label>Today: <span id="minutesToday">0</span> min &nbsp;·&nbsp; Best load:
+      <span id="bestLoad">0</span></label>
   </div>
-
-  <div class="setting-group">
-    <label>N Value</label>
-    <input type="number" id="nValue" value="2" min="1" />
-  </div>
-
-  <div class="setting-group"><label><input type="checkbox" id="directionalOn"> Directional</label></div>
-  <div class="setting-group"><label><input type="checkbox" id="soundOn"> Sound</label></div>
-  <div class="setting-group"><label><input type="checkbox" id="colorOn"> Color</label></div>
-  <div class="setting-group"><label><input type="checkbox" id="shapeOn"> Shape</label></div>
-  <div class="setting-group"><label><input type="checkbox" id="sizeOn"> Size</label></div>
 </aside>
 
 <div class="hud">
-  <div>Interval: <span id="intervalCount">0</span></div>
-  <div>Accuracy: <span id="accuracy">—</span></div>
-  <div>Today: <span id="minutes">0</span> min</div>
+  <div class="mode-name" id="hudMode">—</div>
+  <div class="row"><span>N</span><b id="hudN">1</b><span>·</span><span id="hudSpinLabel">still</span><span>·</span><span>trial</span><b id="hudTrial">0/20</b></div>
+  <div class="row"><span>block</span><b id="hudAcc">—</b></div>
+  <div class="load">Load <b id="hudLoad">0</b></div>
+  <div class="speed-wrap" id="speedWrap">
+    <div class="speed-labels"><span id="speedNow">5.00s</span><span id="speedGoal">→ 3.00s</span></div>
+    <div class="progress-track"><span class="progress-fill" id="hudProgress"></span></div>
+  </div>
+  <div class="next" id="hudNext"></div>
 </div>
 
 <main class="scene">
-    <div id="characterIntro"
-     style="position:fixed;inset:0;display:none;
-            align-items:center;justify-content:center;
-            background:rgba(0,0,0,0.6);z-index:50;">
-  <div id="characterGrid"
-       style="display:grid;
-              grid-template-columns:1fr 1fr;
-              grid-template-rows:1fr 1fr;
-              gap:14px;
-              padding:22px;
-              background:#141820;
-              border:1px solid rgba(180,200,255,0.45);
-              border-radius:12px;
-              font-size:26px;
-              text-align:center;">
+  <div class="cube-stage">
+    <div class="cube-wrapper" id="cubeWrapper" style="--spin-speed:60s">
+      <div class="grid-cube" id="gridCube"></div>
+      <div class="gizmo" id="gizmo"></div>
+    </div>
   </div>
-</div>
-  <div class="cube-wrapper" id="cubeWrapper" style="--spin-speed:18s">
-    <div class="grid-cube" id="gridCube"></div>
-  </div>
-
-  <div class="ui">
-    <button id="startBtn">Start</button>
-    <button id="stopBtn">Stop</button>
-    <button id="positionBtn">Position</button>
-    <button data-dir="north">North</button>
-    <button data-dir="south">South</button>
-    <button data-dir="east">East</button>
-    <button data-dir="west">West</button>
-    <button data-dir="above">Above</button>
-    <button data-dir="below">Below</button>
-    <button id="soundBtn">Sound</button>
-    <button id="colorBtn">Color</button>
-    <button id="shapeBtn">Char</button>
-    <button data-char="char-north">C↑</button>
-    <button data-char="char-south">C↓</button>
-    <button data-char="char-east">C→</button>
-    <button data-char="char-west">C←</button>
-    <button data-char="char-higher">C+</button>
-    <button data-char="char-lower">C−</button>
-    <button id="sizeBtn">Size</button>
-  </div>
+  <div class="deck" id="deck"></div>
 </main>
 
+<div class="glyph-legend" id="glyphLegend"></div>
+
+<div class="controls">
+  <button id="startBtn" class="primary">Start block</button>
+  <button id="stopBtn">Stop</button>
+</div>
+
+<div class="modal" id="modal"><div class="modal-box" id="modalBox"></div></div>
+
 <script>
-  const gridCube = document.getElementById('gridCube');
-  const cubeWrapper = document.getElementById('cubeWrapper');
+"use strict";
 
-  const intervalCountEl = document.getElementById('intervalCount');
-  const accuracyEl = document.getElementById('accuracy');
-  const minutesEl = document.getElementById('minutes');
+/* ============================================================
+   1. CONSTANTS
+   ============================================================ */
 
-  const cubeDimension = document.getElementById('cubeDimension');
-  const rotationSpeed = document.getElementById('rotationSpeed');
-  const intervalMs = document.getElementById('intervalMs');
-  const nValue = document.getElementById('nValue');
+/* Six cube axes. `vec` is in CSS 3D space: +X right, +Y DOWN, +Z toward viewer. */
+const AXES = [
+  { id:'north', letter:'N', name:'North', vec:[ 0,-1, 0], color:'#4dabf7', key:'w' },
+  { id:'south', letter:'S', name:'South', vec:[ 0, 1, 0], color:'#ff6b6b', key:'s' },
+  { id:'east',  letter:'E', name:'East',  vec:[ 1, 0, 0], color:'#51cf66', key:'d' },
+  { id:'west',  letter:'W', name:'West',  vec:[-1, 0, 0], color:'#fcc419', key:'a' },
+  { id:'above', letter:'A', name:'Above', vec:[ 0, 0, 1], color:'#cc5de8', key:'e' },
+  { id:'below', letter:'B', name:'Below', vec:[ 0, 0,-1], color:'#ff922b', key:'q' },
+];
+const AXIS = Object.fromEntries(AXES.map(a => [a.id, a]));
 
-  const directionalOn = document.getElementById('directionalOn');
-  const soundOn = document.getElementById('soundOn');
-  const colorOn = document.getElementById('colorOn');
-  const shapeOn = document.getElementById('shapeOn');
-  const sizeOn = document.getElementById('sizeOn');
+/* Transform that maps the element's local +X onto each axis direction. */
+const AXIS_ORIENT = {
+  east:  '',
+  west:  'rotateY(180deg)',
+  south: 'rotateZ(90deg)',
+  north: 'rotateZ(-90deg)',
+  above: 'rotateY(-90deg)',
+  below: 'rotateY(90deg)',
+};
 
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const positionBtn = document.getElementById('positionBtn');
-  const soundBtn = document.getElementById('soundBtn');
-  const colorBtn = document.getElementById('colorBtn');
-  const shapeBtn = document.getElementById('shapeBtn');
-  const sizeBtn = document.getElementById('sizeBtn');
+/* Stimulus pools. Every pool is ORDERED so a relational judgement is well defined. */
+const PITCHES = [220, 293.66, 392, 523.25];                 // A3 D4 G4 C5, low → high
+const TIMBRES = ['sine', 'triangle', 'square', 'sawtooth']; // dull → bright
+const PANS    = [-0.9, -0.3, 0.3, 0.9];                     // left → right
+const COLORS  = ['#ff4d4d','#ff9f1a','#ffe14d','#4ddb6f','#4d9fff']; // warm → cool
+const SIZES   = [15, 22, 30, 40];                           // small → large
+const COUNTS  = [1, 2, 3, 4];                               // few → many
 
-  let cells = [];
-  let history = [];
-  let expected = new Set();
-  let interval = null;
-  let intervalCount = 0;
-  let correct = 0;
-  let total = 0;
+const GLYPH_SETS = {
+  '123': ['1','2','3','4','5'],
+  'ABC': ['A','B','C','D','E'],
+  'αβγ': ['α','β','γ','δ','ε'],
+  'IV' : ['I','II','III','IV','V'],
+};
+const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
 
-  // time tracking (today)
-  let sessionStart = null;
-  let minutesToday = 0;
+const TARGET_RATE = 0.28;  // forced identity matches
+const LURE_RATE   = 0.20;  // n±1 matches that are NOT n-back matches
+const EPS         = 0.20;  // "no movement on this axis" threshold, unit-normalised
 
-  // stimuli pools
-  const sounds = [220, 330, 440, 550];
-  const colors = ['#ff6b6b', '#4dabf7', '#51cf66', '#fcc419'];
-  const sizes = [18, 24, 32, 40];
+/* ---------- Stream registry ----------
+   Each stream declares its channels (= response buttons) for each mode. */
+const STREAMS = {
+  position: {
+    label: 'Position', color: '#8ab4ff',
+    identity:   [{ id:'pos', glyph:'●', label:'Same', key:' ' }],
+    relational: AXES.map(a => ({ id:a.id, glyph:a.letter, label:a.name, key:a.key, color:a.color })),
+    /* Screen-frame twins. Separate channels so "both frames" can ask for the same
+       movement twice, once per reference frame. */
+    relationalScreen: [
+      { id:'s-north', glyph:'↑', label:'Screen up',    key:'i', color:'#4dabf7' },
+      { id:'s-south', glyph:'↓', label:'Screen down',  key:'k', color:'#ff6b6b' },
+      { id:'s-east',  glyph:'→', label:'Screen right', key:'l', color:'#51cf66' },
+      { id:'s-west',  glyph:'←', label:'Screen left',  key:'j', color:'#fcc419' },
+      { id:'s-near',  glyph:'⊕', label:'Toward you',   key:'o', color:'#cc5de8' },
+      { id:'s-far',   glyph:'⊖', label:'Away from you',key:'u', color:'#ff922b' },
+    ],
+  },
+  pitch: {
+    label: 'Tone', color: '#7ee0d0',
+    identity:   [{ id:'pitch', glyph:'♪', label:'Same', key:'j' }],
+    relational: [{ id:'pitch-up', glyph:'♪↑', label:'Higher', key:'u' },
+                 { id:'pitch-down', glyph:'♪↓', label:'Lower', key:'j' }],
+  },
+  color: {
+    label: 'Colour', color: '#ffb74d',
+    identity:   [{ id:'color', glyph:'■', label:'Same', key:'k' }],
+    relational: [{ id:'color-warm', glyph:'■↑', label:'Warmer', key:'i' },
+                 { id:'color-cool', glyph:'■↓', label:'Cooler', key:'k' }],
+  },
+  glyph: {
+    label: 'Glyph', color: '#aed581',
+    identity:   [{ id:'glyph', glyph:'✦', label:'Same', key:'l' }],
+    relational: [{ id:'glyph-west',  glyph:'←', label:'Set left',  key:'arrowleft' },
+                 { id:'glyph-east',  glyph:'→', label:'Set right', key:'arrowright' },
+                 { id:'glyph-north', glyph:'↑', label:'Set up',    key:'arrowup' },
+                 { id:'glyph-south', glyph:'↓', label:'Set down',  key:'arrowdown' },
+                 { id:'glyph-up',    glyph:'+', label:'Rank up',   key:'o' },
+                 { id:'glyph-down',  glyph:'−', label:'Rank down', key:'p' }],
+  },
+  pan: {
+    label: 'Stereo', color: '#4dd0e1',
+    identity:   [{ id:'pan', glyph:'◉', label:'Same', key:'n' }],
+    relational: [{ id:'pan-left', glyph:'◀', label:'Left', key:'b' },
+                 { id:'pan-right', glyph:'▶', label:'Right', key:'n' }],
+  },
+  timbre: {
+    label: 'Timbre', color: '#b39ddb',
+    identity:   [{ id:'timbre', glyph:'◍', label:'Same', key:'h' }],
+    relational: [{ id:'timbre-up', glyph:'◍↑', label:'Brighter', key:'y' },
+                 { id:'timbre-down', glyph:'◍↓', label:'Duller', key:'h' }],
+  },
+  size: {
+    label: 'Size', color: '#f06292',
+    identity:   [{ id:'size', glyph:'⬍', label:'Same', key:';' }],
+    relational: [{ id:'size-up', glyph:'⬆', label:'Bigger', key:'.' },
+                 { id:'size-down', glyph:'⬇', label:'Smaller', key:',' }],
+  },
+  quantity: {
+    label: 'Quantity', color: '#ff8a65',
+    identity:   [{ id:'qty', glyph:'#', label:'Same', key:'m' }],
+    relational: [{ id:'qty-up', glyph:'#↑', label:'More', key:'m' },
+                 { id:'qty-down', glyph:'#↓', label:'Fewer', key:'v' }],
+  },
+};
+const STREAM_KEYS = Object.keys(STREAMS);
 
-  // character stimulus sets (REPLACES old shapes[] completely)
-  const charSets = {
-    123: ['1','2','3','4','5'],
-    ABC:   ['A','B','C','D','E'],
-    αβγ:   ['α','β','γ','δ','ε'],
-    IV:   ['I','II','III','IV','V']
-  };
-  const characterSetKeys = Object.keys(charSets);
-let characterGridLayout = {};
+/* Extra scoring buckets that aren't user-configurable streams. */
+const EXTRA_LABELS = { position2: 'Position (screen)' };
+const labelFor = k => (STREAMS[k] ? STREAMS[k].label : EXTRA_LABELS[k]) || k;
+const colorFor = k => (STREAMS[k] ? STREAMS[k].color : '#9ccc65');
 
-  // 2x2 character-set layout (generated on start)
-  let charGridLayout = null;
+/* Keys are assigned dynamically from this pool when a preferred key collides —
+   enabling many streams at once (or "both frames") otherwise double-books keys. */
+const KEY_POOL = ('qwertyuiopasdfghjkl;zxcvbnm,./1234567890').split('');
 
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+/* ============================================================
+   2. PROGRESSION LADDER
 
-  document.querySelector('.settings-btn').onclick = () =>
-    document.getElementById('settingsPanel').classList.toggle('open');
+   An odometer. The interval is the fastest-rolling digit; when it reaches the
+   target it carries into the next digit up:
 
-  cubeDimension.onchange = e => buildCube(+e.target.value);
-  rotationSpeed.oninput = e =>
-    cubeWrapper.style.setProperty('--spin-speed', `${e.target.value}s`);
+       interval  →  rotation speed  →  N  →  number of stimuli
 
-function showCharacterIntro() {
-  if (!shapeOn.checked) return;
+   Order of introduction: position is relational from the very first block. Every
+   stream added after it enters as an identity judgement, except size and quantity
+   — the two magnitude dimensions — which are relational and come last.
+   ============================================================ */
 
-  const intro = document.getElementById('characterIntro');
-  const grid = document.getElementById('characterGrid');
+const PROG_STREAMS = [
+  { key:'position', mode:'relational' },
+  { key:'pitch',    mode:'identity'   },
+  { key:'color',    mode:'identity'   },
+  { key:'glyph',    mode:'identity'   },
+  { key:'pan',      mode:'identity'   },
+  { key:'timbre',   mode:'identity'   },
+  { key:'size',     mode:'relational' },
+  { key:'quantity', mode:'relational' },
+];
 
-  grid.innerHTML = '';
-  characterGridLayout = {};
+const ADVANCE_AT = 0.85;   // block score that earns a speed-up
+const DEMOTE_AT  = 0.70;   // block score that forces a slow-down
 
-  const shuffled = [...characterSetKeys].sort(() => Math.random() - 0.5);
-
-  shuffled.forEach((key, i) => {
-    characterGridLayout[key] = {
-      x: i % 2,
-      y: Math.floor(i / 2)
-    };
-
-    const cell = document.createElement('div');
-    cell.textContent = key.toUpperCase();
-    cell.style.padding = '14px';
-    cell.style.border = '1px solid rgba(180,200,255,0.25)';
-    grid.appendChild(cell);
-  });
-
-  intro.style.display = 'flex';
-  setTimeout(() => intro.style.display = 'none', 2000);
+/* Rotation periods in seconds/turn, slowest → fastest. Index 0 is a still cube. */
+function spinLevels() {
+  const out = [0];
+  const { spinStart, spinEnd, spinStep } = tune;
+  for (let s = spinStart; s >= spinEnd - 1e-9; s -= spinStep) out.push(Math.round(s));
+  if (out.length === 1) out.push(spinStart);
+  return out;
 }
 
-  function buildCube(n) {
-    gridCube.innerHTML = '';
-    cells = [];
-    const size = gridCube.clientWidth;
-    const cellSize = size / n;
-    const offset = (n - 1) / 2;
-
-    for (let x = 0; x < n; x++)
-      for (let y = 0; y < n; y++)
-        for (let z = 0; z < n; z++) {
-          const cell = document.createElement('div');
-          cell.className = 'cell';
-          cell.style.width = cell.style.height = `${cellSize}px`;
-          cell.style.transform = `translate3d(${(x-offset)*cellSize}px, ${(y-offset)*cellSize}px, ${(z-offset)*cellSize}px)`;
-          cell.dataset.x = x; cell.dataset.y = y; cell.dataset.z = z;
-          createFaces(cell, cellSize);
-          gridCube.appendChild(cell);
-          cells.push(cell);
-        }
+/* The carry rules, exactly as laid out:
+     · still cube: N climbs 1 → 2
+     · then rotation is introduced and N resets to 1
+     · rotation speeds up step by step at fixed N
+     · at top rotation speed: N + 1, rotation back to slowest
+     · past max N: add a stimulus, N back to `nAfterStimulus`, rotation to slowest */
+function advanceLadder(p) {
+  const levels = spinLevels();
+  if (p.spinLevel === 0) {
+    if (p.n < 2) p.n++;
+    else { p.spinLevel = 1; p.n = 1; }
+  } else if (p.spinLevel < levels.length - 1) {
+    p.spinLevel++;
+  } else if (p.n < tune.nMax) {
+    p.n++; p.spinLevel = 1;
+  } else if (p.streamCount < PROG_STREAMS.length) {
+    p.streamCount++; p.n = Math.min(tune.nAfterStimulus, tune.nMax); p.spinLevel = 1;
+  } else {
+    return false;                     // ladder complete
   }
+  p.interval = tune.startInterval;
+  return true;
+}
 
-  function createFaces(cell, size) {
-    const rotations = [
-      'rotateY(0deg)','rotateY(180deg)','rotateY(90deg)',
-      'rotateY(-90deg)','rotateX(90deg)','rotateX(-90deg)'
-    ];
-    rotations.forEach(r => {
-      const f = document.createElement('div');
-      f.className = 'cell-face';
-      f.style.transform = `${r} translateZ(${size/2}px)`;
-      cell.appendChild(f);
+function regressLadder(p) {
+  const levels = spinLevels();
+  if (p.spinLevel === 0) {
+    if (p.n > 1) p.n--; else return false;
+  } else if (p.spinLevel > 1) {
+    p.spinLevel--;
+  } else if (p.n > 1) {
+    p.n--; p.spinLevel = levels.length - 1;
+  } else if (p.streamCount > 1) {
+    p.streamCount--; p.n = tune.nMax; p.spinLevel = levels.length - 1;
+  } else {
+    p.spinLevel = 0; p.n = 2;
+  }
+  p.interval = tune.startInterval;
+  return true;
+}
+
+/* What clearing the current milestone will unlock. Drives the "next up" line, which
+   is the whole point of the ladder feeling intuitive — you always know the goal. */
+function describeNext(p) {
+  const levels = spinLevels();
+  if (p.spinLevel === 0) {
+    if (p.n < 2) return { what: `N rises to 2`, why: 'still no rotation — just a longer gap to hold' };
+    return { what: `the cube starts rotating`, why: `slowly, one turn per ${levels[1]}s — and N drops back to 1` };
+  }
+  if (p.spinLevel < levels.length - 1)
+    return { what: `rotation speeds up to ${levels[p.spinLevel + 1]}s per turn`, why: 'same N, less stable frame' };
+  if (p.n < tune.nMax)
+    return { what: `N rises to ${p.n + 1}`, why: 'rotation resets to slowest' };
+  if (p.streamCount < PROG_STREAMS.length) {
+    const nx = PROG_STREAMS[p.streamCount];
+    return { what: `${STREAMS[nx.key].label} joins (${nx.mode})`,
+             why: `N drops to ${Math.min(tune.nAfterStimulus, tune.nMax)}, rotation resets` };
+  }
+  return { what: 'the ladder is complete', why: 'switch to Free Play to keep pushing Load' };
+}
+
+/* Position on the ladder, found by replaying it from the start. Cheaper than a
+   closed-form index and impossible to get out of sync with advanceLadder. */
+function ladderPosition() {
+  const start = { streamCount:1, n:1, spinLevel:0, interval:tune.startInterval };
+  const same = (a, b) => a.streamCount === b.streamCount && a.n === b.n && a.spinLevel === b.spinLevel;
+  const p = { ...start };
+  let index = 0, total = 0, found = -1;
+  for (let i = 0; i < 5000; i++) {
+    if (same(p, prog)) found = index;
+    total = ++index;
+    if (!advanceLadder(p)) break;
+  }
+  return { index: (found < 0 ? 0 : found) + 1, total };
+}
+
+/* ============================================================
+   3. STATE
+   ============================================================ */
+
+const cfg = {
+  mode: 'progression',                 // 'progression' | 'free'
+  n: 1,
+  streams: { position: 'relational' },
+  dim: 3,
+  rotation: false,
+  spin: 60,
+  frame: 'cube',                       // 'cube' | 'screen' | 'both'
+  interval: 5000,
+  blockLength: 20,
+  gizmo: 'full',
+  feedback: 'reveal',
+};
+
+/* Free Play keeps its own settings so switching modes doesn't clobber either one. */
+const freeCfg = {
+  n: 2, streams: { position: 'relational' }, dim: 3, rotation: false,
+  spin: 60, frame: 'cube', interval: 2500, blockLength: 20, feedback: 'reveal',
+};
+
+const tune = {
+  startInterval: 5000, targetInterval: 3000, intervalStep: 250, maxInterval: 6500,
+  spinStart: 100, spinEnd: 20, spinStep: 10,
+  nMax: 3, nAfterStimulus: 2, blockLength: 20,
+};
+
+let prog = { streamCount: 1, n: 1, spinLevel: 0, interval: 5000 };
+
+const state = {
+  running: false, timer: null,
+  history: [], judgments: [], presses: new Set(),
+  trial: 0, scored: 0, tally: {},
+  glyphMap: null, cells: [],
+  sessionStart: null, keyIndex: {},
+};
+
+let progress = loadProgress();
+
+/* ============================================================
+   4. DOM
+   ============================================================ */
+
+const $ = id => document.getElementById(id);
+const gridCube = $('gridCube'), cubeWrapper = $('cubeWrapper'), gizmoEl = $('gizmo');
+const deckEl = $('deck'), modalEl = $('modal'), modalBox = $('modalBox');
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+/* ============================================================
+   5. PERSISTENCE
+   ============================================================ */
+
+const STORE_KEY = 'rnb.progress.v2';
+
+function loadProgress() {
+  const blank = { version:2, bestLoad:0, dailyMinutes:{}, blocks:[] };
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return blank;
+    const p = Object.assign(blank, JSON.parse(raw));
+    if (p.prog) Object.assign(prog, p.prog);
+    if (p.tune) Object.assign(tune, p.tune);
+    if (p.freeCfg) Object.assign(freeCfg, p.freeCfg);
+    if (p.mode) cfg.mode = p.mode;
+    return p;
+  } catch (e) { return blank; }
+}
+
+function saveProgress() {
+  try {
+    if (progress.blocks.length > 500) progress.blocks = progress.blocks.slice(-500);
+    progress.prog = prog; progress.tune = tune;
+    progress.freeCfg = freeCfg; progress.mode = cfg.mode;
+    localStorage.setItem(STORE_KEY, JSON.stringify(progress));
+  } catch (e) { /* quota or private mode — training still works, just unsaved */ }
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+function addMinutes(ms) {
+  const d = today();
+  progress.dailyMinutes[d] = (progress.dailyMinutes[d] || 0) + ms / 60000;
+  saveProgress();
+  renderDataPanel();
+}
+
+/* ============================================================
+   6. CUBE + GIZMO GEOMETRY
+   ============================================================ */
+
+/* Six outward-facing planes, so content is legible from any viewing angle. */
+function addFaces(parent, size, cls, html) {
+  const rot = ['rotateY(0deg)','rotateY(180deg)','rotateY(90deg)',
+               'rotateY(-90deg)','rotateX(90deg)','rotateX(-90deg)'];
+  return rot.map(r => {
+    const f = document.createElement('div');
+    f.className = cls;
+    f.style.transform = `${r} translateZ(${size / 2}px)`;
+    if (html != null) f.innerHTML = html;
+    parent.appendChild(f);
+    return f;
+  });
+}
+
+function buildCube(dim) {
+  gridCube.innerHTML = '';
+  state.cells = [];
+  const size = gridCube.clientWidth || 240;
+  const cellSize = size / dim;
+  const off = (dim - 1) / 2;
+
+  for (let x = 0; x < dim; x++)
+    for (let y = 0; y < dim; y++)
+      for (let z = 0; z < dim; z++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.style.width = cell.style.height = cellSize + 'px';
+        cell.style.left = cell.style.top = `calc(50% - ${cellSize / 2}px)`;
+        cell.style.transform =
+          `translate3d(${(x-off)*cellSize}px, ${(y-off)*cellSize}px, ${(z-off)*cellSize}px)`;
+        addFaces(cell, cellSize, 'cell-face', '');
+        gridCube.appendChild(cell);
+        state.cells.push({ el: cell, x, y, z });
+      }
+  buildGizmo();
+}
+
+function buildGizmo() {
+  gizmoEl.innerHTML = '';
+  const cubeSize = gridCube.clientWidth || 240;
+  const L = cubeSize * 0.62, HEAD = cubeSize * 0.10, BADGE = 26;
+
+  AXES.forEach(ax => {
+    const arm = document.createElement('div');
+    arm.className = 'arm';
+    arm.dataset.axis = ax.id;
+    arm.style.color = ax.color;
+    arm.style.transform = AXIS_ORIENT[ax.id];   // local +X now points along this axis
+
+    /* Shaft: two planes crossed at 90° about the arm, so it never vanishes edge-on. */
+    [0, 90].forEach(roll => {
+      const s = document.createElement('div');
+      s.className = 'shaft';
+      s.style.width = L + 'px';
+      s.style.background = ax.color;
+      s.style.transform = `rotateX(${roll}deg)`;
+      arm.appendChild(s);
+
+      const h = document.createElement('div');
+      h.className = 'head';
+      h.style.width = HEAD + 'px';
+      h.style.height = HEAD * 0.85 + 'px';
+      h.style.top = `${-HEAD * 0.425}px`;
+      h.style.left = L + 'px';
+      h.style.background = ax.color;
+      h.style.transform = `rotateX(${roll}deg)`;
+      arm.appendChild(h);
     });
+
+    const badge = document.createElement('div');
+    badge.className = 'badge';
+    badge.style.width = badge.style.height = BADGE + 'px';
+    badge.style.left = `${L + HEAD}px`;
+    badge.style.top = `${-BADGE / 2}px`;
+    badge.style.transform = invertOrient(ax.id);   // keep the letter upright
+    const faces = addFaces(badge, BADGE, 'badge-face', ax.letter);
+    faces.forEach(f => { f.style.color = ax.color; f.style.border = `1px solid ${ax.color}`; });
+    arm.appendChild(badge);
+
+    gizmoEl.appendChild(arm);
+  });
+  applyGizmoMode();
+}
+
+function invertOrient(id) {
+  return ({
+    east: '', west: 'rotateY(-180deg)', south: 'rotateZ(-90deg)',
+    north: 'rotateZ(90deg)', above: 'rotateY(90deg)', below: 'rotateY(-90deg)',
+  })[id];
+}
+
+function applyGizmoMode() {
+  gizmoEl.classList.toggle('hidden', cfg.gizmo === 'off');
+  gizmoEl.classList.toggle('letters-only', cfg.gizmo === 'letters');
+}
+
+function flashArm(axisId) {
+  const arm = gizmoEl.querySelector(`.arm[data-axis="${axisId}"]`);
+  if (!arm) return;
+  arm.classList.add('flash');
+  setTimeout(() => arm.classList.remove('flash'), 200);
+}
+
+function applyRotation() {
+  cubeWrapper.classList.toggle('spinning', cfg.rotation);
+  cubeWrapper.style.setProperty('--spin-speed', cfg.spin + 's');
+}
+
+/* ============================================================
+   7. REFERENCE FRAME
+   ============================================================ */
+
+/* Live rotation matrix of the spinning wrapper. getComputedStyle returns the
+   interpolated matrix mid-animation, so this is exact rather than re-derived. */
+function currentMatrix() {
+  const t = getComputedStyle(cubeWrapper).transform;
+  if (!t || t === 'none') return null;
+  try { return new DOMMatrixReadOnly(t); } catch (e) { return null; }
+}
+
+function projectScreen(d, matrix) {
+  if (!matrix) return d;
+  const p = matrix.transformPoint({ x: d[0], y: d[1], z: d[2], w: 0 });
+  return [p.x, p.y, p.z];
+}
+
+function normalise(v) {
+  const m = Math.hypot(v[0], v[1], v[2]);
+  return m < 1e-6 ? [0, 0, 0] : [v[0]/m, v[1]/m, v[2]/m];
+}
+
+/* ============================================================
+   8. TRIAL GENERATION
+   ============================================================ */
+
+const randInt = n => Math.floor(Math.random() * n);
+
+/* Index sampler with controlled target and lure rates. */
+function sampleIndex(len, nbackIdx, lureIdxs) {
+  if (nbackIdx != null && Math.random() < TARGET_RATE) return nbackIdx;
+  const lures = (lureIdxs || []).filter(i => i != null && i !== nbackIdx);
+  if (lures.length && Math.random() < LURE_RATE) return lures[randInt(lures.length)];
+  let i, guard = 0;
+  do { i = randInt(len); guard++; } while (i === nbackIdx && guard < 20 && len > 1);
+  return i;
+}
+
+function backAt(k) {
+  const h = state.history;
+  return k >= 1 && h.length >= k ? h[h.length - k] : null;
+}
+
+function sampleTrial() {
+  const n = cfg.n;
+  const nb = backAt(n);
+  const lureA = backAt(n - 1), lureB = backAt(n + 1);
+  const rel = k => cfg.streams[k] === 'relational';
+  const on  = k => cfg.streams[k] && cfg.streams[k] !== 'off';
+  const t = {};
+
+  /* Identity mode needs forced matches (1/27 is far too rare otherwise);
+     relational mode is dense by construction, so sample freely. */
+  if (rel('position') || !on('position')) {
+    t.cellIdx = randInt(state.cells.length);
+  } else {
+    t.cellIdx = sampleIndex(state.cells.length, nb ? nb.cellIdx : null,
+                            [lureA && lureA.cellIdx, lureB && lureB.cellIdx]);
   }
 
-  function playTone(freq) {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.frequency.value = freq;
-    gain.gain.value = 0.05;
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.15);
-  }
-
-  function clearCells() {
-    cells.forEach(c => {
-      c.classList.remove('active');
-      c.querySelectorAll('.cell-face').forEach(f => {
-        f.style.background = '';
-        f.textContent = '';
-        f.style.fontSize = '';
-      });
-    });
-  }
-
-  function generateCharGrid() {
-    const sets = Object.keys(charSets);
-    const positions = [
-      {x:0,y:0},{x:1,y:0},
-      {x:0,y:1},{x:1,y:1}
-    ];
-    charGridLayout = {};
-    sets.sort(() => Math.random() - 0.5)
-        .forEach((s,i) => { charGridLayout[s] = positions[i]; });
-  }
-
-  function nextStimulus() {
-    if (expected.size) {
-      total += expected.size;
-      expected.clear();
-      updateAccuracy();
-    }
-
-    clearCells();
-
-    const cell = cells[Math.floor(Math.random()*cells.length)];
-    cell.classList.add('active');
-
-    let sound = null;
-    let color = null;
-    let shape = null;
-    let size = null;
-
-    if (soundOn.checked) {
-      sound = sounds[Math.floor(Math.random()*sounds.length)];
-      playTone(sound);
-    }
-
-    if (colorOn.checked) {
-      color = colors[Math.floor(Math.random()*colors.length)];
-      cell.querySelectorAll('.cell-face').forEach(f => f.style.background = color);
-    }
-
-    if (shapeOn.checked) {
-      const setNames = Object.keys(charSets);
-      const set = setNames[Math.floor(Math.random()*setNames.length)];
-      const idx = Math.floor(Math.random()*charSets[set].length);
-      shape = { set, idx };
-      const glyph = charSets[set][idx];
-      cell.querySelectorAll('.cell-face').forEach(f => f.textContent = glyph);
-    }
-
-    if (sizeOn.checked) {
-      size = sizes[Math.floor(Math.random()*sizes.length)];
-      cell.querySelectorAll('.cell-face').forEach(f => f.style.fontSize = `${size}px`);
-    }
-
-    history.push({ cell, sound, color, shape, size });
-
-    const n = +nValue.value;
-    if (history.length > n) {
-      const a = history[history.length - 1 - n];
-      const b = history[history.length - 1];
-
-      if (a.cell === b.cell) expected.add('position');
-
-      if (directionalOn.checked) {
-        const dx = b.cell.dataset.x - a.cell.dataset.x;
-        const dy = b.cell.dataset.y - a.cell.dataset.y;
-        const dz = b.cell.dataset.z - a.cell.dataset.z;
-        if (dx > 0) expected.add('east');
-        if (dx < 0) expected.add('west');
-        if (dy > 0) expected.add('south');
-        if (dy < 0) expected.add('north');
-        if (dz > 0) expected.add('above');
-        if (dz < 0) expected.add('below');
-      }
-
-      if (soundOn.checked && a.sound === b.sound) expected.add('sound');
-      if (colorOn.checked && a.color === b.color) expected.add('color');
-
-      if (shapeOn.checked && a.shape && b.shape &&
-          a.shape.set === b.shape.set && a.shape.idx === b.shape.idx) {
-        expected.add('shape');
-      }
-
-      if (shapeOn.checked && a.shape && b.shape && charGridLayout) {
-        const pa = charGridLayout[a.shape.set];
-        const pb = charGridLayout[b.shape.set];
-        if (pb.x > pa.x) expected.add('char-east');
-        if (pb.x < pa.x) expected.add('char-west');
-        if (pb.y > pa.y) expected.add('char-south');
-        if (pb.y < pa.y) expected.add('char-north');
-        if (b.shape.idx > a.shape.idx) expected.add('char-higher');
-        if (b.shape.idx < a.shape.idx) expected.add('char-lower');
-      }
-
-      if (sizeOn.checked && a.size === b.size) expected.add('size');
-    }
-
-    intervalCount++;
-    intervalCountEl.textContent = intervalCount;
-  }
-
-  function updateAccuracy() {
-    accuracyEl.textContent = total ? `${Math.round((correct/total)*100)}%` : '—';
-  }
-
-  function respond(type) {
-    total++;
-    if (expected.has(type)) {
-      correct++;
-      expected.delete(type);
-    }
-    updateAccuracy();
-  }
-
-  startBtn.onclick = () => {
-  showCharacterIntro();
-    stopGame();
-    history = [];
-    expected.clear();
-    intervalCount = correct = total = 0;
-    updateAccuracy();
-
-    if (shapeOn.checked) generateCharGrid();
-
-    sessionStart = Date.now();
-    nextStimulus();
-    interval = setInterval(nextStimulus, +intervalMs.value);
+  const feature = (key, pool) => {
+    if (!on(key)) return null;
+    if (rel(key)) return randInt(pool.length);
+    return sampleIndex(pool.length, nb ? nb[key] : null,
+                       [lureA && lureA[key], lureB && lureB[key]]);
   };
 
-  function stopGame() {
-    clearInterval(interval);
-    interval = null;
-    clearCells();
-    if (sessionStart) {
-      minutesToday += (Date.now() - sessionStart) / 60000;
-      sessionStart = null;
-      minutesEl.textContent = Math.floor(minutesToday);
+  t.pitch    = feature('pitch',    PITCHES);
+  t.timbre   = feature('timbre',   TIMBRES);
+  t.pan      = feature('pan',      PANS);
+  t.color    = feature('color',    COLORS);
+  t.size     = feature('size',     SIZES);
+  t.quantity = feature('quantity', COUNTS);
+
+  if (on('glyph')) {
+    if (rel('glyph')) {
+      t.glyphSet = randInt(GLYPH_SET_KEYS.length);
+      t.glyphIdx = randInt(5);
+    } else {
+      const same = nb && nb.glyphSet != null && Math.random() < TARGET_RATE;
+      t.glyphSet = same ? nb.glyphSet : randInt(GLYPH_SET_KEYS.length);
+      t.glyphIdx = same ? nb.glyphIdx : randInt(5);
+    }
+  } else { t.glyphSet = null; t.glyphIdx = null; }
+
+  return t;
+}
+
+function renderTrial(t) {
+  clearCells();
+  const cell = state.cells[t.cellIdx];
+  cell.el.classList.add('active');
+  const faces = cell.el.querySelectorAll('.cell-face');
+
+  const glyphChar = t.glyphSet != null ? GLYPH_SETS[GLYPH_SET_KEYS[t.glyphSet]][t.glyphIdx] : null;
+  const fontSize = t.size != null ? SIZES[t.size] : 26;
+
+  /* Quantity gets its own marker row rather than repeating the glyph — repeating a
+     multi-character glyph like "III" three times is unreadable. */
+  let html = '';
+  if (glyphChar) html += `<span class="g" style="font-size:${fontSize}px">${glyphChar}</span>`;
+  if (t.quantity != null) {
+    const dots = '●'.repeat(COUNTS[t.quantity]);
+    const qs = glyphChar ? Math.max(7, fontSize * 0.32) : Math.max(9, fontSize * 0.55);
+    html += `<span class="q" style="font-size:${qs}px">${dots}</span>`;
+  }
+  if (!glyphChar && t.quantity == null && t.size != null)
+    html = `<span class="g" style="font-size:${fontSize}px">●</span>`;
+
+  faces.forEach(f => {
+    if (t.color != null) f.style.background = COLORS[t.color];
+    f.innerHTML = html;
+  });
+
+  if (t.pitch != null || t.timbre != null || t.pan != null) playTone(t);
+  t.matrix = currentMatrix();
+}
+
+function clearCells() {
+  state.cells.forEach(c => {
+    c.el.classList.remove('active');
+    c.el.querySelectorAll('.cell-face').forEach(f => {
+      f.style.background = ''; f.innerHTML = '';
+    });
+  });
+}
+
+function playTone(t) {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = t.timbre != null ? TIMBRES[t.timbre] : 'sine';
+  osc.frequency.value = t.pitch != null ? PITCHES[t.pitch] : 330;
+  gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.09, audioCtx.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.30);
+
+  let tail = gain;
+  if (t.pan != null && audioCtx.createStereoPanner) {
+    const p = audioCtx.createStereoPanner();
+    p.pan.value = PANS[t.pan];
+    gain.connect(p); tail = p;
+  }
+  osc.connect(gain); tail.connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.32);
+}
+
+/* ============================================================
+   9. JUDGMENTS
+   ============================================================ */
+
+function buildJudgments(a, b) {
+  const js = [];
+  const mode = k => cfg.streams[k] || 'off';
+  const push = (stream, options, correct) => js.push({ stream, options, correct });
+  const axisJ = (stream, v, ids) => {
+    push(stream, [ids[0], ids[1]], v > EPS ? [ids[0]] : v < -EPS ? [ids[1]] : []);
+  };
+
+  /* --- position --- */
+  if (mode('position') === 'identity') {
+    push('position', ['pos'], a.cellIdx === b.cellIdx ? ['pos'] : []);
+  } else if (mode('position') === 'relational') {
+    const ca = state.cells[a.cellIdx], cb = state.cells[b.cellIdx];
+    const raw = [cb.x - ca.x, cb.y - ca.y, cb.z - ca.z];
+
+    if (cfg.frame === 'cube' || cfg.frame === 'both') {
+      const v = normalise(raw);
+      axisJ('position', v[0], ['east', 'west']);
+      axisJ('position', v[1], ['south', 'north']);
+      axisJ('position', v[2], ['above', 'below']);
+    }
+    if (cfg.frame === 'screen' || cfg.frame === 'both') {
+      const v = normalise(projectScreen(raw, b.matrix));
+      axisJ('position2', v[0], ['s-east', 's-west']);
+      axisJ('position2', v[1], ['s-south', 's-north']);
+      axisJ('position2', v[2], ['s-near', 's-far']);
     }
   }
 
-  stopBtn.onclick = stopGame;
+  /* --- ordered scalar features --- */
+  const scalar = (key, idCommon, idUp, idDown) => {
+    const m = mode(key);
+    if (m === 'off' || a[key] == null || b[key] == null) return;
+    if (m === 'identity') push(key, [idCommon], a[key] === b[key] ? [idCommon] : []);
+    else push(key, [idUp, idDown], b[key] > a[key] ? [idUp] : b[key] < a[key] ? [idDown] : []);
+  };
+  scalar('pitch',    'pitch',  'pitch-up',   'pitch-down');
+  scalar('timbre',   'timbre', 'timbre-up',  'timbre-down');
+  scalar('pan',      'pan',    'pan-right',  'pan-left');
+  scalar('color',    'color',  'color-cool', 'color-warm');  // pool runs warm → cool
+  scalar('size',     'size',   'size-up',    'size-down');
+  scalar('quantity', 'qty',    'qty-up',     'qty-down');
 
-  positionBtn.onclick = () => respond('position');
-  soundBtn.onclick = () => respond('sound');
-  colorBtn.onclick = () => respond('color');
-  shapeBtn.onclick = () => respond('shape');
-  sizeBtn.onclick = () => respond('size');
+  /* --- glyph: identity, or movement across the 2×2 set map + rank --- */
+  const gm = mode('glyph');
+  if (gm !== 'off' && a.glyphSet != null && b.glyphSet != null) {
+    if (gm === 'identity') {
+      const same = a.glyphSet === b.glyphSet && a.glyphIdx === b.glyphIdx;
+      push('glyph', ['glyph'], same ? ['glyph'] : []);
+    } else {
+      const pa = state.glyphMap[GLYPH_SET_KEYS[a.glyphSet]];
+      const pb = state.glyphMap[GLYPH_SET_KEYS[b.glyphSet]];
+      push('glyph', ['glyph-east','glyph-west'],
+        pb.x > pa.x ? ['glyph-east'] : pb.x < pa.x ? ['glyph-west'] : []);
+      push('glyph', ['glyph-south','glyph-north'],
+        pb.y > pa.y ? ['glyph-south'] : pb.y < pa.y ? ['glyph-north'] : []);
+      push('glyph', ['glyph-up','glyph-down'],
+        b.glyphIdx > a.glyphIdx ? ['glyph-up'] : b.glyphIdx < a.glyphIdx ? ['glyph-down'] : []);
+    }
+  }
+  return js;
+}
 
-  document.querySelectorAll('[data-dir]')
-    .forEach(b => b.onclick = () => respond(b.dataset.dir));
+function scoreInterval() {
+  if (!state.judgments.length) return;
+  state.judgments.forEach(j => {
+    const t = state.tally[j.stream] ||
+      (state.tally[j.stream] = { ok:0, total:0, empty:0, hit:0, miss:0, fa:0, cr:0 });
+    if (!j.correct.length) t.empty++;
+    let exact = true;
+    j.options.forEach(o => {
+      const target = j.correct.includes(o);
+      const pressed = state.presses.has(o);
+      if (target && pressed) t.hit++;
+      else if (target && !pressed) { t.miss++; exact = false; }
+      else if (!target && pressed) { t.fa++; exact = false; }
+      else t.cr++;
+    });
+    t.total++;
+    if (exact) t.ok++;
+  });
+  state.scored++;
+}
 
-  document.querySelectorAll('[data-char]')
-    .forEach(b => b.onclick = () => respond(b.dataset.char));
+/* Raw accuracy: the fraction of judgments answered exactly right. Intuitive, but its
+   chance level moves with the stream — pressing nothing scores ~72% on an identity
+   stream (28% target rate) and ~33% on a 3-way relational axis. */
+const rawAcc = t => t.total ? t.ok / t.total : 0;
 
-  buildCube(3);
+/* Chance-corrected score, on a scale where "never press" = 0 and perfect = 1.
+   `empty/total` IS the score a passive player would get, measured from the block's
+   own base rates — so one fixed threshold means the same thing at every milestone. */
+function streamScore(t) {
+  if (!t.total) return 0;
+  const chance = t.empty / t.total;
+  if (chance >= 0.999) return 0;
+  return Math.max(0, (rawAcc(t) - chance) / (1 - chance));
+}
+
+/* Mostly the mean, partly the weakest stream, so you can't win by abandoning one. */
+function blockScore() {
+  const scores = Object.values(state.tally).filter(t => t.total).map(streamScore);
+  if (!scores.length) return 0;
+  const mean = scores.reduce((s, a) => s + a, 0) / scores.length;
+  return 0.6 * mean + 0.4 * Math.min(...scores);
+}
+
+/* ============================================================
+   10. RESPONSE DECK
+   ============================================================ */
+
+/* Groups shown on the deck, in order. Position splits per reference frame. */
+function deckGroups() {
+  const groups = [];
+  STREAM_KEYS.forEach(k => {
+    const m = cfg.streams[k];
+    if (m !== 'identity' && m !== 'relational') return;
+    const spec = STREAMS[k];
+
+    if (k === 'position' && m === 'relational') {
+      const both = cfg.frame === 'both';
+      if (cfg.frame === 'cube' || both)
+        groups.push({ key:'position', label:'Position' + (both ? ' · cube' : ''),
+                      color: spec.color, channels: spec.relational });
+      if (cfg.frame === 'screen' || both)
+        groups.push({ key:'position2', label:'Position' + (both ? ' · screen' : ' · screen'),
+                      color:'#9ccc65', channels: spec.relationalScreen });
+    } else {
+      groups.push({ key:k, label: spec.label + (m === 'relational' ? ' ↔' : ' ='),
+                    color: spec.color, channels: spec[m] });
+    }
+  });
+  return groups;
+}
+
+/* Preferred key first; anything double-booked falls back to the next free key. */
+function assignKeys(groups) {
+  const used = new Set(), map = new Map();
+  const all = groups.flatMap(g => g.channels);
+  all.forEach(c => { if (c.key && !used.has(c.key)) { used.add(c.key); map.set(c.id, c.key); } });
+  all.forEach(c => {
+    if (map.has(c.id)) return;
+    const k = KEY_POOL.find(k => !used.has(k));
+    if (k) { used.add(k); map.set(c.id, k); }
+  });
+  return map;
+}
+
+const keyLabel = k => !k ? '—' : k === ' ' ? 'Spc'
+  : k.startsWith('arrow') ? ({arrowleft:'←',arrowright:'→',arrowup:'↑',arrowdown:'↓'})[k]
+  : k.toUpperCase();
+
+function buildDeck() {
+  deckEl.innerHTML = '';
+  state.keyIndex = {};
+  const groups = deckGroups();
+  const keys = assignKeys(groups);
+
+  groups.forEach(g => {
+    const group = document.createElement('div');
+    group.className = 'deck-group';
+    group.style.borderColor = g.color + '55';
+    const title = document.createElement('div');
+    title.className = 'title';
+    title.textContent = g.label;
+    group.appendChild(title);
+
+    const btns = document.createElement('div');
+    btns.className = 'btns';
+    g.channels.forEach(c => {
+      const key = keys.get(c.id);
+      state.keyIndex[key] = c.id;
+
+      const b = document.createElement('button');
+      b.className = 'rbtn';
+      b.dataset.channel = c.id;
+      b.style.setProperty('--btn-color', c.color || g.color);
+      b.title = `${g.label}: ${c.label}`;
+      b.innerHTML = `<span class="glyph">${c.glyph}</span>` +
+                    `<span class="kbd">${keyLabel(key)}</span>`;
+      b.onclick = () => press(c.id);
+      btns.appendChild(b);
+    });
+    group.appendChild(btns);
+    deckEl.appendChild(group);
+  });
+}
+
+function press(channelId) {
+  if (!state.running || state.presses.has(channelId)) return;
+  state.presses.add(channelId);
+
+  const btn = deckEl.querySelector(`[data-channel="${channelId}"]`);
+  if (AXIS[channelId]) flashArm(channelId);
+
+  if (cfg.feedback !== 'off' && btn) {
+    const j = state.judgments.find(x => x.options.includes(channelId));
+    const ok = j && j.correct.includes(channelId);
+    btn.classList.add(ok ? 'hit' : 'miss');
+    setTimeout(() => btn.classList.remove('hit', 'miss'), 260);
+  }
+}
+
+function revealAnswers() {
+  if (cfg.feedback !== 'reveal') return;
+  state.judgments.forEach(j => j.correct.forEach(id => {
+    const btn = deckEl.querySelector(`[data-channel="${id}"]`);
+    if (btn) { btn.classList.add('reveal'); setTimeout(() => btn.classList.remove('reveal'), 500); }
+    if (AXIS[id]) flashArm(id);
+  }));
+}
+
+/* ============================================================
+   11. BLOCK LOOP
+   ============================================================ */
+
+function tick() {
+  if (state.judgments.length) { scoreInterval(); revealAnswers(); }
+  if (state.scored >= cfg.blockLength) { endBlock(); return; }
+
+  const t = sampleTrial();
+  renderTrial(t);
+  state.history.push(t);
+  state.trial++;
+
+  const partner = state.history[state.history.length - 1 - cfg.n];
+  state.judgments = partner ? buildJudgments(partner, t) : [];
+  state.presses.clear();
+  updateHUD();
+}
+
+function startBlock() {
+  stopBlock(true);
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  state.history = []; state.judgments = []; state.presses.clear();
+  state.trial = 0; state.scored = 0; state.tally = {};
+  state.sessionStart = Date.now();
+  state.running = true;
+
+  if (cfg.streams.glyph === 'relational' && !state.glyphMap) shuffleGlyphMap();
+
+  updateHUD();
+  tick();
+  state.timer = setInterval(tick, cfg.interval);
+}
+
+function stopBlock(silent) {
+  clearInterval(state.timer);
+  state.timer = null;
+  state.running = false;
+  clearCells();
+  if (state.sessionStart) {
+    addMinutes(Date.now() - state.sessionStart);
+    state.sessionStart = null;
+  }
+  if (!silent) { state.judgments = []; updateHUD(); }
+}
+
+function endBlock() {
+  const score = blockScore();
+  const load = computeLoad();
+  stopBlock(true);
+
+  let verdict = 'hold', headline = '', detail = '', milestone = null;
+
+  if (cfg.mode === 'progression') {
+    if (score >= ADVANCE_AT) {
+      verdict = 'up';
+      if (prog.interval <= tune.targetInterval + 1e-6) {
+        /* Already at target speed and just held it — the milestone is proven, so
+           carry into the next digit. (Carrying on the step that merely *reaches*
+           the target would mean never actually playing a block at it.) */
+        const nx = describeNext(prog);
+        milestone = nx;
+        if (!advanceLadder(prog)) { prog.interval = tune.targetInterval; milestone = null;
+          headline = 'Ladder complete'; detail = 'Switch to Free Play to keep pushing.'; }
+      } else {
+        prog.interval = Math.max(tune.targetInterval, prog.interval - tune.intervalStep);
+        headline = `Faster — ${(prog.interval / 1000).toFixed(2)}s per stimulus`;
+        const left = Math.ceil((prog.interval - tune.targetInterval) / tune.intervalStep);
+        detail = left > 0
+          ? `${left} more step${left > 1 ? 's' : ''}, then hold ${(tune.targetInterval / 1000).toFixed(2)}s to clear this milestone.`
+          : `Hold ${(tune.targetInterval / 1000).toFixed(2)}s for one block to clear this milestone.`;
+      }
+    } else if (score <= DEMOTE_AT) {
+      verdict = 'down';
+      prog.interval += tune.intervalStep;
+      if (prog.interval > tune.maxInterval) {
+        regressLadder(prog);
+        headline = 'Stepped back a milestone';
+        detail = 'You were at the slowest interval and still under 70%.';
+      } else {
+        headline = `Slower — ${(prog.interval / 1000).toFixed(2)}s per stimulus`;
+        detail = 'Interval eased off. Same milestone.';
+      }
+    } else {
+      headline = `Holding at ${(prog.interval / 1000).toFixed(2)}s`;
+      detail = `Score ${Math.round(ADVANCE_AT * 100)}% or better speeds you up.`;
+    }
+    applyProgression();
+  } else {
+    /* Free Play adapts N the classic way and leaves everything else alone. */
+    if (score >= ADVANCE_AT) { freeCfg.n = Math.min(9, freeCfg.n + 1); verdict = 'up';
+      headline = `N rises to ${freeCfg.n}`; }
+    else if (score <= DEMOTE_AT) { freeCfg.n = Math.max(1, freeCfg.n - 1); verdict = 'down';
+      headline = `N falls to ${freeCfg.n}`; }
+    else headline = `N holds at ${freeCfg.n}`;
+    cfg.n = freeCfg.n;
+    $('nValue').value = freeCfg.n;
+  }
+
+  if (score >= ADVANCE_AT) progress.bestLoad = Math.max(progress.bestLoad || 0, load);
+  progress.blocks.push({
+    ts: Date.now(), mode: cfg.mode, n: cfg.n, load, score,
+    ladder: cfg.mode === 'progression' ? { ...prog } : null,
+    streams: Object.fromEntries(Object.entries(state.tally)
+      .map(([k, t]) => [k, { score: streamScore(t), raw: rawAcc(t),
+                             hit:t.hit, miss:t.miss, fa:t.fa, cr:t.cr }])),
+  });
+  saveProgress();
+
+  showReport(score, verdict, headline, detail, milestone, load);
+  syncSettingsUI();
+  updateHUD();
+}
+
+/* ============================================================
+   12. LOAD SCORE
+   ============================================================ */
+
+function computeLoad() {
+  let load = 10 * cfg.n;
+  STREAM_KEYS.forEach(k => {
+    if (cfg.streams[k] === 'identity') load += 4;
+    else if (cfg.streams[k] === 'relational') load += 9;
+  });
+  if (cfg.dim === 4) load += 12;
+  /* Capped: unbounded, this term dwarfs every other axis and lets Free Play inflate
+     Load with a silly interval instead of actual difficulty. */
+  load += Math.min(30, Math.max(0, 12 * (2500 / cfg.interval - 1)));
+  if (cfg.rotation) load += 6 + 600 / cfg.spin;
+  if (cfg.frame === 'screen') load += 20;
+  if (cfg.frame === 'both') load += 34;
+  return Math.round(load);
+}
+
+/* ============================================================
+   13. APPLYING THE LADDER
+   ============================================================ */
+
+function applyProgression() {
+  const levels = spinLevels();
+  prog.spinLevel = Math.min(prog.spinLevel, levels.length - 1);
+  prog.streamCount = Math.min(prog.streamCount, PROG_STREAMS.length);
+  prog.n = Math.max(1, prog.n);
+  prog.interval = Math.min(Math.max(prog.interval, tune.targetInterval), tune.maxInterval);
+
+  cfg.streams = {};
+  STREAM_KEYS.forEach(k => cfg.streams[k] = 'off');
+  PROG_STREAMS.slice(0, prog.streamCount).forEach(s => cfg.streams[s.key] = s.mode);
+
+  cfg.n = prog.n;
+  cfg.interval = prog.interval;
+  cfg.dim = 3;
+  cfg.frame = 'cube';
+  cfg.rotation = prog.spinLevel > 0;
+  cfg.spin = prog.spinLevel > 0 ? levels[prog.spinLevel] : 60;
+  cfg.blockLength = tune.blockLength;
+
+  if (cfg.streams.glyph === 'relational' && !state.glyphMap) shuffleGlyphMap();
+  onConfigChanged();
+}
+
+function applyFree() {
+  cfg.streams = { ...freeCfg.streams };
+  cfg.n = freeCfg.n;
+  cfg.interval = freeCfg.interval;
+  cfg.dim = freeCfg.dim;
+  cfg.frame = freeCfg.frame;
+  cfg.rotation = freeCfg.rotation;
+  cfg.spin = freeCfg.spin;
+  cfg.blockLength = freeCfg.blockLength;
+  cfg.feedback = freeCfg.feedback;
+  onConfigChanged(true);
+}
+
+function setMode(mode) {
+  if (state.running) stopBlock(true);
+  cfg.mode = mode;
+  $('modeProgression').classList.toggle('on', mode === 'progression');
+  $('modeFree').classList.toggle('on', mode === 'free');
+  $('progressionPane').style.display = mode === 'progression' ? '' : 'none';
+  $('freePane').style.display = mode === 'free' ? '' : 'none';
+  $('modeHint').textContent = mode === 'progression'
+    ? 'One ladder, driven by your accuracy. Speed adapts every block; clearing the target speed unlocks the next difficulty.'
+    : 'Everything unlocked and manual. N still adapts each block; Load scores the setup.';
+  if (mode === 'progression') applyProgression(); else applyFree();
+  buildCube(cfg.dim);
+  syncSettingsUI();
+  updateHUD();
+  saveProgress();
+}
+
+/* ============================================================
+   14. HUD + REPORT
+   ============================================================ */
+
+function spinLabel() {
+  if (!cfg.rotation) return 'still';
+  return `${cfg.spin}s/turn`;
+}
+
+function updateHUD() {
+  const isProg = cfg.mode === 'progression';
+  const pos = isProg ? ladderPosition() : null;
+
+  $('hudMode').textContent = isProg
+    ? `Milestone ${pos.index} / ${pos.total}`
+    : 'Free Play';
+  $('hudN').textContent = cfg.n;
+  $('hudSpinLabel').textContent = spinLabel();
+  $('hudTrial').textContent = `${state.scored}/${cfg.blockLength}`;
+  $('hudLoad').textContent = computeLoad();
+  $('hudAcc').textContent = Object.keys(state.tally).length
+    ? Math.round(blockScore() * 100) + '%' : '—';
+
+  if (isProg) {
+    $('speedWrap').style.display = '';
+    $('speedNow').textContent = (prog.interval / 1000).toFixed(2) + 's';
+    $('speedGoal').textContent = '→ ' + (tune.targetInterval / 1000).toFixed(2) + 's';
+    const span = Math.max(1, tune.startInterval - tune.targetInterval);
+    const done = (tune.startInterval - prog.interval) / span;
+    $('hudProgress').style.width = Math.max(0, Math.min(1, done)) * 100 + '%';
+    const nx = describeNext(prog);
+    $('hudNext').innerHTML = `next: <b>${nx.what}</b>`;
+  } else {
+    $('speedWrap').style.display = 'none';
+    $('hudNext').textContent = '';
+  }
+}
+
+const barColor = a => a >= 0.85 ? '#51cf66' : a >= 0.7 ? '#fcc419' : '#ff6b6b';
+
+function showReport(score, verdict, headline, detail, milestone, load) {
+  const rows = Object.entries(state.tally).map(([k, t]) => {
+    const s = streamScore(t);
+    return `<div class="bar-row">
+      <span class="nm">${labelFor(k)}</span>
+      <span class="track"><span class="fill" style="width:${(s*100).toFixed(0)}%;background:${barColor(s)}"></span></span>
+      <span class="val">${Math.round(s*100)}%</span>
+    </div>
+    <div class="bar-detail">${t.hit} hit · ${t.miss} miss · ${t.fa} false alarm ·
+      ${Math.round(rawAcc(t)*100)}% raw</div>`;
+  }).join('');
+
+  const mBanner = milestone ? `
+    <div class="milestone-banner">
+      <div class="t">★ Milestone cleared</div>
+      <div class="s">Now: <b style="color:#e6ebff">${milestone.what}</b><br>${milestone.why}</div>
+    </div>` : '';
+
+  modalBox.innerHTML = `
+    <h2>Block complete</h2>
+    <p>Score <b style="color:${barColor(score)}">${Math.round(score*100)}%</b> ·
+       Load <b>${load}</b> · N ${cfg.n} · ${spinLabel()}</p>
+    <div class="bars">${rows || '<p>No scored judgments.</p>'}</div>
+    ${headline ? `<div class="verdict ${verdict}">${headline}</div>` : ''}
+    ${detail ? `<p style="text-align:center;margin:6px 0 0;font-size:12px">${detail}</p>` : ''}
+    ${mBanner}
+    <p style="margin-top:14px;font-size:12px">
+      Bars are chance-corrected: 0% is what you'd score by never pressing, 100% is
+      flawless. The block score blends the average across streams with your weakest
+      stream, so an abandoned stream costs you either way.</p>
+    <button class="cta" id="modalClose">Continue</button>`;
+  modalEl.classList.add('open');
+  $('modalClose').onclick = () => modalEl.classList.remove('open');
+}
+
+/* ============================================================
+   15. GLYPH MAP
+   ============================================================ */
+
+/* ONE layout, generated once per session and used by both the intro and the scorer. */
+function shuffleGlyphMap() {
+  const pos = [{x:0,y:0},{x:1,y:0},{x:0,y:1},{x:1,y:1}];
+  const keys = [...GLYPH_SET_KEYS].sort(() => Math.random() - 0.5);
+  state.glyphMap = {};
+  keys.forEach((k, i) => { state.glyphMap[k] = pos[i]; });
+  renderGlyphLegend();
+}
+
+function glyphMapHTML() {
+  const grid = [null, null, null, null];
+  Object.entries(state.glyphMap).forEach(([k, p]) => { grid[p.y * 2 + p.x] = k; });
+  return `<div class="glyph-map">` + grid.map(k =>
+    `<div class="gm-cell"><div class="set">${k}</div>
+     <div class="items">${GLYPH_SETS[k].join(' ')}</div></div>`).join('') + `</div>`;
+}
+
+function renderGlyphLegend() {
+  const el = $('glyphLegend');
+  const show = state.glyphMap && cfg.streams.glyph === 'relational' && cfg.feedback === 'reveal';
+  el.classList.toggle('show', !!show);
+  if (!show) return;
+  const grid = [null, null, null, null];
+  Object.entries(state.glyphMap).forEach(([k, p]) => { grid[p.y * 2 + p.x] = k; });
+  el.innerHTML = `set map<br><b>${grid[0]}</b> &nbsp;<b>${grid[1]}</b><br><b>${grid[2]}</b> &nbsp;<b>${grid[3]}</b>`;
+}
+
+/* Blocking intro — the map must be memorised before trials begin. */
+function showGlyphIntro(then) {
+  shuffleGlyphMap();
+  modalBox.innerHTML = `
+    <h2>Symbol map</h2>
+    <p>These four sets sit on a 2×2 map, reshuffled every session. You will report
+       movement <em>across this map</em> — not which set it was.</p>
+    ${glyphMapHTML()}
+    <p>Within a set, <b>+</b> / <b>−</b> report rank movement (1→5, A→E, …).</p>
+    <button class="cta" id="modalClose">I have it — begin</button>`;
+  modalEl.classList.add('open');
+  $('modalClose').onclick = () => { modalEl.classList.remove('open'); then(); };
+}
+
+/* ============================================================
+   16. SETTINGS UI
+   ============================================================ */
+
+function renderStreamRows() {
+  const wrap = $('streamRows');
+  wrap.innerHTML = '';
+  STREAM_KEYS.forEach(k => {
+    const spec = STREAMS[k];
+    const row = document.createElement('div');
+    row.className = 'stream-row';
+    row.innerHTML = `<span class="swatch" style="background:${spec.color}"></span>
+      <span class="nm">${spec.label}</span>
+      <select data-stream="${k}">
+        <option value="off">Off</option>
+        <option value="identity">Identity</option>
+        <option value="relational">Relational</option>
+      </select>`;
+    const sel = row.querySelector('select');
+    sel.value = freeCfg.streams[k] || 'off';
+    sel.onchange = () => { freeCfg.streams[k] = sel.value; applyFree(); updateHUD(); saveProgress(); };
+    wrap.appendChild(row);
+  });
+}
+
+function renderLadderState() {
+  const levels = spinLevels();
+  const active = PROG_STREAMS.slice(0, prog.streamCount);
+  const pos = ladderPosition();
+  $('ladderState').innerHTML = `
+    <div><span class="k">Milestone</span><b>${pos.index}</b> of ${pos.total}</div>
+    <div><span class="k">Stimuli</span><b>${active.length}</b> — ${
+      active.map(s => `${STREAMS[s.key].label}<span style="opacity:.5">·${s.mode === 'relational' ? 'rel' : 'id'}</span>`).join(', ')}</div>
+    <div><span class="k">N</span><b>${prog.n}</b></div>
+    <div><span class="k">Rotation</span><b>${prog.spinLevel === 0 ? 'still' : levels[prog.spinLevel] + 's/turn'}</b>${
+      prog.spinLevel > 0 ? ` <span style="opacity:.5">(step ${prog.spinLevel}/${levels.length - 1})</span>` : ''}</div>
+    <div><span class="k">Interval</span><b>${(prog.interval / 1000).toFixed(2)}s</b>
+      <span style="opacity:.5">→ ${(tune.targetInterval / 1000).toFixed(2)}s</span></div>`;
+
+  const nx = describeNext(prog);
+  $('nextUp').innerHTML = `Clear this milestone and <b>${nx.what}</b>.<br>
+    <span style="opacity:.75">${nx.why}</span>`;
+
+  $('spinLadderHint').textContent =
+    `${levels.length - 1} rotation steps: ${levels.slice(1).join('s, ')}s per turn.`;
+}
+
+function syncSettingsUI() {
+  $('feedbackMode').value = cfg.feedback;
+  $('feedbackModeF').value = freeCfg.feedback;
+  $('startInterval').value = tune.startInterval / 1000;
+  $('targetInterval').value = tune.targetInterval / 1000;
+  $('intervalStep').value = tune.intervalStep / 1000;
+  $('spinStart').value = tune.spinStart;
+  $('spinEnd').value = tune.spinEnd;
+  $('spinStep').value = tune.spinStep;
+  $('nMax').value = tune.nMax;
+  $('nAfterStimulus').value = tune.nAfterStimulus;
+  $('blockLengthP').value = tune.blockLength;
+
+  $('nValue').value = freeCfg.n;
+  $('intervalMs').value = freeCfg.interval;
+  $('blockLengthF').value = freeCfg.blockLength;
+  $('cubeDimension').value = freeCfg.dim;
+  $('rotationOn').checked = freeCfg.rotation;
+  $('rotationSpeed').value = freeCfg.spin;
+  $('frameMode').value = freeCfg.frame;
+  $('gizmoMode').value = cfg.gizmo;
+
+  renderStreamRows();
+  renderLadderState();
+}
+
+function onConfigChanged(rebuildCube) {
+  if (rebuildCube) buildCube(cfg.dim);
+  applyRotation();
+  applyGizmoMode();
+  buildDeck();
+  renderGlyphLegend();
+  updateHUD();   // single place, so the readout can never drift from cfg
+}
+
+function renderDataPanel() {
+  $('minutesToday').textContent = Math.floor(progress.dailyMinutes[today()] || 0);
+  $('bestLoad').textContent = progress.bestLoad || 0;
+}
+
+/* ============================================================
+   17. WIRING
+   ============================================================ */
+
+$('settingsBtn').onclick = () => $('settingsPanel').classList.toggle('open');
+$('modeProgression').onclick = () => setMode('progression');
+$('modeFree').onclick = () => setMode('free');
+
+/* --- progression tunables --- */
+const numIn = (id, apply) => $(id).oninput = e => {
+  const v = parseFloat(e.target.value);
+  if (!isFinite(v)) return;
+  apply(v);
+  if (cfg.mode === 'progression') applyProgression();
+  renderLadderState(); updateHUD(); saveProgress();
+};
+numIn('startInterval',  v => { tune.startInterval = Math.max(1000, v * 1000);
+                               tune.maxInterval = tune.startInterval + 1500; });
+numIn('targetInterval', v => tune.targetInterval = Math.max(500, v * 1000));
+numIn('intervalStep',   v => tune.intervalStep = Math.max(50, v * 1000));
+numIn('spinStart',      v => tune.spinStart = Math.max(5, v));
+numIn('spinEnd',        v => tune.spinEnd = Math.max(3, v));
+numIn('spinStep',       v => tune.spinStep = Math.max(1, v));
+numIn('nMax',           v => tune.nMax = Math.max(1, Math.round(v)));
+numIn('nAfterStimulus', v => tune.nAfterStimulus = Math.max(1, Math.round(v)));
+numIn('blockLengthP',   v => tune.blockLength = Math.max(5, Math.round(v)));
+
+$('feedbackMode').onchange = e => {
+  cfg.feedback = e.target.value; renderGlyphLegend(); saveProgress();
+};
+
+$('resetProgress').onclick = () => {
+  if (!confirm('Erase the ladder, all history and settings? This cannot be undone.')) return;
+  localStorage.removeItem(STORE_KEY);
+  prog = { streamCount:1, n:1, spinLevel:0, interval:5000 };
+  progress = { version:2, bestLoad:0, dailyMinutes:{}, blocks:[] };
+  setMode('progression');
+  renderDataPanel();
+};
+
+/* --- free play --- */
+const freeIn = (id, apply, rebuild) => $(id).oninput = e => {
+  const v = parseFloat(e.target.value);
+  if (!isFinite(v)) return;
+  apply(v); applyFree(); if (rebuild) buildCube(cfg.dim); updateHUD(); saveProgress();
+};
+freeIn('nValue',        v => freeCfg.n = Math.max(1, Math.round(v)));
+freeIn('intervalMs',    v => freeCfg.interval = Math.max(500, v));
+freeIn('blockLengthF',  v => freeCfg.blockLength = Math.max(5, Math.round(v)));
+freeIn('rotationSpeed', v => freeCfg.spin = Math.max(5, v));
+
+$('cubeDimension').onchange = e => { freeCfg.dim = +e.target.value; applyFree(); buildCube(cfg.dim); updateHUD(); saveProgress(); };
+$('rotationOn').onchange    = e => { freeCfg.rotation = e.target.checked; applyFree(); updateHUD(); saveProgress(); };
+$('frameMode').onchange     = e => { freeCfg.frame = e.target.value; applyFree(); updateHUD(); saveProgress(); };
+$('feedbackModeF').onchange = e => { freeCfg.feedback = e.target.value; cfg.feedback = e.target.value; renderGlyphLegend(); saveProgress(); };
+$('gizmoMode').onchange     = e => { cfg.gizmo = e.target.value; applyGizmoMode(); saveProgress(); };
+
+/* --- run controls --- */
+$('startBtn').onclick = () => {
+  $('settingsPanel').classList.remove('open');
+  if (cfg.streams.glyph === 'relational') showGlyphIntro(startBlock);
+  else startBlock();
+};
+$('stopBtn').onclick = () => stopBlock(false);
+
+document.addEventListener('keydown', e => {
+  /* e.target can be `document` (no .matches), which would throw and swallow the
+     keypress. Guard on Element before testing. */
+  if (e.target instanceof Element && e.target.closest('input, select, textarea')) return;
+  const k = e.key.toLowerCase();
+  const ch = state.keyIndex[k];
+  if (ch) { e.preventDefault(); press(ch); return; }
+  if (k === 'enter' && !state.running) { e.preventDefault(); $('startBtn').click(); }
+  if (k === 'escape') { e.preventDefault(); stopBlock(false); }
+});
+
+/* Debounced: cube size is vmin-based so a resize must rebuild, but mobile browsers
+   fire this continuously as the address bar hides, and each rebuild drops the
+   on-screen stimulus. */
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    buildCube(cfg.dim);
+    const cur = state.history[state.history.length - 1];
+    if (state.running && cur) state.cells[cur.cellIdx].el.classList.add('active');
+  }, 160);
+});
+
+/* ============================================================
+   18. BOOT
+   ============================================================ */
+
+buildCube(3);
+setMode(cfg.mode);
+renderDataPanel();
 </script>
-
 </body>
 </html>
