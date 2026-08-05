@@ -91,6 +91,26 @@
   }
   .next-up b { color: #8ab4ff; }
 
+  /* keybind editor */
+  .kb-stream {
+    margin: 12px 0 5px; font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .kb-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .kb-row .kb-glyph { width: 24px; text-align: center; font-weight: 700; flex: none; }
+  .kb-row .kb-label { flex: 1; font-size: 12.5px; }
+  .kb-key {
+    width: 70px; flex: none; padding: 4px 6px; font-size: 11px; text-align: center;
+    background: #0e121a; border: 1px solid var(--border-inner); border-radius: 5px;
+    color: var(--text); cursor: pointer; font-family: ui-monospace, monospace;
+  }
+  .kb-key.custom { border-color: #4d7fd6; color: #8ab4ff; }
+  .kb-key.capturing { border-color: #4d7fd6; background: #1b2740; color: #8ab4ff; }
+  .kb-key.clash { border-color: var(--bad); color: var(--bad); }
+  #keybindDetails summary {
+    cursor: pointer; font-size: 12.5px; color: var(--muted); padding: 2px 0;
+  }
+
   /* ---------- HUD ---------- */
   .hud {
     position: fixed; top: 14px; right: 14px; z-index: 10;
@@ -445,6 +465,17 @@
     </div>
   </div>
 
+  <h3>Keybinds</h3>
+  <details id="keybindDetails">
+    <summary>Show all bindings</summary>
+    <div id="keybindList"></div>
+    <button class="rbtn" id="resetKeybinds" style="width:100%;padding:8px;margin-top:12px">
+      Reset to defaults</button>
+  </details>
+  <div class="hint">Click a key to rebind, then press the new one.
+    <b>Esc</b> cancels, <b>Backspace</b> restores the default. Bindings apply in both
+    modes and are saved.</div>
+
   <h3>Data</h3>
   <div class="setting-group">
     <label>Today: <span id="minutesToday">0</span> min &nbsp;·&nbsp; Best load:
@@ -606,6 +637,44 @@ const colorFor = k => (STREAMS[k] ? STREAMS[k].color : '#9ccc65');
 /* Keys are assigned dynamically from this pool when a preferred key collides —
    enabling many streams at once (or "both frames") otherwise double-books keys. */
 const KEY_POOL = ('qwertyuiopasdfghjkl;zxcvbnm,./1234567890').split('');
+
+/* Every response channel in the app, tagged with the stream + mode slot it lives in.
+   This is the list the keybind editor walks. */
+const CHANNELS = STREAM_KEYS.flatMap(k =>
+  ['identity', 'relational', 'relationalScreen'].flatMap(mode =>
+    (STREAMS[k][mode] || []).map(c => ({ ...c, stream: k, mode }))));
+const CHANNEL_BY_ID = Object.fromEntries(CHANNELS.map(c => [c.id, c]));
+
+/* Two channels only clash if they can be on screen simultaneously. A stream is in
+   exactly one mode at a time, so `pitch` (identity) and `pitch-down` (relational)
+   sharing J is deliberate, not a conflict. The one exception is position, whose cube
+   and screen channels are both live in "both frames" mode. */
+function canCoOccur(a, b) {
+  if (!a || !b) return false;
+  if (a.stream !== b.stream) return true;
+  if (a.mode === b.mode) return true;
+  return a.stream === 'position' &&
+         [a.mode, b.mode].sort().join('|') === 'relational|relationalScreen';
+}
+
+let keyBinds = {};                                   // channelId -> key (persisted)
+const effectiveKey = id => keyBinds[id] || (CHANNEL_BY_ID[id] || {}).key;
+
+/* Rebinding swaps with whatever held the key, but only among channels that could
+   actually be active together — otherwise a harmless shared default gets clobbered. */
+function rebind(id, key) {
+  const me = CHANNEL_BY_ID[id], old = effectiveKey(id);
+  CHANNELS.forEach(c => {
+    if (c.id !== id && effectiveKey(c.id) === key && canCoOccur(me, c)) keyBinds[c.id] = old;
+  });
+  keyBinds[id] = key;
+  buildDeck(); renderKeybinds(); saveProgress();
+}
+
+function clearBind(id) {
+  delete keyBinds[id];
+  buildDeck(); renderKeybinds(); saveProgress();
+}
 
 /* ============================================================
    2. PROGRESSION LADDER
@@ -786,6 +855,7 @@ function loadProgress() {
     if (p.prog) Object.assign(prog, p.prog);
     if (p.tune) Object.assign(tune, p.tune);
     if (p.freeCfg) Object.assign(freeCfg, p.freeCfg);
+    if (p.keyBinds) keyBinds = p.keyBinds;
     if (p.mode) cfg.mode = p.mode;
     return p;
   } catch (e) { return blank; }
@@ -796,6 +866,7 @@ function saveProgress() {
     if (progress.blocks.length > 500) progress.blocks = progress.blocks.slice(-500);
     progress.prog = prog; progress.tune = tune;
     progress.freeCfg = freeCfg; progress.mode = cfg.mode;
+    progress.keyBinds = keyBinds;
     localStorage.setItem(STORE_KEY, JSON.stringify(progress));
   } catch (e) { /* quota or private mode — training still works, just unsaved */ }
 }
@@ -1208,16 +1279,16 @@ function deckGroups() {
   return groups;
 }
 
-/* Preferred key first; anything double-booked falls back to the next free key. */
+/* Custom bind wins, then the built-in default, then the pool. The pool pass is the
+   runtime guarantee: whatever the user configures, no two live buttons share a key. */
 function assignKeys(groups) {
   const used = new Set(), map = new Map();
   const all = groups.flatMap(g => g.channels);
-  all.forEach(c => { if (c.key && !used.has(c.key)) { used.add(c.key); map.set(c.id, c.key); } });
-  all.forEach(c => {
-    if (map.has(c.id)) return;
-    const k = KEY_POOL.find(k => !used.has(k));
-    if (k) { used.add(k); map.set(c.id, k); }
-  });
+  const claim = (c, k) => { if (k && !used.has(k)) { used.add(k); map.set(c.id, k); } };
+
+  all.forEach(c => claim(c, keyBinds[c.id]));
+  all.forEach(c => { if (!map.has(c.id)) claim(c, c.key); });
+  all.forEach(c => { if (!map.has(c.id)) claim(c, KEY_POOL.find(k => !used.has(k))); });
   return map;
 }
 
@@ -1622,6 +1693,66 @@ function renderStreamRows() {
   });
 }
 
+let capturingId = null;
+
+function renderKeybinds() {
+  capturingId = null;
+  const wrap = $('keybindList');
+  wrap.innerHTML = '';
+
+  STREAM_KEYS.forEach(k => {
+    const spec = STREAMS[k];
+    const head = document.createElement('div');
+    head.className = 'kb-stream';
+    head.innerHTML = `<span style="color:${spec.color}">■</span> ${spec.label}`;
+    wrap.appendChild(head);
+
+    ['identity', 'relational', 'relationalScreen'].forEach(mode => {
+      (spec[mode] || []).forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'kb-row';
+        row.innerHTML =
+          `<span class="kb-glyph" style="color:${c.color || spec.color}">${c.glyph}</span>
+           <span class="kb-label">${c.label}${
+             mode === 'relationalScreen' ? ' <span style="opacity:.45">screen</span>' :
+             mode === 'identity' ? ' <span style="opacity:.45">id</span>' : ''}</span>`;
+
+        /* For a channel that's live right now, show the key that ACTUALLY works —
+           assignKeys may have bumped it off its preferred key to keep the live deck
+           unambiguous. Dormant channels show their configured key instead. */
+        const live = runtimeKey(c.id);
+        const bumped = live && live !== effectiveKey(c.id);
+        if (!live) row.style.opacity = '.5';
+
+        const btn = document.createElement('button');
+        btn.className = 'kb-key' + (keyBinds[c.id] ? ' custom' : '') + (bumped ? ' clash' : '');
+        btn.dataset.id = c.id;
+        btn.textContent = keyLabel(live || effectiveKey(c.id));
+        if (bumped) btn.title = `Wanted ${keyLabel(effectiveKey(c.id))}, but another ` +
+          `active button already has it — using ${keyLabel(live)} instead.`;
+        else if (!live) btn.title = 'This stream is not active right now.';
+        btn.onclick = () => {
+          wrap.querySelectorAll('.kb-key.capturing').forEach(b => {
+            b.classList.remove('capturing');
+            b.textContent = keyLabel(effectiveKey(b.dataset.id));
+          });
+          capturingId = c.id;
+          btn.classList.add('capturing');
+          btn.textContent = 'press…';
+        };
+        row.appendChild(btn);
+        wrap.appendChild(row);
+      });
+    });
+  });
+}
+
+/* The key a channel responds to right now, or undefined if its stream is dormant. */
+function runtimeKey(id) {
+  for (const k in state.keyIndex) if (state.keyIndex[k] === id) return k;
+  return undefined;
+}
+
 function renderLadderState() {
   const levels = spinLevels();
   const active = PROG_STREAMS.slice(0, prog.streamCount);
@@ -1668,6 +1799,7 @@ function syncSettingsUI() {
 
   renderStreamRows();
   renderLadderState();
+  renderKeybinds();
 }
 
 function onConfigChanged(rebuildCube) {
@@ -1676,7 +1808,8 @@ function onConfigChanged(rebuildCube) {
   applyGizmoMode();
   buildDeck();
   renderGlyphLegend();
-  updateHUD();   // single place, so the readout can never drift from cfg
+  renderKeybinds();   // live/dormant state changes with the active streams
+  updateHUD();        // single place, so the readout can never drift from cfg
 }
 
 function renderDataPanel() {
@@ -1720,8 +1853,14 @@ $('resetProgress').onclick = () => {
   localStorage.removeItem(STORE_KEY);
   prog = { streamCount:1, n:1, spinLevel:0, interval:5000 };
   progress = { version:2, bestLoad:0, dailyMinutes:{}, blocks:[] };
+  keyBinds = {};
   setMode('progression');
   renderDataPanel();
+};
+
+$('resetKeybinds').onclick = () => {
+  keyBinds = {};
+  buildDeck(); renderKeybinds(); saveProgress();
 };
 
 /* --- free play --- */
@@ -1750,6 +1889,16 @@ $('startBtn').onclick = () => {
 $('stopBtn').onclick = () => stopBlock(false);
 
 document.addEventListener('keydown', e => {
+  /* Rebinding swallows the next key, whatever it is — including keys that would
+     otherwise be responses or shortcuts. */
+  if (capturingId) {
+    e.preventDefault(); e.stopPropagation();
+    const id = capturingId, k = e.key.toLowerCase();
+    if (k === 'escape') { renderKeybinds(); return; }
+    capturingId = null;
+    if (k === 'backspace' || k === 'delete') clearBind(id); else rebind(id, k);
+    return;
+  }
   /* e.target can be `document` (no .matches), which would throw and swallow the
      keypress. Guard on Element before testing. */
   if (e.target instanceof Element && e.target.closest('input, select, textarea')) return;
