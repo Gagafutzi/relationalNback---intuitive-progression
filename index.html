@@ -17,7 +17,8 @@
     --muted: rgba(230, 235, 255, 0.55);
     --good: #51cf66;
     --bad: #ff6b6b;
-    --cube-size: min(34vmin, 240px);
+    --cube-scale: 1;
+    --cube-size: calc(min(34vmin, 240px) * var(--cube-scale));
   }
 
   * { box-sizing: border-box; }
@@ -200,6 +201,9 @@
 
   /* The stage reserves the GIZMO's footprint, not the cube's — the arms reach
      ~0.85 × cube-size from centre, so a stage sized to the cube clips the badges. */
+  /* Spaced needs a wider stage: the lattice itself fills --cube-size, and the arms
+     are lengthened on top of that to clear it. */
+  .cube-stage.spread { width: calc(var(--cube-size) * 2.2); height: calc(var(--cube-size) * 2.2); }
   .cube-stage {
     width: calc(var(--cube-size) * 1.7); height: calc(var(--cube-size) * 1.7);
     display: flex; align-items: center; justify-content: center;
@@ -235,7 +239,7 @@
      dimension uses — colour, size and glyph are all taken. */
   .cell.gate-closed .cell-face {
     border: 2px dashed #ff922b !important;
-    box-shadow: 0 0 14px 2px rgba(255,146,43,.6) !important;
+    box-shadow: 0 0 14px 2px rgba(255, 146, 43, .6) !important;
   }
   .gate-banner {
     position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -253,7 +257,7 @@
   .retro-cue.show { display: block; }
   .retro-cue .pair {
     font-size: 40px; font-weight: 700; color: #8ab4ff; font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 22px rgba(138,180,255,.55);
+    text-shadow: 0 0 22px rgba(138, 180, 255, .55);
   }
   .retro-cue .cap {
     font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase;
@@ -623,6 +627,13 @@
         interval to at least 1.30s so there is time to answer after the cue.</div>
     </div>
     <div class="setting-group">
+      <label><input type="checkbox" id="fixedGlyphMap" style="width:auto"> Fixed symbol
+        map</label>
+      <div class="hint">Normally the 2×2 map of symbol sets reshuffles every session so
+        it must be re-learned. Fixed keeps one layout forever — much easier, and it
+        removes the re-memorisation the shuffle is there to force.</div>
+    </div>
+    <div class="setting-group">
       <label>Lure rate: <span id="lureVal">20</span>%</label>
       <input type="number" id="lureRateF" value="20" min="10" max="50" step="5" />
       <div class="hint">Share of trials that match N±1 but not N — familiarity says
@@ -675,6 +686,21 @@
       <option value="letters">Letters only</option>
       <option value="off">Off (hard mode)</option>
     </select>
+  </div>
+
+  <div class="setting-group">
+    <label>Cube layout</label>
+    <select id="cubeLayout">
+      <option value="dense">Dense — true cube</option>
+      <option value="spaced">Spaced — gaps between cells</option>
+    </select>
+    <div class="hint" id="layoutHint"></div>
+  </div>
+  <div class="setting-group">
+    <label>Cube size: <span id="cubeSizeVal">100</span>%</label>
+    <input type="range" id="cubeSize" min="60" max="190" step="5" value="100" />
+    <div class="hint">Spaced layout scales its spread to match, so a bigger cube means
+      bigger gaps rather than just bigger cells.</div>
   </div>
 
   <h3>Appearance</h3>
@@ -731,6 +757,18 @@
   <div class="hint">Click a key to rebind, then press the new one.
     <b>Esc</b> cancels, <b>Backspace</b> restores the default. Bindings apply in both
     modes and are saved.</div>
+
+  <h3>Profile</h3>
+  <div class="setting-group">
+    <select id="profileSel"></select>
+    <div class="pair" style="margin-top:7px">
+      <div><button class="rbtn" id="profileNew" style="width:100%;padding:7px">New</button></div>
+      <div><button class="rbtn" id="profileRename" style="width:100%;padding:7px">Rename</button></div>
+    </div>
+    <button class="rbtn" id="profileDelete" style="width:100%;padding:7px;margin-top:6px">
+      Delete this profile</button>
+    <div class="hint" id="profileHint"></div>
+  </div>
 
   <h3>Data</h3>
   <div class="setting-group">
@@ -1286,6 +1324,8 @@ const cfg = {
   blockLength: 20,
   gizmo: 'full',
   cellVis: 'lattice',
+  layout: 'dense',
+  cubeScale: 1,
   feedback: 'reveal',
   lureRate: 0.20,
   meta: false,        // second-order relational judgements
@@ -1299,6 +1339,9 @@ const freeCfg = {
   n: 2, streams: { position: 'relational' }, dim: 3, rotation: false,
   spin: 60, frame: 'cube', interval: 2500, blockLength: 20, feedback: 'reveal',
   lureRate: 0.20, meta: false, gate: 0, retro: 0,
+  /* varPriority was missing here while cfg defaulted it on, so Free Play silently
+     ran without the cue that progression uses. */
+  varPriority: true, fixedGlyphMap: false,
 };
 
 const tune = {
@@ -1347,7 +1390,10 @@ const state = {
   sessionStart: null, keyIndex: {},
 };
 
-let progress = loadProgress();
+/* Declared here, but only populated once the profile registry below has resolved
+   which record to read — `let profiles` sits in the persistence section and a call
+   before it would hit the temporal dead zone. */
+let progress = null;
 
 /* ============================================================
    4. DOM
@@ -1363,12 +1409,99 @@ const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
    5. PERSISTENCE
    ============================================================ */
 
-const STORE_KEY = 'rnb.progress.v2';
+/* ---- Profiles ----
+   Each profile owns a complete, independent training record under its own key, so
+   several people can share a browser and one person can keep separate tracks.
+   Appearance stays device-level: it is a display preference, and per-profile
+   background images would multiply the storage that matters least. */
+const PROFILES_KEY = 'rnb.profiles.v1';
+const LEGACY_KEY   = 'rnb.progress.v2';
+
+let profiles = { active: null, list: [] };
+
+const storeKey = () => `${LEGACY_KEY}.${profiles.active}`;
+const newProfileId = () =>
+  'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+function loadProfiles() {
+  try {
+    const raw = localStorage.getItem(PROFILES_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && Array.isArray(p.list) && p.list.length) {
+        profiles = p;
+        if (!profiles.list.some(x => x.id === profiles.active))
+          profiles.active = profiles.list[0].id;
+        return;
+      }
+    }
+  } catch (e) { /* fall through to a fresh registry */ }
+
+  /* First run, or upgrading from the single-key layout: adopt any existing record
+     as the first profile rather than stranding it. */
+  const id = newProfileId();
+  profiles = { active: id, list: [{ id, name: 'Player 1', created: Date.now() }] };
+  const legacy = localStorage.getItem(LEGACY_KEY);
+  if (legacy) {
+    try {
+      localStorage.setItem(`${LEGACY_KEY}.${id}`, legacy);
+      localStorage.removeItem(LEGACY_KEY);
+    } catch (e) { /* keep the legacy copy if the move fails */ }
+  }
+  saveProfiles();
+}
+
+function saveProfiles() {
+  try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch (e) {}
+}
+
+const activeProfile = () =>
+  profiles.list.find(p => p.id === profiles.active) || { name: '—', id: '' };
+
+loadProfiles();
+progress = loadProgress();
+
+/* Everything that lives outside `progress` and has to be re-seeded when the active
+   profile changes. Reset first, then load, so a profile with no saved value inherits
+   a clean default rather than the previous profile's. */
+function resetInMemoryState() {
+  prog = { streamCount:1, n:1, spinLevel:0, interval:5000, lureRate:0.20 };
+  Object.keys(tiers).forEach(k => delete tiers[k]);
+  rcTier = 3;
+  stairLog = null;
+  keyBinds = {};
+  state.glyphMap = null;
+  Object.assign(tune, {
+    adapt:'bayes', startInterval:5000, targetInterval:3000, intervalStep:250,
+    maxInterval:6500, spinStart:100, spinEnd:20, spinStep:10,
+    nMax:3, nAfterStimulus:2, blockLength:20,
+  });
+  Object.assign(freeCfg, {
+    n:2, streams:{ position:'relational' }, dim:3, rotation:false, spin:60,
+    frame:'cube', interval:2500, blockLength:20, feedback:'reveal',
+    lureRate:0.20, meta:false, gate:0, retro:0, varPriority:true, fixedGlyphMap:false,
+  });
+}
+
+function switchProfile(id) {
+  if (id === profiles.active) return;
+  if (state.running) stopBlock(true);
+  saveProgress();                      // flush the outgoing profile
+  profiles.active = id;
+  saveProfiles();
+  resetInMemoryState();
+  progress = loadProgress();
+  if (!stairLog) stairInit(prog.interval || tune.startInterval);
+  setMode(progress.mode || 'progression');
+  buildCube(cfg.dim);
+  renderDataPanel();
+  renderProfileUI();
+}
 
 function loadProgress() {
   const blank = { version:2, bestLoad:0, dailyMinutes:{}, blocks:[] };
   try {
-    const raw = localStorage.getItem(STORE_KEY);
+    const raw = localStorage.getItem(storeKey());
     if (!raw) return blank;
     const p = Object.assign(blank, JSON.parse(raw));
     if (p.prog) Object.assign(prog, p.prog);
@@ -1383,8 +1516,12 @@ function loadProgress() {
         stair: Array.isArray(v.stair) && v.stair.length === STAIR.steps ? v.stair.slice() : null };
     });
     if (p.rcTier) rcTier = p.rcTier;
+    /* A fixed symbol map is only fixed if it outlives the session that made it. */
+    if (p.glyphMap) state.glyphMap = p.glyphMap;
     if (p.display) { cfg.gizmo = p.display.gizmo || cfg.gizmo;
-                     cfg.cellVis = p.display.cellVis || cfg.cellVis; }
+                     cfg.cellVis = p.display.cellVis || cfg.cellVis;
+                     cfg.layout = p.display.layout || cfg.layout;
+                     cfg.cubeScale = p.display.cubeScale || cfg.cubeScale; }
     if (p.mode) cfg.mode = p.mode;
     return p;
   } catch (e) { return blank; }
@@ -1396,16 +1533,20 @@ function saveProgress() {
   progress.prog = prog; progress.tune = tune;
   progress.freeCfg = freeCfg; progress.mode = cfg.mode;
   progress.keyBinds = keyBinds;
-  progress.display = { gizmo: cfg.gizmo, cellVis: cfg.cellVis };
+  progress.display = { gizmo: cfg.gizmo, cellVis: cfg.cellVis, layout: cfg.layout,
+                       cubeScale: cfg.cubeScale };
   progress.stair = stairLog ? stairLog.map(v => +v.toFixed(4)) : null;
   progress.rcTier = rcTier;
+  progress.profileName = activeProfile().name;
+  if (freeCfg.fixedGlyphMap && state.glyphMap) progress.glyphMap = state.glyphMap;
+  else delete progress.glyphMap;
   tierState(rcTier).prog = { ...prog };
   tierState(rcTier).stair = stairLog ? stairLog.slice() : null;
   progress.tiers = Object.fromEntries(Object.entries(tiers).map(([k, v]) =>
     [k, { prog: v.prog, stair: v.stair ? v.stair.map(x => +x.toFixed(4)) : null }]));
 
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(progress));
+    localStorage.setItem(storeKey(), JSON.stringify(progress));
     progress.saveWarning = null;
   } catch (e) {
     /* Out of quota. Shed the bulkiest thing (raw per-press logs on older blocks)
@@ -1416,12 +1557,12 @@ function saveProgress() {
       progress.blocks.forEach((b, i) => {
         if (i < progress.blocks.length - keep) delete b.presses;
       });
-      localStorage.setItem(STORE_KEY, JSON.stringify(progress));
+      localStorage.setItem(storeKey(), JSON.stringify(progress));
       progress.saveWarning = 'storage full — dropped raw press logs from older blocks';
     } catch (e2) {
       try {
         progress.blocks = progress.blocks.slice(-100);
-        localStorage.setItem(STORE_KEY, JSON.stringify(progress));
+        localStorage.setItem(storeKey(), JSON.stringify(progress));
         progress.saveWarning = 'storage full — kept only the last 100 blocks';
       } catch (e3) {
         progress.saveWarning = 'could not save — export your JSON before closing';
@@ -1458,12 +1599,94 @@ function addFaces(parent, size, cls, html) {
   });
 }
 
+/* How readable each depth layer is. A dense cube in perspective projects a front
+   cell and a back cell to nearly the same place, which is the single biggest reason
+   positions are hard to read. */
+const LAYOUT_HINT = {
+  dense:  'The true cube. Most faithful, but front and back layers overlap on screen.',
+  spaced: 'Cells shrunk apart on a viewing angle solved so that no two slots overlap while the cube is still. Depth-tinted. Rotation still works, and overlap returns while it turns.',
+};
+
+/* ---- Solving the static view ----
+   A cube lattice under perspective normally has collisions — an isometric view is the
+   worst case, since (X+Z) lands on the same screen x for many cells. Rather than guess
+   an angle, search for the one that maximises the MINIMUM pairwise screen distance
+   between slot centres. That distance then dictates how large a cell can be drawn
+   before neighbours touch.
+
+   Projection under rotateX(a) rotateY(b), matching the CSS transform order:
+     sx = X·cos b + Z·sin b
+     sy = X·sin a·sin b + Y·cos a − Z·sin a·cos b                                    */
+function projectLattice(dim, a, b) {
+  const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+  const pts = [];
+  for (let X = 0; X < dim; X++)
+    for (let Y = 0; Y < dim; Y++)
+      for (let Z = 0; Z < dim; Z++)
+        pts.push([X * cb + Z * sb, X * sa * sb + Y * ca - Z * sa * cb]);
+  return pts;
+}
+
+function minPairDistance(pts) {
+  let m = Infinity;
+  for (let i = 0; i < pts.length; i++)
+    for (let j = i + 1; j < pts.length; j++) {
+      const dx = pts[i][0] - pts[j][0], dy = pts[i][1] - pts[j][1];
+      const d = dx * dx + dy * dy;
+      if (d < m) m = d;
+    }
+  return Math.sqrt(m);
+}
+
+const staticViewCache = {};
+let staticView = null;      // solved angle in force for the current build, if any
+
+function solveStaticView(dim) {
+  if (staticViewCache[dim]) return staticViewCache[dim];
+  let best = { sep: -1, ax: -24, ay: -28 };
+  /* Coarse sweep then refine. A few thousand candidates is milliseconds and only
+     ever runs once per cube dimension. */
+  for (let ax = -46; ax <= -8; ax += 2)
+    for (let ay = -68; ay <= -12; ay += 2) {
+      const sep = minPairDistance(projectLattice(dim, ax * Math.PI / 180, ay * Math.PI / 180));
+      if (sep > best.sep) best = { sep, ax, ay };
+    }
+  for (let ax = best.ax - 2; ax <= best.ax + 2; ax += 0.5)
+    for (let ay = best.ay - 2; ay <= best.ay + 2; ay += 0.5) {
+      const sep = minPairDistance(projectLattice(dim, ax * Math.PI / 180, ay * Math.PI / 180));
+      if (sep > best.sep) best = { sep, ax, ay };
+    }
+  /* Projected bounding box, so the result can be scaled to the available space. */
+  const pts = projectLattice(dim, best.ax * Math.PI / 180, best.ay * Math.PI / 180);
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  best.w = Math.max(...xs) - Math.min(...xs);
+  best.h = Math.max(...ys) - Math.min(...ys);
+  return (staticViewCache[dim] = best);
+}
+
 function buildCube(dim) {
   gridCube.innerHTML = '';
   state.cells = [];
   const size = gridCube.clientWidth || 240;
-  const cellSize = size / dim;
+  const layout = cfg.layout || 'dense';
   const off = (dim - 1) / 2;
+
+  let step = size / dim;
+  let cellSize = step;
+
+  if (layout === 'spaced') {
+    /* Spread the lattice out and size the cells from the solved separation, so no two
+       slots touch at the static viewing angle. Scaled to fill the space available
+       rather than to a fixed step, so a bigger cube uses the room it is given. */
+    const v = solveStaticView(dim);
+    step = size / Math.max(v.w, v.h);
+    /* 0.82 leaves a visible gap at the tightest pair instead of exact tangency. */
+    cellSize = v.sep * step * 0.82;
+    staticView = v;
+  } else {
+    staticView = null;
+  }
+  document.querySelector('.cube-stage').classList.toggle('spread', layout === 'spaced');
 
   for (let x = 0; x < dim; x++)
     for (let y = 0; y < dim; y++)
@@ -1473,8 +1696,15 @@ function buildCube(dim) {
         cell.style.width = cell.style.height = cellSize + 'px';
         cell.style.left = cell.style.top = `calc(50% - ${cellSize / 2}px)`;
         cell.style.transform =
-          `translate3d(${(x-off)*cellSize}px, ${(y-off)*cellSize}px, ${(z-off)*cellSize}px)`;
-        addFaces(cell, cellSize, 'cell-face', '');
+          `translate3d(${(x-off)*step}px, ${(y-off)*step}px, ${(z-off)*step}px)`;
+        const faces = addFaces(cell, cellSize, 'cell-face', '');
+        if (layout === 'spaced') {
+          /* Depth cue by brightness, not hue — the six axis colours already own the
+             hue channel, and a magenta far-layer reads as the violet A axis. */
+          const t = dim > 1 ? z / (dim - 1) : 0;
+          const col = `hsla(215, 30%, ${52 + t * 34}%, ${0.20 + t * 0.45})`;
+          faces.forEach(f => { f.style.borderColor = col; });
+        }
         gridCube.appendChild(cell);
         state.cells.push({ el: cell, x, y, z });
       }
@@ -1483,6 +1713,7 @@ function buildCube(dim) {
   buildGuides(size);
   buildGizmo();
   applyCellVis();
+  applyRotation();
 }
 
 /* Outer wireframe box. Once the lattice is faded or hidden there is nothing left to
@@ -1567,9 +1798,28 @@ function applyCellVis() {
 function buildGizmo() {
   gizmoEl.innerHTML = '';
   const cubeSize = gridCube.clientWidth || 240;
-  const L = cubeSize * 0.62, HEAD = cubeSize * 0.10, BADGE = 26;
+  const HEAD = cubeSize * 0.10, BADGE = 26;
+
+  /* How far one cube unit travels on screen along each axis at the solved static
+     view. The angle that best separates the slots foreshortens the depth axis to
+     roughly half of X, which drops the A/B badges right on top of the lattice —
+     so each arm is lengthened in inverse proportion to its own foreshortening. */
+  let proj = null;
+  if (staticView) {
+    const a = staticView.ax * Math.PI / 180, b = staticView.ay * Math.PI / 180;
+    const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+    proj = { x: Math.hypot(cb, sa * sb), y: Math.abs(ca), z: Math.hypot(sb, sa * cb) };
+  }
+  const armLength = ax => {
+    if (!proj) return cubeSize * 0.62;
+    const k = ax.vec[0] ? 'x' : ax.vec[1] ? 'y' : 'z';
+    /* 0.68 puts every badge at the same screen radius, clear of the lattice's ~0.5
+       half-extent. The depth arm reaches ~1.3× further in cube space to get there. */
+    return Math.min(cubeSize * 1.45, (cubeSize * 0.68) / Math.max(proj[k], 0.18));
+  };
 
   AXES.forEach(ax => {
+    const L = armLength(ax);
     const arm = document.createElement('div');
     arm.className = 'arm';
     arm.dataset.axis = ax.id;
@@ -1633,6 +1883,13 @@ function flashArm(axisId) {
 function applyRotation() {
   cubeWrapper.classList.toggle('spinning', cfg.rotation);
   cubeWrapper.style.setProperty('--spin-speed', cfg.spin + 's');
+  /* The solved angle is what makes the spaced layout non-overlapping, so it has to be
+     applied — the CSS default of -24°/-28° is not the solution. While spinning there
+     is no fixed angle to solve for and overlap is unavoidable. */
+  if (!cfg.rotation && staticView)
+    cubeWrapper.style.transform = `rotateX(${staticView.ax}deg) rotateY(${staticView.ay}deg)`;
+  else
+    cubeWrapper.style.transform = '';
 }
 
 /* ============================================================
@@ -2289,7 +2546,7 @@ function startBlock() {
   state.sessionStart = Date.now();
   state.running = true;
 
-  if (cfg.streams.glyph === 'relational' && !state.glyphMap) shuffleGlyphMap();
+  if (cfg.streams.glyph === 'relational' && !state.glyphMap) ensureGlyphMap();
 
   updateHUD();
   tick();
@@ -2435,6 +2692,9 @@ function endBlock() {
       spin: cfg.spin, feedback: cfg.feedback, lureRate: cfg.lureRate,
       meta: cfg.meta, gate: cfg.gate, retro: cfg.retro, cellVis: cfg.cellVis,
       gizmo: cfg.gizmo,
+      /* Layout belongs here, not with the cosmetics: flat panels remove the depth
+         ambiguity entirely, so the same score means something different. */
+      layout: cfg.layout, cubeScale: cfg.cubeScale,
     },
     streams: Object.fromEntries(Object.entries(state.tally)
       .map(([k, t]) => [k, { score: streamScore(t), raw: rawAcc(t), chance: chanceOf(t),
@@ -2652,7 +2912,7 @@ function applyProgression() {
   cfg.spin = prog.spinLevel > 0 ? levels[prog.spinLevel] : 60;
   cfg.blockLength = tune.blockLength;
 
-  if (cfg.streams.glyph === 'relational' && !state.glyphMap) shuffleGlyphMap();
+  if (cfg.streams.glyph === 'relational' && !state.glyphMap) ensureGlyphMap();
   onConfigChanged();
 }
 
@@ -2790,6 +3050,14 @@ function showReport(score, verdict, headline, detail, milestone, load) {
    ============================================================ */
 
 /* ONE layout, generated once per session and used by both the intro and the scorer. */
+/* With a fixed map the layout is generated once and then reused forever, so it can be
+   learned instead of re-memorised every session. That makes the glyph stream markedly
+   easier, which is the point of it being opt-in. */
+function ensureGlyphMap() {
+  if (freeCfg.fixedGlyphMap && state.glyphMap) { renderGlyphLegend(); return; }
+  shuffleGlyphMap();
+}
+
 function shuffleGlyphMap() {
   const pos = [{x:0,y:0},{x:1,y:0},{x:0,y:1},{x:1,y:1}];
   const keys = [...GLYPH_SET_KEYS].sort(() => Math.random() - 0.5);
@@ -2818,7 +3086,7 @@ function renderGlyphLegend() {
 
 /* Blocking intro — the map must be memorised before trials begin. */
 function showGlyphIntro(then) {
-  shuffleGlyphMap();
+  ensureGlyphMap();
   modalBox.innerHTML = `
     <h2>Symbol map</h2>
     <p>These four sets sit on a 2×2 map, reshuffled every session. You will report
@@ -2975,6 +3243,7 @@ function syncSettingsUI() {
   $('rotationSpeed').value = freeCfg.spin;
   $('frameMode').value = freeCfg.frame;
   $('varPriority').checked = !!freeCfg.varPriority;
+  $('fixedGlyphMap').checked = !!freeCfg.fixedGlyphMap;
   $('metaOn').checked = !!freeCfg.meta;
   $('gateOn').value = String(freeCfg.gate || 0);
   $('retroOn').value = String(freeCfg.retro || 0);
@@ -2984,6 +3253,11 @@ function syncSettingsUI() {
   $('lureVal').textContent = Math.round(freeCfg.lureRate * 100);
   $('gizmoMode').value = cfg.gizmo;
   $('cellVis').value = cfg.cellVis;
+  $('cubeLayout').value = cfg.layout;
+  $('layoutHint').textContent = LAYOUT_HINT[cfg.layout] || '';
+  $('cubeSize').value = Math.round((cfg.cubeScale || 1) * 100);
+  $('cubeSizeVal').textContent = Math.round((cfg.cubeScale || 1) * 100);
+  document.documentElement.style.setProperty('--cube-scale', cfg.cubeScale || 1);
   applyCellVis();
 
   renderStreamRows();
@@ -3013,12 +3287,30 @@ function renderDataPanel() {
     (progress.saveWarning ? `<br><span style="color:#ff6b6b">${progress.saveWarning}</span>` : '');
 }
 
+function renderProfileUI() {
+  const sel = $('profileSel');
+  if (!sel) return;
+  sel.innerHTML = '';
+  profiles.list.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.id; o.textContent = p.name;
+    sel.appendChild(o);
+  });
+  sel.value = profiles.active;
+  $('profileDelete').disabled = profiles.list.length < 2;
+  $('profileHint').innerHTML =
+    `${profiles.list.length} profile${profiles.list.length === 1 ? '' : 's'} on this ` +
+    `device. Each keeps its own ladder, staircase, keybinds and history. ` +
+    `<span style="opacity:.7">Appearance is shared.</span>`;
+}
+
 /* ---- export / import ---- */
 
 function exportPayload() {
   return JSON.stringify({
     build: BUILD,
     tester: progress.tester || '',
+    profile: activeProfile().name,
     exportedAt: new Date().toISOString(),
     timezoneOffsetMin: new Date().getTimezoneOffset(),
     data: progress,
@@ -3026,7 +3318,7 @@ function exportPayload() {
 }
 
 function downloadJSON() {
-  const label = (progress.tester || 'tester').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase();
+  const label = (progress.tester || activeProfile().name || 'tester').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase();
   const name = `rnb-${label}-${today()}.json`;
   const blob = new Blob([exportPayload()], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -3116,6 +3408,15 @@ $('rcTier').onchange = e => {
   applyProgression(); syncSettingsUI(); updateHUD(); saveProgress();
 };
 
+$('fixedGlyphMap').onchange = e => {
+  freeCfg.fixedGlyphMap = e.target.checked;
+  /* Turning it on pins whatever map is current; turning it off drops the stored one
+     so the next session reshuffles as normal. */
+  if (!freeCfg.fixedGlyphMap) { delete progress.glyphMap; state.glyphMap = null; }
+  else if (!state.glyphMap) shuffleGlyphMap();
+  renderGlyphLegend(); saveProgress();
+};
+
 $('varPriority').onchange = e => {
   freeCfg.varPriority = e.target.checked;
   cfg.varPriority = e.target.checked;
@@ -3131,13 +3432,55 @@ $('adaptMode').onchange = e => {
 
 $('resetProgress').onclick = () => {
   if (!confirm('Erase the ladder, all history and settings? This cannot be undone.')) return;
-  localStorage.removeItem(STORE_KEY);
+  localStorage.removeItem(storeKey());
   prog = { streamCount:1, n:1, spinLevel:0, interval:5000 };
   progress = { version:2, bestLoad:0, dailyMinutes:{}, blocks:[] };
   keyBinds = {};
   stairInit(tune.startInterval);
   setMode('progression');
   renderDataPanel();
+};
+
+/* --- profiles --- */
+$('profileSel').onchange = e => switchProfile(e.target.value);
+
+$('profileNew').onclick = () => {
+  const name = (prompt('Name for the new profile?', `Player ${profiles.list.length + 1}`) || '').trim();
+  if (!name) return;
+  const id = newProfileId();
+  profiles.list.push({ id, name, created: Date.now() });
+  saveProfiles();
+  switchProfile(id);
+  progress.tester = name;          // prefill the export label so files are identifiable
+  saveProgress();
+  syncSettingsUI();
+};
+
+$('profileRename').onclick = () => {
+  const cur = activeProfile();
+  const name = (prompt('Rename profile', cur.name) || '').trim();
+  if (!name) return;
+  cur.name = name;
+  saveProfiles(); saveProgress(); renderProfileUI(); renderDataPanel();
+};
+
+$('profileDelete').onclick = () => {
+  if (profiles.list.length < 2) return;
+  const cur = activeProfile();
+  if (!confirm(`Delete profile "${cur.name}" and all of its training history? ` +
+               `This cannot be undone.`)) return;
+  try { localStorage.removeItem(storeKey()); } catch (e) {}
+  profiles.list = profiles.list.filter(p => p.id !== cur.id);
+  const next = profiles.list[0].id;
+  profiles.active = null;          // force switchProfile to do the full reload
+  saveProfiles();
+  profiles.active = next;
+  resetInMemoryState();
+  progress = loadProgress();
+  if (!stairLog) stairInit(prog.interval || tune.startInterval);
+  setMode(progress.mode || 'progression');
+  buildCube(cfg.dim);
+  saveProfiles(); renderDataPanel(); renderProfileUI(); syncSettingsUI();
 };
 
 /* --- session data --- */
@@ -3207,6 +3550,28 @@ $('feedbackModeF').onchange = e => { freeCfg.feedback = e.target.value; cfg.feed
 /* --- display (shared by both modes) --- */
 $('gizmoMode').onchange = e => { cfg.gizmo = e.target.value; applyGizmoMode(); saveProgress(); };
 $('cellVis').onchange   = e => { cfg.cellVis = e.target.value; applyCellVis(); saveProgress(); };
+$('cubeSize').oninput = e => {
+  cfg.cubeScale = +e.target.value / 100;
+  $('cubeSizeVal').textContent = e.target.value;
+  document.documentElement.style.setProperty('--cube-scale', cfg.cubeScale);
+  /* The stage is sized from --cube-size, so the cube has to be rebuilt against the
+     new pixel width or the spaced solve is scaled to the old one. */
+  buildCube(cfg.dim);
+  const cur = state.history[state.history.length - 1];
+  if (state.running && cur) state.cells[cur.cellIdx].el.classList.add('active');
+  saveProgress();
+};
+
+$('cubeLayout').onchange = e => {
+  cfg.layout = e.target.value;
+  buildCube(cfg.dim);
+  applyGizmoMode();
+  /* A layout change mid-block would strand the lit cell on a destroyed element. */
+  const cur = state.history[state.history.length - 1];
+  if (state.running && cur) state.cells[cur.cellIdx].el.classList.add('active');
+  $('layoutHint').textContent = LAYOUT_HINT[cfg.layout] || '';
+  updateHUD(); saveProgress();
+};
 
 /* --- run controls --- */
 $('startBtn').onclick = () => {
@@ -3261,6 +3626,7 @@ if (!stairLog) stairInit(prog.interval || tune.startInterval);
 if (tune.adapt === 'bayes') prog.interval = stairNextInterval();
 setMode(cfg.mode);
 renderDataPanel();
+renderProfileUI();
 </script>
 </body>
 </html>
