@@ -249,6 +249,18 @@
   }
   .gate-banner.show { opacity: .95; }
 
+  /* Browsers clamp setInterval to ~1 Hz in a hidden tab, so a block left running in
+     the background silently plays at the wrong pace and logs meaningless reaction
+     times. Pause instead. */
+  .pause-veil {
+    position: fixed; inset: 0; z-index: 40; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+    background: rgba(4, 6, 10, .82); text-align: center;
+  }
+  .pause-veil.show { display: flex; }
+  .pause-veil .t { font-size: 19px; font-weight: 600; }
+  .pause-veil .s { font-size: 13px; color: var(--muted); max-width: 300px; line-height: 1.5; }
+
   /* Retro-cue: which pair of items to report on, revealed after the stimulus. */
   .retro-cue {
     position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -680,6 +692,18 @@
     <div class="hint" id="cellVisHint"></div>
   </div>
   <div class="setting-group">
+    <label>Daily goal (minutes, 0 = off)</label>
+    <input type="number" id="dailyGoal" value="20" min="0" max="240" step="5" />
+    <div class="hint">Counts time inside blocks only, and ticks live while you play.
+      Turns green once you hit it.</div>
+  </div>
+  <div class="setting-group">
+    <label><input type="checkbox" id="buzzer" style="width:auto"> Buzz on wrong
+      answer</label>
+    <div class="hint">A short low tone on an incorrect press. Independent of the
+      Feedback setting, so you can keep the audio cue with the visuals off.</div>
+  </div>
+  <div class="setting-group">
     <label>Axis gizmo</label>
     <select id="gizmoMode">
       <option value="full">Arrows + letters</option>
@@ -798,6 +822,7 @@
   <div class="row"><span>N</span><b id="hudN">1</b><span>·</span><span id="hudSpinLabel">still</span><span>·</span><span>trial</span><b id="hudTrial">0/20</b></div>
   <div class="row"><span>block</span><b id="hudAcc">—</b></div>
   <div class="row" id="hudPriority" style="display:none"></div>
+  <div class="row"><span>today</span><b id="hudToday">0m</b><span id="hudGoal"></span></div>
   <div class="load">Load <b id="hudLoad">0</b></div>
   <div class="speed-wrap" id="speedWrap">
     <div class="speed-labels"><span id="speedNow">5.00s</span><span id="speedGoal">→ 3.00s</span></div>
@@ -818,6 +843,13 @@
 
 <div class="glyph-legend" id="glyphLegend"></div>
 <div class="gate-banner" id="gateBanner">do not update</div>
+
+<div class="pause-veil" id="pauseVeil">
+  <div class="t" id="pauseTitle">Paused</div>
+  <div class="s" id="pauseText">The tab lost focus, so the block was paused — browsers
+    slow background timers and the pacing would have been wrong.</div>
+  <button class="rbtn" id="pauseResume" style="padding:10px 22px;margin-top:6px">Resume</button>
+</div>
 <div class="retro-cue" id="retroCue">
   <div class="pair" id="retroPair"></div>
   <div class="cap">report this move</div>
@@ -877,7 +909,7 @@ const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
 /* Stamped into every block and into the export. Testers who pick the file up at
    different times will be on different snapshots, and without this you cannot tell
    which build produced which numbers. */
-const BUILD = '2026-08-05.3';
+const BUILD = '2026-08-06.2';
 
 /* ---- Relational complexity (Halford) ----
    Difficulty defined by how many variables are bound in one representation.
@@ -1326,6 +1358,8 @@ const cfg = {
   cellVis: 'lattice',
   layout: 'dense',
   cubeScale: 1,
+  dailyGoal: 20,
+  buzzer: false,
   feedback: 'reveal',
   lureRate: 0.20,
   meta: false,        // second-order relational judgements
@@ -1386,6 +1420,7 @@ const state = {
   stimAt: 0,              // when the response window opened, for reaction times
   presses_log: [],        // {trial, ch, rt, ok} for every press in the block
   priorityStream: null,   // stream cued for extra weight this block
+  paused: false, interrupted: false,
   glyphMap: null, cells: [],
   sessionStart: null, keyIndex: {},
 };
@@ -1521,7 +1556,9 @@ function loadProgress() {
     if (p.display) { cfg.gizmo = p.display.gizmo || cfg.gizmo;
                      cfg.cellVis = p.display.cellVis || cfg.cellVis;
                      cfg.layout = p.display.layout || cfg.layout;
-                     cfg.cubeScale = p.display.cubeScale || cfg.cubeScale; }
+                     cfg.cubeScale = p.display.cubeScale || cfg.cubeScale;
+                     if (p.display.dailyGoal != null) cfg.dailyGoal = p.display.dailyGoal;
+                     cfg.buzzer = !!p.display.buzzer; }
     if (p.mode) cfg.mode = p.mode;
     return p;
   } catch (e) { return blank; }
@@ -1534,7 +1571,8 @@ function saveProgress() {
   progress.freeCfg = freeCfg; progress.mode = cfg.mode;
   progress.keyBinds = keyBinds;
   progress.display = { gizmo: cfg.gizmo, cellVis: cfg.cellVis, layout: cfg.layout,
-                       cubeScale: cfg.cubeScale };
+                       cubeScale: cfg.cubeScale, dailyGoal: cfg.dailyGoal,
+                       buzzer: cfg.buzzer };
   progress.stair = stairLog ? stairLog.map(v => +v.toFixed(4)) : null;
   progress.rcTier = rcTier;
   progress.profileName = activeProfile().name;
@@ -2122,6 +2160,23 @@ function clearCells() {
   });
 }
 
+/* Deliberately below the stimulus pitches (220–523 Hz) and harsher than any of them,
+   so it can never be mistaken for a trial tone. */
+function playBuzz() {
+  if (!cfg.buzzer) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(96, audioCtx.currentTime + 0.14);
+  gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.06, audioCtx.currentTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.16);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.18);
+}
+
 function playTone(t) {
   if (audioCtx.state === 'suspended') audioCtx.resume();
   const osc = audioCtx.createOscillator();
@@ -2433,6 +2488,8 @@ function press(channelId) {
     rt: state.stimAt ? Math.round(performance.now() - state.stimAt) : null,
   });
 
+  if (!ok) playBuzz();
+
   if (cfg.feedback !== 'off' && btn) {
     btn.classList.add(ok ? 'hit' : 'miss');
     setTimeout(() => btn.classList.remove('hit', 'miss'), 260);
@@ -2530,6 +2587,8 @@ function startBlock() {
   state.trial = 0; state.scored = 0; state.tally = {};
   state.lureTally = null; state.currentTrial = null; state.cued = true;
   state.presses_log = []; state.stimAt = 0;
+  state.paused = false; state.interrupted = false;
+  $('pauseVeil').classList.remove('show');
 
   /* Rotate the cued stream rather than picking at random, so every stream actually
      gets its turn — random selection leaves streams uncued for long stretches. */
@@ -2541,6 +2600,7 @@ function startBlock() {
     state.priorityStream = null;
   }
   renderPriorityCue();
+  renderDailyTimer();
   clearTimeout(state.cueTimer);
   $('retroCue').classList.remove('show');
   state.sessionStart = Date.now();
@@ -2560,6 +2620,8 @@ function stopBlock(silent) {
   state.running = false;
   state.cued = true;
   $('retroCue').classList.remove('show');
+  $('pauseVeil').classList.remove('show');
+  state.paused = false;
   clearCells();
   if (state.sessionStart) {
     addMinutes(Date.now() - state.sessionStart);
@@ -2681,6 +2743,7 @@ function endBlock() {
   progress.blocks.push({
     ts: Date.now(), build: BUILD, mode: cfg.mode, n: cfg.n, load, score,
     rc: relationalComplexity(), rcTier,
+    interrupted: !!state.interrupted,
     priority: state.priorityStream,
     lureScore: ls, lureTrials: state.lureTally ? state.lureTally.total : 0,
     ladder: cfg.mode === 'progression' ? { ...prog } : null,
@@ -3008,6 +3071,29 @@ function updateHUD() {
   }
 }
 
+/* Banked minutes plus whatever the current block has accrued, so the readout moves
+   while you play instead of jumping only when a block ends. */
+function minutesToday() {
+  const banked = progress.dailyMinutes[today()] || 0;
+  const live = state.sessionStart && !state.paused
+    ? (Date.now() - state.sessionStart) / 60000 : 0;
+  return banked + live;
+}
+
+function renderDailyTimer() {
+  const el = $('hudToday'), goalEl = $('hudGoal');
+  if (!el) return;
+  const m = minutesToday(), goal = cfg.dailyGoal || 0;
+  el.textContent = m < 1 && m > 0 ? '<1m' : Math.floor(m) + 'm';
+  const hit = goal > 0 && m >= goal;
+  el.style.color = hit ? 'var(--good)' : '';
+  goalEl.textContent = goal > 0 ? (hit ? '✓ goal' : `/ ${goal}m`) : '';
+  goalEl.style.color = hit ? 'var(--good)' : '';
+}
+
+/* One second is plenty for a minutes display, and it keeps ticking between blocks. */
+setInterval(renderDailyTimer, 1000);
+
 const barColor = a => a >= 0.85 ? '#51cf66' : a >= 0.7 ? '#fcc419' : '#ff6b6b';
 
 function showReport(score, verdict, headline, detail, milestone, load) {
@@ -3255,6 +3341,8 @@ function syncSettingsUI() {
   $('cellVis').value = cfg.cellVis;
   $('cubeLayout').value = cfg.layout;
   $('layoutHint').textContent = LAYOUT_HINT[cfg.layout] || '';
+  $('dailyGoal').value = cfg.dailyGoal || 0;
+  $('buzzer').checked = !!cfg.buzzer;
   $('cubeSize').value = Math.round((cfg.cubeScale || 1) * 100);
   $('cubeSizeVal').textContent = Math.round((cfg.cubeScale || 1) * 100);
   document.documentElement.style.setProperty('--cube-scale', cfg.cubeScale || 1);
@@ -3550,6 +3638,16 @@ $('feedbackModeF').onchange = e => { freeCfg.feedback = e.target.value; cfg.feed
 /* --- display (shared by both modes) --- */
 $('gizmoMode').onchange = e => { cfg.gizmo = e.target.value; applyGizmoMode(); saveProgress(); };
 $('cellVis').onchange   = e => { cfg.cellVis = e.target.value; applyCellVis(); saveProgress(); };
+$('dailyGoal').oninput = e => {
+  cfg.dailyGoal = Math.max(0, +e.target.value || 0);
+  renderDailyTimer(); saveProgress();
+};
+$('buzzer').onchange = e => {
+  cfg.buzzer = e.target.checked;
+  if (cfg.buzzer) playBuzz();          // audition it so the volume isn't a surprise
+  saveProgress();
+};
+
 $('cubeSize').oninput = e => {
   cfg.cubeScale = +e.target.value / 100;
   $('cubeSizeVal').textContent = e.target.value;
@@ -3602,6 +3700,40 @@ document.addEventListener('keydown', e => {
   if (k === 'escape') { e.preventDefault(); stopBlock(false); }
 });
 
+/* ---- Pause when the tab is hidden ----
+   A hidden tab has its timers clamped to ~1 Hz, so a block left running in the
+   background would present trials at the wrong interval and log reaction times
+   measured against a stretched clock. Both would quietly corrupt the record, so the
+   block stops and the interruption is flagged on the saved block. */
+function pauseForHidden() {
+  if (!state.running || state.paused) return;
+  clearInterval(state.timer); state.timer = null;
+  clearTimeout(state.cueTimer);
+  state.paused = true;
+  state.interrupted = true;
+  /* The trial on screen was not seen for its proper duration, so it must not be
+     scored. */
+  state.judgments = [];
+  state.presses.clear();
+  clearCells();
+  $('retroCue').classList.remove('show');
+  $('pauseVeil').classList.add('show');
+}
+
+function resumeFromPause() {
+  if (!state.paused) return;
+  state.paused = false;
+  $('pauseVeil').classList.remove('show');
+  state.stimAt = 0;
+  tick();
+  state.timer = setInterval(tick, cfg.interval);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) pauseForHidden();
+});
+$('pauseResume').onclick = resumeFromPause;
+
 /* Debounced: cube size is vmin-based so a resize must rebuild, but mobile browsers
    fire this continuously as the address bar hides, and each rebuild drops the
    on-screen stimulus. */
@@ -3627,6 +3759,7 @@ if (tune.adapt === 'bayes') prog.interval = stairNextInterval();
 setMode(cfg.mode);
 renderDataPanel();
 renderProfileUI();
+renderDailyTimer();
 </script>
 </body>
 </html>
