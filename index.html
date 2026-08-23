@@ -32,6 +32,14 @@
   :root.spread-stage { --stage-k: 2.15; }
   :root.gizmo-off { --stage-k: 1.5; }
   :root.gizmo-off.spread-stage { --stage-k: 1.25; }
+  /* Spinning needs more room than resting: the solved tilt is steeper than the resting
+     view, and the roll turns the silhouette through every angle, so the footprint is
+     the circumscribed circle rather than one static outline. Every combination is
+     spelled out — a two-class selector has to outrank the one-class rules above it. */
+  :root.spin-stage                        { --stage-k: 1.95; }
+  :root.spin-stage.spread-stage           { --stage-k: 2.15; }
+  :root.spin-stage.gizmo-off              { --stage-k: 1.72; }
+  :root.spin-stage.gizmo-off.spread-stage { --stage-k: 1.25; }
 
   * { box-sizing: border-box; }
 
@@ -238,9 +246,29 @@
   }
   .cube-wrapper.spinning { animation: spin var(--spin-speed, 60s) linear infinite; }
 
+  /* Yaw at a pitch solved per cube size — see solveSpinView(). Sweeping the pitch as
+     well (the old -30° → 330°) marches the view straight down a lattice axis four
+     times a turn, and there every column of slots lands on a single screen point: the
+     cube reads as a flat grid and the active slot cannot be located.
+
+     The outer roll is what keeps north off the top of the screen. Under
+     rotateX(a) rotateY(b) the model's vertical axis projects to (0, cos a) — dead
+     vertical for EVERY pitch and yaw, so no tumble in those two angles can ever move
+     it. The old animation only flipped north top-to-bottom by driving the pitch
+     through ±90°, which is precisely the collapsed view. A roll is applied outside
+     the projection instead: it turns the finished picture in its own plane, so it
+     sweeps every axis through every screen direction while leaving every distance
+     between slots exactly as it was. The separation guarantee is untouched by it.
+
+     Against the yaw, deliberately, and the sign matters. The horizontal axes already
+     wind once clockwise per yaw turn while the vertical one does not wind at all, so
+     the roll has to be a number of turns that is neither 0 (which would leave north
+     pinned) nor +1 (which would cancel the horizontal axes and leave THEM rocking
+     about a fixed direction instead). -1 gives north one turn and the other two a
+     double sweep, and no axis holds still. */
   @keyframes spin {
-    from { transform: rotateX(-30deg) rotateY(0deg); }
-    to   { transform: rotateX(330deg) rotateY(360deg); }
+    from { transform: rotateZ(0deg)    rotateX(var(--spin-pitch, -30deg)) rotateY(0deg); }
+    to   { transform: rotateZ(-360deg) rotateX(var(--spin-pitch, -30deg)) rotateY(360deg); }
   }
 
   .grid-cube { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
@@ -995,7 +1023,7 @@ const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
 /* Stamped into every block and into the export. Testers who pick the file up at
    different times will be on different snapshots, and without this you cannot tell
    which build produced which numbers. */
-const BUILD = '2026-08-23.1';
+const BUILD = '2026-08-23.3';
 
 /* ---- Relational complexity (Halford) ----
    Difficulty defined by how many variables are bound in one representation.
@@ -1754,15 +1782,42 @@ function projectLattice(dim, a, b) {
   return pts;
 }
 
-function minPairDistance(pts) {
+/* Every pair of slots differs by some lattice vector, and two pairs sharing a
+   difference project to the same screen offset — so the closest pair can be found by
+   scanning the difference vectors instead of the pairs. One of each ± pair is enough.
+   For a 4-cube that is 171 candidates rather than 2016, which is what makes solving
+   an entire circle of views cheap enough to do at build time. */
+const deltaCache = {};
+function latticeDeltas(dim) {
+  if (deltaCache[dim]) return deltaCache[dim];
+  const out = [], n = dim - 1;
+  for (let X = -n; X <= n; X++)
+    for (let Y = -n; Y <= n; Y++)
+      for (let Z = -n; Z <= n; Z++) {
+        if (!X && !Y && !Z) continue;
+        if (X < 0 || (X === 0 && (Y < 0 || (Y === 0 && Z < 0)))) continue;
+        out.push([X, Y, Z]);
+      }
+  return (deltaCache[dim] = out);
+}
+
+/* Smallest screen distance between any two slot centres, in lattice-pitch units. */
+function minLatticeSep(dim, a, b) {
+  const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
   let m = Infinity;
-  for (let i = 0; i < pts.length; i++)
-    for (let j = i + 1; j < pts.length; j++) {
-      const dx = pts[i][0] - pts[j][0], dy = pts[i][1] - pts[j][1];
-      const d = dx * dx + dy * dy;
-      if (d < m) m = d;
-    }
+  for (const [X, Y, Z] of latticeDeltas(dim)) {
+    const dx = X * cb + Z * sb, dy = X * sa * sb + Y * ca - Z * sa * cb;
+    const d = dx * dx + dy * dy;
+    if (d < m) m = d;
+  }
   return Math.sqrt(m);
+}
+
+/* Widest the lattice ever projects, so the result can be scaled to fit the stage. */
+function projectedExtent(dim, a, b) {
+  const pts = projectLattice(dim, a, b);
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  return { w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
 }
 
 const staticViewCache = {};
@@ -1775,20 +1830,66 @@ function solveStaticView(dim) {
      ever runs once per cube dimension. */
   for (let ax = -46; ax <= -8; ax += 2)
     for (let ay = -68; ay <= -12; ay += 2) {
-      const sep = minPairDistance(projectLattice(dim, ax * Math.PI / 180, ay * Math.PI / 180));
+      const sep = minLatticeSep(dim, ax * Math.PI / 180, ay * Math.PI / 180);
       if (sep > best.sep) best = { sep, ax, ay };
     }
   for (let ax = best.ax - 2; ax <= best.ax + 2; ax += 0.5)
     for (let ay = best.ay - 2; ay <= best.ay + 2; ay += 0.5) {
-      const sep = minPairDistance(projectLattice(dim, ax * Math.PI / 180, ay * Math.PI / 180));
+      const sep = minLatticeSep(dim, ax * Math.PI / 180, ay * Math.PI / 180);
       if (sep > best.sep) best = { sep, ax, ay };
     }
-  /* Projected bounding box, so the result can be scaled to the available space. */
-  const pts = projectLattice(dim, best.ax * Math.PI / 180, best.ay * Math.PI / 180);
-  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
-  best.w = Math.max(...xs) - Math.min(...xs);
-  best.h = Math.max(...ys) - Math.min(...ys);
+  Object.assign(best, projectedExtent(dim, best.ax * Math.PI / 180, best.ay * Math.PI / 180));
   return (staticViewCache[dim] = best);
+}
+
+/* ---- Solving the spin ----
+   No full tumble can stay readable. Sweep the pitch through a turn and the view
+   passes down each lattice axis in turn; there the slots collapse onto one another
+   exactly — separation zero, whole columns on a single point. The old keyframes did
+   precisely that, hitting a total collapse a third of the way through every turn.
+
+   Yawing at a FIXED pitch can avoid it, but only at the right pitch: a yaw circle at
+   0°, ±45° or ±90° still collapses. So the pitch is solved once per cube size — the
+   tilt whose entire yaw circle holds the slot centres furthest apart.
+
+   The answer has a tidy shape. The binding pair is the vertical neighbour, separated
+   by cos(pitch) no matter where the yaw is; tilting further apart the horizontal
+   axes squashes the vertical one. The optimum is the balance point, and it lands at
+   -71.6° for a 3-cube (0.32 of a lattice pitch) and -76.0° for a 4-cube (0.24).
+   For reference the flat default view, -24°/-28°, separates by only 0.06. */
+const spinViewCache = {};
+let spinView = null;        // solved turntable in force for the current build, if any
+
+function solveSpinView(dim) {
+  if (spinViewCache[dim]) return spinViewCache[dim];
+  const ring = (ax, step) => {
+    const a = ax * Math.PI / 180;
+    let m = Infinity;
+    for (let ay = 0; ay < 360; ay += step) {
+      const s = minLatticeSep(dim, a, ay * Math.PI / 180);
+      if (s < m) m = s;
+    }
+    return m;
+  };
+  /* Negative pitch only: the cube is looked at from above throughout the app, and
+     the positive mirror is the same view seen from below. */
+  let best = { sep: -1, ax: -60 };
+  for (let ax = -88; ax <= -2; ax += 1) { const s = ring(ax, 3); if (s > best.sep) best = { sep: s, ax }; }
+  for (let ax = best.ax - 1; ax <= best.ax + 1; ax += 0.1) {
+    const s = ring(ax, 0.5); if (s > best.sep) best = { sep: s, ax };
+  }
+  best.ax = Math.round(best.ax * 100) / 100;   // the 0.1° sweep leaves float dust
+  best.sep = ring(best.ax, 0.25);      // honest figure at the chosen tilt
+
+  /* Extent is taken over the whole turn, not at one yaw — scaling to a single frame
+     would let the cube grow past the stage as it came round. */
+  let w = 0, h = 0;
+  for (let ay = 0; ay < 360; ay += 1) {
+    const e = projectedExtent(dim, best.ax * Math.PI / 180, ay * Math.PI / 180);
+    w = Math.max(w, e.w); h = Math.max(h, e.h);
+  }
+  best.w = w; best.h = h;
+  return (spinViewCache[dim] = best);
 }
 
 function buildCube(dim) {
@@ -1799,6 +1900,7 @@ function buildCube(dim) {
      the previous size. */
   document.documentElement.classList.toggle('spread-stage', layout === 'spaced');
   document.documentElement.classList.toggle('gizmo-off', cfg.gizmo === 'off');
+  document.documentElement.classList.toggle('spin-stage', !!cfg.rotation);
 
   gridCube.innerHTML = '';
   state.cells = [];
@@ -1808,15 +1910,20 @@ function buildCube(dim) {
   let step = size / dim;
   let cellSize = step;
 
+  /* Solved whenever the cube spins, layout aside: the gizmo arms are aimed at it too. */
+  spinView = cfg.rotation ? solveSpinView(dim) : null;
+
   if (layout === 'spaced') {
     /* Spread the lattice out and size the cells from the solved separation, so no two
-       slots touch at the static viewing angle. Scaled to fill the space available
-       rather than to a fixed step, so a bigger cube uses the room it is given. */
-    const v = solveStaticView(dim);
+       slots touch at the viewing angle actually held. Scaled to fill the space
+       available rather than to a fixed step, so a bigger cube uses the room it is
+       given. While spinning the figures come from the tightest moment of the whole
+       turn, which is what keeps the slots apart at every frame rather than at one. */
+    const v = spinView || solveStaticView(dim);
     step = size / Math.max(v.w, v.h);
     /* 0.82 leaves a visible gap at the tightest pair instead of exact tangency. */
     cellSize = v.sep * step * 0.82;
-    staticView = v;
+    staticView = cfg.rotation ? null : v;
   } else {
     staticView = null;
   }
@@ -1937,8 +2044,21 @@ function buildGizmo() {
      view. The angle that best separates the slots foreshortens the depth axis to
      roughly half of X, which drops the A/B badges right on top of the lattice —
      so each arm is lengthened in inverse proportion to its own foreshortening. */
-  let proj = null;
-  if (staticView) {
+  let proj = null, reach = 0.68, cap = 1.45;
+  if (spinView) {
+    /* Yaw carries X and Z each through their flattest moment, |sin pitch|, while the
+       vertical axis is held at |cos pitch| for the whole turn. Solving against those
+       worst cases is what stops the A/B badges sinking into the lattice halfway
+       through every revolution — at a 72° tilt the vertical axis is squashed to a
+       third, so its arm has to reach three times as far in cube space to land at the
+       same screen radius. */
+    const p = spinView.ax * Math.PI / 180;
+    const flat = Math.abs(Math.sin(p)), steep = Math.abs(Math.cos(p));
+    proj = { x: flat, y: steep, z: flat };
+    /* The lattice is compact on screen at this tilt, so a shorter radius already
+       clears it — and the cap has to allow the reach the squashed axis needs. */
+    reach = 0.66; cap = 2.10;
+  } else if (staticView) {
     const a = staticView.ax * Math.PI / 180, b = staticView.ay * Math.PI / 180;
     const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
     proj = { x: Math.hypot(cb, sa * sb), y: Math.abs(ca), z: Math.hypot(sb, sa * cb) };
@@ -1946,9 +2066,9 @@ function buildGizmo() {
   const armLength = ax => {
     if (!proj) return cubeSize * 0.62;
     const k = ax.vec[0] ? 'x' : ax.vec[1] ? 'y' : 'z';
-    /* 0.68 puts every badge at the same screen radius, clear of the lattice's ~0.5
-       half-extent. The depth arm reaches ~1.3× further in cube space to get there. */
-    return Math.min(cubeSize * 1.45, (cubeSize * 0.68) / Math.max(proj[k], 0.18));
+    /* Puts every badge at the same screen radius, clear of the lattice's half-extent.
+       A foreshortened axis reaches further in cube space to get there. */
+    return Math.min(cubeSize * cap, (cubeSize * reach) / Math.max(proj[k], 0.18));
   };
 
   AXES.forEach(ax => {
@@ -2016,11 +2136,20 @@ function flashArm(axisId) {
 }
 
 function applyRotation() {
-  cubeWrapper.classList.toggle('spinning', cfg.rotation);
   cubeWrapper.style.setProperty('--spin-speed', cfg.spin + 's');
+  /* The keyframes read the pitch from here, so it has to be in place before the
+     animation starts. */
+  const sv = cfg.rotation ? solveSpinView(cfg.dim) : null;
+  cubeWrapper.style.setProperty('--spin-pitch', (sv ? sv.ax : -30) + 'deg');
+  /* Restart rather than retarget: a running animation does not re-read a custom
+     property it already sampled, so changing cube size mid-spin would keep the old
+     tilt and its collapses. */
+  cubeWrapper.classList.remove('spinning');
+  void cubeWrapper.offsetWidth;
+  cubeWrapper.classList.toggle('spinning', cfg.rotation);
+
   /* The solved angle is what makes the spaced layout non-overlapping, so it has to be
-     applied — the CSS default of -24°/-28° is not the solution. While spinning there
-     is no fixed angle to solve for and overlap is unavoidable. */
+     applied — the CSS default of -24°/-28° is not the solution. */
   if (!cfg.rotation && staticView)
     cubeWrapper.style.transform = `rotateX(${staticView.ax}deg) rotateY(${staticView.ay}deg)`;
   else
