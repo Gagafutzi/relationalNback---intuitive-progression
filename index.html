@@ -540,6 +540,11 @@
        the screen. Width is what binds here; the vh term only steps in on a short
        viewport, to keep the response deck reachable without scrolling. */
     :root {
+      /* svh, not dvh: the dynamic viewport height changes every time the address bar
+         slides, and the cube is sized from this. On dvh a scroll gesture resized the
+         box, which forced a rebuild mid-block — restarting the spin and wiping the
+         stimulus off the screen. svh is the height with the chrome shown and does not
+         move. */
       --stage-budget: min(96vw, 54vh);
       --cube-size: min(
         calc(var(--stage-budget) / var(--stage-k) * var(--cube-scale)),
@@ -584,8 +589,8 @@
   /* dvh so the address bar sliding in cannot push the deck off the bottom. Kept
      behind @supports: a custom property holding an unknown unit fails at
      computed-value time, which would leave --cube-size with no value at all. */
-  @supports (height: 1dvh) {
-    @media (max-width: 700px) { :root { --stage-budget: min(96vw, 54dvh); } }
+  @supports (height: 1svh) {
+    @media (max-width: 700px) { :root { --stage-budget: min(96vw, 54svh); } }
   }
 </style>
 </head>
@@ -1050,7 +1055,7 @@ const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
 /* Stamped into every block and into the export. Testers who pick the file up at
    different times will be on different snapshots, and without this you cannot tell
    which build produced which numbers. */
-const BUILD = '2026-08-23.6';
+const BUILD = '2026-08-23.7';
 
 /* ---- Relational complexity (Halford) ----
    Difficulty defined by how many variables are bound in one representation.
@@ -1563,6 +1568,9 @@ const state = {
   presses_log: [],        // {trial, ch, rt, ok} for every press in the block
   priorityStream: null,   // stream cued for extra weight this block
   paused: false, interrupted: false,
+  builtSize: 0,           // cube box the lattice was last laid out for, in px
+  spinKey: '',            // identity of the running spin, so a rebuild need not restart it
+  stimShown: false,       // is a stimulus on screen right now (vs cleared for a retro cue)
   tickAt: 0,              // when the stimulus last swapped, for the late-press grace
   lastSnap: null,         // the interval just closed, still open to a late press
   buzzTimer: null,
@@ -2014,6 +2022,7 @@ function buildCube(dim) {
         state.cells.push({ el: cell, x, y, z });
       }
 
+  state.builtSize = size;
   buildCubeFrame(size);
   buildGuides(size);
   buildGizmo();
@@ -2209,11 +2218,17 @@ function applyRotation() {
   cubeWrapper.style.setProperty('--spin-pitch', (sv ? sv.ax : -30) + 'deg');
   cubeWrapper.classList.toggle('free-spin', freeSpin);
   /* Restart rather than retarget: a running animation does not re-read a custom
-     property it already sampled, so changing cube size mid-spin would keep the old
-     tilt and its collapses. */
-  cubeWrapper.classList.remove('spinning');
-  void cubeWrapper.offsetWidth;
-  cubeWrapper.classList.toggle('spinning', cfg.rotation);
+     property it already sampled, so a changed tilt would otherwise never take.
+     Only when it CHANGED, though — applyRotation runs at the end of every rebuild,
+     and restarting on each one snapped the cube back to the top of its turn every
+     time anything touched the layout. */
+  const spinKey = cfg.rotation ? `${freeSpin ? 'tumble' : 'spin'}:${sv ? sv.ax : ''}` : '';
+  if (spinKey !== state.spinKey) {
+    state.spinKey = spinKey;
+    cubeWrapper.classList.remove('spinning');
+    void cubeWrapper.offsetWidth;
+    cubeWrapper.classList.toggle('spinning', cfg.rotation);
+  }
 
   /* The solved angle is what makes the spaced layout non-overlapping, so it has to be
      applied — the CSS default of -24°/-28° is not the solution. */
@@ -2404,6 +2419,7 @@ function sampleTrial() {
 
 function renderTrial(t) {
   clearCells();
+  state.stimShown = true;
   const cell = state.cells[t.cellIdx];
   cell.el.classList.add('active');
   if (t.gate === 'compare') cell.el.classList.add('gate-closed');
@@ -2444,6 +2460,7 @@ function renderTrial(t) {
 }
 
 function clearCells() {
+  state.stimShown = false;
   $('gateBanner').classList.remove('show');
   state.cells.forEach(c => {
     c.el.classList.remove('active', 'gate-closed');
@@ -4165,9 +4182,26 @@ let resizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
+    /* Only the cube box matters here. A phone fires resize for every address-bar
+       slide and for the keyboard opening, and rebuilding on each one threw away the
+       stimulus mid-trial. */
+    const box = parseFloat(getComputedStyle(cubeWrapper).width);
+    if (Math.abs(box - state.builtSize) < 0.5) return;
+
     buildCube(cfg.dim);
-    const cur = state.history[state.history.length - 1];
-    if (state.running && cur) state.cells[cur.cellIdx].el.classList.add('active');
+    /* Re-render rather than just re-flagging the cell: the lattice is new DOM, so
+       colour, glyph, size and quantity are all gone and the slot would come back
+       blank. Skipped while a retro cue is up — the stimulus is meant to be hidden
+       then, and painting it back would hand over the answer. */
+    const cur = state.currentTrial;
+    if (state.running && cur && state.stimShown) {
+      /* The recorded matrix is the one the screen frame is judged against, sampled
+         at onset. Re-rendering must not re-sample it at the angle we happen to be
+         at now. */
+      const m = cur.matrix;
+      renderTrial(cur);
+      cur.matrix = m;
+    }
   }, 160);
 });
 
