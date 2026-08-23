@@ -18,8 +18,20 @@
     --good: #51cf66;
     --bad: #ff6b6b;
     --cube-scale: 1;
+    /* How much wider than the lattice the stage has to be to hold the gizmo arms and
+       their badges. Measured, not guessed: badges reach ~1.85 × the lattice across at
+       the solved angle, ~2.05 when the lattice is spread. With the gizmo hidden the
+       only thing to fit is the projected cube itself, which is far tighter — so the
+       lattice can be much bigger for the same footprint. */
+    --stage-k: 1.9;
     --cube-size: calc(min(34vmin, 240px) * var(--cube-scale));
   }
+  /* On :root, not body — --cube-size is declared on :root and a var() there can only
+     read a custom property off :root itself. Setting these on body would leave the
+     lattice sized against the default 1.9 forever. */
+  :root.spread-stage { --stage-k: 2.15; }
+  :root.gizmo-off { --stage-k: 1.5; }
+  :root.gizmo-off.spread-stage { --stage-k: 1.25; }
 
   * { box-sizing: border-box; }
 
@@ -28,7 +40,10 @@
     background: radial-gradient(circle at 50% 0%, var(--bg-glow, #121728), var(--bg));
     color: var(--text);
     font-family: system-ui, -apple-system, sans-serif;
+    /* dvh, not vh: a phone's vh is the height with the address bar RETRACTED, so a
+       100vh body with overflow:hidden puts its last ~60px permanently off-screen. */
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
   }
 
@@ -95,7 +110,8 @@
   }
 
   .settings {
-    position: fixed; top: 0; left: 0; height: 100vh; width: 340px;
+    position: fixed; top: 0; left: 0; height: 100vh; height: 100dvh;
+    width: min(340px, 88vw);
     background: linear-gradient(180deg, var(--panel), var(--panel-2));
     border-right: 1px solid var(--border-outer);
     padding: 56px 18px 18px; transform: translateX(-100%);
@@ -193,21 +209,26 @@
   .hud .next b { color: #8ab4ff; font-weight: 600; }
 
   /* ---------- SCENE ---------- */
+  /* Centred by auto margins on the children rather than justify-content: a centred
+     flex column that overflows pushes its FIRST child above scroll position 0, where
+     no amount of scrolling brings it back. On a phone that silently cropped the top
+     of the cube. Auto margins collapse instead of overflowing. */
   .scene {
     position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; perspective: 1400px;
-    padding: 54px 0 62px; overflow-y: auto;
+    align-items: center; justify-content: flex-start; perspective: 1400px;
+    padding: 54px 0 62px; overflow-y: auto; -webkit-overflow-scrolling: touch;
   }
 
-  /* The stage reserves the GIZMO's footprint, not the cube's — the arms reach
-     ~0.85 × cube-size from centre, so a stage sized to the cube clips the badges. */
-  /* Spaced needs a wider stage: the lattice itself fills --cube-size, and the arms
-     are lengthened on top of that to clear it. */
-  .cube-stage.spread { width: calc(var(--cube-size) * 2.2); height: calc(var(--cube-size) * 2.2); }
+  /* The stage reserves the GIZMO's footprint, not the cube's — the arms reach well
+     past the lattice, so a stage sized to the cube alone clips the badges. The
+     multiplier lives on the body (see --stage-k) because --cube-size is derived from
+     it on a phone, and a custom property can only read another one from its own
+     element. */
   .cube-stage {
-    width: calc(var(--cube-size) * 1.7); height: calc(var(--cube-size) * 1.7);
+    width: calc(var(--cube-size) * var(--stage-k));
+    height: calc(var(--cube-size) * var(--stage-k));
     display: flex; align-items: center; justify-content: center;
-    flex: none; margin-bottom: 6px;
+    flex: none; margin: auto auto 6px;
   }
 
   .cube-wrapper {
@@ -350,7 +371,7 @@
   /* ---------- RESPONSE DECK ---------- */
   .deck {
     display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
-    padding: 0 16px; max-width: 980px; z-index: 20;
+    padding: 0 16px; max-width: 980px; z-index: 20; margin-bottom: auto;
   }
   .deck-group {
     display: flex; flex-direction: column; gap: 5px;
@@ -375,8 +396,14 @@
     color: var(--text); border-radius: 8px; cursor: pointer;
     font-size: 14px; line-height: 1.1; text-align: center;
     transition: background .08s, transform .08s;
+    /* `manipulation` drops the double-tap-zoom wait the browser otherwise inserts
+       before every tap — the delay that made touch answers arrive late. */
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    user-select: none; -webkit-user-select: none;
   }
-  .rbtn:active { transform: translateY(1px); }
+  /* Presses fire on pointerdown and cancel the default, so :active never latches on
+     touch — the class is the press feedback a phone actually gets. */
+  .rbtn:active, .rbtn.down { transform: translateY(1px); }
   .rbtn .glyph { color: var(--btn-color, var(--text)); font-weight: 700; }
   .rbtn .kbd {
     position: absolute; left: 0; right: 0; bottom: 3px;
@@ -407,7 +434,7 @@
   .modal-box {
     background: var(--panel); border: 1px solid var(--border-outer);
     border-radius: 14px; padding: 24px; max-width: 480px; width: 100%;
-    max-height: 88vh; overflow-y: auto;
+    max-height: 88vh; max-height: 88dvh; overflow-y: auto;
   }
   .modal-box h2 { margin: 0 0 6px; font-size: 20px; }
   .modal-box p { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
@@ -451,10 +478,67 @@
   .glyph-legend.show { display: block; }
   .glyph-legend b { color: var(--text); }
 
+  /* A coarse pointer means there is no hardware keyboard behind it, so the key caps
+     are dead weight — and the room they take is better spent on the target itself.
+     46px is the smallest square a fingertip hits reliably. */
+  @media (pointer: coarse) {
+    .rbtn { min-height: 46px; padding: 11px 9px; }
+    .rbtn .kbd { display: none; }
+  }
+
   @media (max-width: 700px) {
-    :root { --cube-size: min(32vmin, 185px); }
-    .rbtn { min-width: 40px; padding: 6px 6px 14px; font-size: 13px; }
-    .hud { font-size: 12px; min-width: 165px; }
+    /* Sized the other way round from desktop: pick the footprint the phone can give
+       the stage, then divide by --stage-k for the lattice. 32vmin was reading off the
+       375px WIDTH of a portrait phone, so the cube came out at 120px — a quarter of
+       the screen. Width is what binds here; the vh term only steps in on a short
+       viewport, to keep the response deck reachable without scrolling. */
+    :root {
+      --stage-budget: min(96vw, 54vh);
+      --cube-size: min(
+        calc(var(--stage-budget) / var(--stage-k) * var(--cube-scale)),
+        /* Hard ceiling: the scale slider may shrink the cube but never push the
+           stage past the width the scene can actually paint. */
+        calc(96vw / var(--stage-k)));
+    }
+
+    /* Wider keys AND wider gutters. 40px keys 5px apart are narrower than the
+       fingertip aiming at them, so the neighbour of the intended answer was easy to
+       hit — and a neighbour is always the opposite direction on the same axis. */
+    .deck { padding: 0 6px; gap: 8px; }
+    .deck-group { padding: 7px 6px 8px; }
+    .deck-group .btns { gap: 7px; flex-wrap: wrap; justify-content: center; }
+    .rbtn { min-width: 50px; padding: 10px 6px; font-size: 15px; }
+    .rbtn .glyph { font-size: 16px; }
+
+    /* The HUD becomes a wrapping header strip. As a 210px floating column it sat on
+       top of the cube on anything narrower than a tablet. */
+    .hud {
+      top: 8px; right: 8px; left: 56px; min-width: 0; font-size: 11px;
+      display: flex; flex-wrap: wrap; justify-content: flex-end;
+      align-items: baseline; column-gap: 11px; row-gap: 2px;
+    }
+    .hud .mode-name { font-size: 12.5px; margin: 0; }
+    .hud .row { gap: 5px; }
+    .hud .load { margin: 0; display: flex; align-items: baseline; gap: 5px; }
+    .hud .load b { font-size: 14px; }
+    .speed-wrap { width: 100%; margin: 3px 0 0; }
+    .hud .next { width: 100%; max-width: none; font-size: 10px; line-height: 1.4; }
+    /* Mid-block the phone needs the pixels for the cube; the hint is only actionable
+       between blocks anyway. */
+    body.running .hud .next { display: none; }
+
+    .settings-btn { top: 8px; left: 8px; padding: 7px 9px; font-size: 12px; }
+    .scene { padding: 78px 4px 62px; }
+    .controls { bottom: 8px; }
+    .controls button { padding: 10px 20px; }
+    .glyph-legend { bottom: 54px; left: 8px; font-size: 10px; }
+  }
+
+  /* dvh so the address bar sliding in cannot push the deck off the bottom. Kept
+     behind @supports: a custom property holding an unknown unit fails at
+     computed-value time, which would leave --cube-size with no value at all. */
+  @supports (height: 1dvh) {
+    @media (max-width: 700px) { :root { --stage-budget: min(96vw, 54dvh); } }
   }
 </style>
 </head>
@@ -700,8 +784,10 @@
   <div class="setting-group">
     <label><input type="checkbox" id="buzzer" style="width:auto"> Buzz on wrong
       answer</label>
-    <div class="hint">A short low tone on an incorrect press. Independent of the
-      Feedback setting, so you can keep the audio cue with the visuals off.</div>
+    <div class="hint">Two distinct error sounds: a descending slide for a
+      <b>wrong press</b>, two low pulses for a <b>miss</b> (a target you never
+      answered). Independent of the Feedback setting, so you can keep the audio cue
+      with the visuals off.</div>
   </div>
   <div class="setting-group">
     <label>Axis gizmo</label>
@@ -909,7 +995,7 @@ const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
 /* Stamped into every block and into the export. Testers who pick the file up at
    different times will be on different snapshots, and without this you cannot tell
    which build produced which numbers. */
-const BUILD = '2026-08-06.2';
+const BUILD = '2026-08-23.1';
 
 /* ---- Relational complexity (Halford) ----
    Difficulty defined by how many variables are bound in one representation.
@@ -1421,6 +1507,9 @@ const state = {
   presses_log: [],        // {trial, ch, rt, ok} for every press in the block
   priorityStream: null,   // stream cued for extra weight this block
   paused: false, interrupted: false,
+  tickAt: 0,              // when the stimulus last swapped, for the late-press grace
+  lastSnap: null,         // the interval just closed, still open to a late press
+  buzzTimer: null,
   glyphMap: null, cells: [],
   sessionStart: null, keyIndex: {},
 };
@@ -1703,10 +1792,17 @@ function solveStaticView(dim) {
 }
 
 function buildCube(dim) {
+  const layout = cfg.layout || 'dense';
+  /* Set BEFORE the lattice is measured. On a phone the stage footprint is what the
+     screen affords and --cube-size is derived from it, so these classes decide the
+     width that `size` is about to read — flipping them afterwards builds the cube at
+     the previous size. */
+  document.documentElement.classList.toggle('spread-stage', layout === 'spaced');
+  document.documentElement.classList.toggle('gizmo-off', cfg.gizmo === 'off');
+
   gridCube.innerHTML = '';
   state.cells = [];
   const size = gridCube.clientWidth || 240;
-  const layout = cfg.layout || 'dense';
   const off = (dim - 1) / 2;
 
   let step = size / dim;
@@ -1724,7 +1820,6 @@ function buildCube(dim) {
   } else {
     staticView = null;
   }
-  document.querySelector('.cube-stage').classList.toggle('spread', layout === 'spaced');
 
   for (let x = 0; x < dim; x++)
     for (let y = 0; y < dim; y++)
@@ -1909,6 +2004,8 @@ function invertOrient(id) {
 function applyGizmoMode() {
   gizmoEl.classList.toggle('hidden', cfg.gizmo === 'off');
   gizmoEl.classList.toggle('letters-only', cfg.gizmo === 'letters');
+  /* Redundant when buildCube set it a moment ago, but this runs on its own too. */
+  document.documentElement.classList.toggle('gizmo-off', cfg.gizmo === 'off');
 }
 
 function flashArm(axisId) {
@@ -2162,19 +2259,35 @@ function clearCells() {
 
 /* Deliberately below the stimulus pitches (220–523 Hz) and harsher than any of them,
    so it can never be mistaken for a trial tone. */
-function playBuzz() {
+function playBuzz(kind) {
   if (!cfg.buzzer) return;
   if (audioCtx.state === 'suspended') audioCtx.resume();
+  const t0 = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   osc.type = 'square';
-  osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(96, audioCtx.currentTime + 0.14);
-  gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.06, audioCtx.currentTime + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.16);
-  osc.connect(gain).connect(audioCtx.destination);
-  osc.start(); osc.stop(audioCtx.currentTime + 0.18);
+  const pulse = (at, dur, peak) => {
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(peak, at + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  };
+
+  if (kind === 'miss') {
+    /* A miss and a wrong press are opposite mistakes and need opposite corrections,
+       so they get different sounds rather than leaving you to guess which one you
+       just made. Two flat low pulses vs the single descending slide. */
+    osc.frequency.setValueAtTime(112, t0);
+    pulse(t0, 0.07, 0.055);
+    pulse(t0 + 0.10, 0.07, 0.055);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t0); osc.stop(t0 + 0.20);
+  } else {
+    osc.frequency.setValueAtTime(150, t0);
+    osc.frequency.exponentialRampToValueAtTime(96, t0 + 0.14);
+    pulse(t0, 0.16, 0.06);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t0); osc.stop(t0 + 0.18);
+  }
 }
 
 function playTone(t) {
@@ -2285,47 +2398,72 @@ function buildJudgments(a, b, extra) {
   return js;
 }
 
-function scoreInterval() {
-  if (!state.judgments.length) return;
-  state.judgments.forEach(j => {
+/* The tally update is written as a signed fold so it can also be run backwards.
+   A press that lands just after the stimulus changed was aimed at the trial that
+   just left the screen (see press()); crediting it means unapplying the closed
+   interval, adding the press, and applying it again. */
+function applyInterval(snap, sign) {
+  const { judgments, presses, isLure } = snap;
+  judgments.forEach(j => {
     const t = state.tally[j.stream] ||
       (state.tally[j.stream] = { ok:0, total:0, empty:0, sigs:{}, hit:0, miss:0, fa:0, cr:0 });
-    if (!j.correct.length) t.empty++;
+    if (!j.correct.length) t.empty += sign;
     /* Histogram of correct-answer patterns. Chance is the best CONSTANT strategy,
        which is "always answer the most common thing" — that equals the never-press
        rate only when a never-press answer exists. Meta-relations always has exactly
        one correct answer, so its true chance is the modal answer's share (~2/3),
        not 0. */
     const sig = j.correct.slice().sort().join('|');
-    t.sigs[sig] = (t.sigs[sig] || 0) + 1;
+    t.sigs[sig] = (t.sigs[sig] || 0) + sign;
     let exact = true;
     j.options.forEach(o => {
       const target = j.correct.includes(o);
-      const pressed = state.presses.has(o);
-      if (target && pressed) t.hit++;
-      else if (target && !pressed) { t.miss++; exact = false; }
-      else if (!target && pressed) { t.fa++; exact = false; }
-      else t.cr++;
+      const pressed = presses.has(o);
+      if (target && pressed) t.hit += sign;
+      else if (target && !pressed) { t.miss += sign; exact = false; }
+      else if (!target && pressed) { t.fa += sign; exact = false; }
+      else t.cr += sign;
     });
-    t.total++;
-    if (exact) t.ok++;
+    t.total += sign;
+    if (exact) t.ok += sign;
   });
 
   /* Lure trials get their own tally. Adapting the lure rate on OVERALL accuracy
      would just re-measure what the interval staircase already measures, and the two
      would fight over the same evidence; lure resistance is a separate signal. */
-  if (state.currentTrial && state.currentTrial.isLure) {
+  if (isLure) {
     const lt = state.lureTally || (state.lureTally = { ok:0, total:0, empty:0, sigs:{} });
-    state.judgments.forEach(j => {
-      if (!j.correct.length) lt.empty++;
+    judgments.forEach(j => {
+      if (!j.correct.length) lt.empty += sign;
       const sig = j.correct.slice().sort().join('|');
-      lt.sigs[sig] = (lt.sigs[sig] || 0) + 1;
-      const exact = j.options.every(o => j.correct.includes(o) === state.presses.has(o));
-      lt.total++;
-      if (exact) lt.ok++;
+      lt.sigs[sig] = (lt.sigs[sig] || 0) + sign;
+      const exact = j.options.every(o => j.correct.includes(o) === presses.has(o));
+      lt.total += sign;
+      if (exact) lt.ok += sign;
     });
   }
-  state.scored++;
+  state.scored += sign;
+}
+
+const snapMissed = snap =>
+  snap.judgments.some(j => j.correct.some(o => !snap.presses.has(o)));
+
+function scoreInterval() {
+  /* Reset before the guard: a priming trial with no judgments must not inherit the
+     previous interval's result. */
+  state.lastSnap = null;
+  if (!state.judgments.length) return;
+  /* The press set is copied — the live one is cleared for the incoming trial, but
+     this one has to stay editable for the length of the grace window. */
+  const snap = {
+    judgments: state.judgments,
+    presses: new Set(state.presses),
+    trial: state.trial,
+    stimAt: state.stimAt,
+    isLure: !!(state.currentTrial && state.currentTrial.isLure),
+  };
+  applyInterval(snap, 1);
+  state.lastSnap = snap;
 }
 
 /* Chance-corrected accuracy restricted to lure trials. */
@@ -2450,7 +2588,22 @@ function buildDeck() {
       b.title = `${g.label}: ${c.label}`;
       b.innerHTML = `<span class="glyph">${c.glyph}</span>` +
                     `<span class="kbd">${keyLabel(key)}</span>`;
-      b.onclick = () => press(c.id);
+      /* pointerdown, not click: on touch a click is only dispatched when the finger
+         LIFTS, plus whatever the browser spends deciding the tap was not the first
+         half of a double-tap. That delay pushed answers given near the end of an
+         interval across the boundary, where they were graded against the next
+         trial. preventDefault suppresses the compatibility click that would
+         otherwise arrive a second time. */
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        b.classList.add('down');
+        press(c.id);
+      });
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev =>
+        b.addEventListener(ev, () => b.classList.remove('down')));
+      /* detail === 0 means the click came from Enter/Space on a focused button, not
+         from a pointer — the only clicks left to honour. */
+      b.addEventListener('click', e => { if (e.detail === 0) press(c.id); });
       btns.appendChild(b);
     });
     group.appendChild(btns);
@@ -2471,13 +2624,50 @@ function renderPriorityCue() {
   } else el.style.display = 'none';
 }
 
-function press(channelId) {
-  if (!state.running || state.presses.has(channelId)) return;
-  if (!state.cued) return;        // retro-cue trial: no answering before the cue
-  state.presses.add(channelId);
+/* Grace window for a response that lands just after the stimulus changed. No press
+   this soon can be a reaction to the NEW trial — a relational judgment needs half a
+   second at the very least — so it belongs to the interval that just closed.
+   Without this, an answer given near the end of an interval was scored against the
+   trial that replaced it, and a correct answer flashed red. */
+const LATE_PRESS_GRACE = 260;
+const graceMs = () => Math.min(LATE_PRESS_GRACE, cfg.interval * 0.25);
 
+function pressFeedback(channelId, ok) {
   const btn = deckEl.querySelector(`[data-channel="${channelId}"]`);
   if (AXIS[channelId]) flashArm(channelId);
+  if (!ok) playBuzz('fa');
+  if (cfg.feedback !== 'off' && btn) {
+    btn.classList.add(ok ? 'hit' : 'miss');
+    setTimeout(() => btn.classList.remove('hit', 'miss'), 260);
+  }
+}
+
+function press(channelId) {
+  if (!state.running) return;
+
+  /* Tested before the `cued` guard: on a retro-cue trial the window for the NEW
+     trial is still shut, but a late answer to the trial that just closed is
+     perfectly legitimate and must not be swallowed. */
+  const snap = state.lastSnap;
+  if (snap && state.tickAt && performance.now() - state.tickAt < graceMs() &&
+      !snap.presses.has(channelId) &&
+      snap.judgments.some(j => j.options.includes(channelId))) {
+    applyInterval(snap, -1);
+    snap.presses.add(channelId);
+    applyInterval(snap, 1);
+
+    const ok = snap.judgments.some(j => j.correct.includes(channelId));
+    state.presses_log.push({
+      t: snap.trial, ch: channelId, ok, late: true,
+      rt: snap.stimAt ? Math.round(performance.now() - snap.stimAt) : null,
+    });
+    pressFeedback(channelId, ok);
+    return;
+  }
+
+  if (state.presses.has(channelId)) return;
+  if (!state.cued) return;        // retro-cue trial: no answering before the cue
+  state.presses.add(channelId);
 
   const j = state.judgments.find(x => x.options.includes(channelId));
   const ok = !!(j && j.correct.includes(channelId));
@@ -2488,12 +2678,7 @@ function press(channelId) {
     rt: state.stimAt ? Math.round(performance.now() - state.stimAt) : null,
   });
 
-  if (!ok) playBuzz();
-
-  if (cfg.feedback !== 'off' && btn) {
-    btn.classList.add(ok ? 'hit' : 'miss');
-    setTimeout(() => btn.classList.remove('hit', 'miss'), 260);
-  }
+  pressFeedback(channelId, ok);
 }
 
 function revealAnswers() {
@@ -2518,9 +2703,23 @@ function showRetroCue(k) {
 
 function tick() {
   clearTimeout(state.cueTimer);
+  clearTimeout(state.buzzTimer);
   $('retroCue').classList.remove('show');
+  /* When the stimulus swapped — the origin the grace window is measured from. */
+  state.tickAt = performance.now();
 
-  if (state.judgments.length) { scoreInterval(); revealAnswers(); }
+  if (state.judgments.length) {
+    scoreInterval();
+    /* Once per interval, not once per missed judgment — three misses on one trial
+       would otherwise stack three overlapping buzzes. Held until the grace window
+       shuts, so a press that lands a few tens of ms late is not scolded for a miss
+       it is about to fix. */
+    const snap = state.lastSnap;
+    state.buzzTimer = setTimeout(() => {
+      if (snapMissed(snap)) playBuzz('miss');
+    }, graceMs());
+    revealAnswers();
+  }
   if (state.scored >= cfg.blockLength) { endBlock(); return; }
 
   const t = sampleTrial();
@@ -2587,6 +2786,7 @@ function startBlock() {
   state.trial = 0; state.scored = 0; state.tally = {};
   state.lureTally = null; state.currentTrial = null; state.cued = true;
   state.presses_log = []; state.stimAt = 0;
+  state.tickAt = 0; state.lastSnap = null; clearTimeout(state.buzzTimer);
   state.paused = false; state.interrupted = false;
   $('pauseVeil').classList.remove('show');
 
@@ -2616,8 +2816,11 @@ function startBlock() {
 function stopBlock(silent) {
   clearInterval(state.timer);
   clearTimeout(state.cueTimer);
+  clearTimeout(state.buzzTimer);
+  state.lastSnap = null; state.tickAt = 0;
   state.timer = null;
   state.running = false;
+  document.body.classList.remove('running');
   state.cued = true;
   $('retroCue').classList.remove('show');
   $('pauseVeil').classList.remove('show');
@@ -3029,6 +3232,9 @@ function spinLabel() {
 }
 
 function updateHUD() {
+  /* Lets the stylesheet strip non-essential chrome mid-block, which only matters on
+     a phone where the HUD and the cube compete for the same pixels. */
+  document.body.classList.toggle('running', state.running);
   const isProg = cfg.mode === 'progression';
   const pos = isProg ? ladderPosition() : null;
 
@@ -3636,7 +3842,10 @@ $('rotationOn').onchange    = e => { freeCfg.rotation = e.target.checked; applyF
 $('frameMode').onchange     = e => { freeCfg.frame = e.target.value; applyFree(); updateHUD(); saveProgress(); };
 $('feedbackModeF').onchange = e => { freeCfg.feedback = e.target.value; cfg.feedback = e.target.value; renderGlyphLegend(); saveProgress(); };
 /* --- display (shared by both modes) --- */
-$('gizmoMode').onchange = e => { cfg.gizmo = e.target.value; applyGizmoMode(); saveProgress(); };
+/* Rebuilds rather than just toggling visibility: with the arms gone the stage needs
+   a smaller footprint, so the lattice grows to fill it and the arm lengths — which
+   are computed in px at build time — no longer match. */
+$('gizmoMode').onchange = e => { cfg.gizmo = e.target.value; onConfigChanged(true); saveProgress(); };
 $('cellVis').onchange   = e => { cfg.cellVis = e.target.value; applyCellVis(); saveProgress(); };
 $('dailyGoal').oninput = e => {
   cfg.dailyGoal = Math.max(0, +e.target.value || 0);
@@ -3644,7 +3853,9 @@ $('dailyGoal').oninput = e => {
 };
 $('buzzer').onchange = e => {
   cfg.buzzer = e.target.checked;
-  if (cfg.buzzer) playBuzz();          // audition it so the volume isn't a surprise
+  /* Audition both, so the two error sounds are distinguishable before you meet
+     them mid-block. */
+  if (cfg.buzzer) { playBuzz('fa'); setTimeout(() => playBuzz('miss'), 420); }
   saveProgress();
 };
 
@@ -3709,6 +3920,8 @@ function pauseForHidden() {
   if (!state.running || state.paused) return;
   clearInterval(state.timer); state.timer = null;
   clearTimeout(state.cueTimer);
+  clearTimeout(state.buzzTimer);
+  state.lastSnap = null; state.tickAt = 0;
   state.paused = true;
   state.interrupted = true;
   /* The trial on screen was not seen for its proper duration, so it must not be
@@ -3724,7 +3937,7 @@ function resumeFromPause() {
   if (!state.paused) return;
   state.paused = false;
   $('pauseVeil').classList.remove('show');
-  state.stimAt = 0;
+  state.stimAt = 0; state.tickAt = 0; state.lastSnap = null;
   tick();
   state.timer = setInterval(tick, cfg.interval);
 }
