@@ -39,8 +39,8 @@
   :root.spin-stage                        { --stage-k: 1.95; }
   /* The free tumble presents the lattice edge-on and corner-on in turn, so its
      footprint is the resting one — it is only the solved path that tilts steeply. */
-  :root.tumble-stage                        { --stage-k: 1.90; }
-  :root.tumble-stage.spread-stage           { --stage-k: 2.15; }
+  :root.tumble-stage                        { --stage-k: 1.80; }
+  :root.tumble-stage.spread-stage           { --stage-k: 1.85; }
   :root.tumble-stage.gizmo-off              { --stage-k: 1.75; }
   :root.tumble-stage.gizmo-off.spread-stage { --stage-k: 1.25; }
   /* The spread lattice is compact at the solved tilt, so the arms are what set the
@@ -1050,7 +1050,7 @@ const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
 /* Stamped into every block and into the export. Testers who pick the file up at
    different times will be on different snapshots, and without this you cannot tell
    which build produced which numbers. */
-const BUILD = '2026-08-23.5';
+const BUILD = '2026-08-23.6';
 
 /* ---- Relational complexity (Halford) ----
    Difficulty defined by how many variables are bound in one representation.
@@ -1886,6 +1886,13 @@ function solveStaticView(dim) {
    axes squashes the vertical one. The optimum is the balance point, and it lands at
    -71.6° for a 3-cube (0.32 of a lattice pitch) and -76.0° for a 4-cube (0.24).
    For reference the flat default view, -24°/-28°, separates by only 0.06. */
+/* Cell edge as a fraction of the lattice pitch in the exploded layout, and the most
+   a cell may exceed the tightest gap between slot centres. The cap never binds for
+   the cube sizes on offer (it would need a gap below 0.13 of a pitch); it is there so
+   a larger cube could not quietly reach the point where two slots sit on top of one
+   another. */
+const SPREAD_CELL = 0.40, MAX_CELL_PER_GAP = 3;
+
 const spinViewCache = {};
 let spinView = null;        // solved turntable in force for the current build, if any
 
@@ -1962,8 +1969,20 @@ function buildCube(dim) {
       ? (dim - 1) * Math.sqrt(3)
       : Math.max(v.w, v.h);
     step = size / span;
-    /* 0.82 leaves a visible gap at the tightest pair instead of exact tangency. */
-    cellSize = v.sep * step * 0.82;
+    /* Sized against the lattice PITCH, not against the tightest projected gap. Tying
+       the cell to the gap made it collapse whenever the view got tight — a turning
+       cube shrank its slots to half the size a still one has, to buy a guarantee of
+       no overlap at all that nobody asked for. SPREAD_CELL is exactly what the old
+       gap-derived formula produced at the resting angle, so a still cube is unchanged
+       to the pixel; what changes is that a turning one no longer shrinks to meet its
+       worst moment.
+
+       Slots may now overlap in part when the view is tightest. They can never
+       coincide: on the solved path the centres are held at least 0.32 of a pitch
+       apart (0.24 on a 4-cube), which the cap below keeps a real fraction of the cell
+       — so every slot always shows an offset of its own. On the free tumble the
+       centres do meet, which is that option's whole nature. */
+    cellSize = Math.min(step * SPREAD_CELL, v.sep * step * MAX_CELL_PER_GAP);
     /* Cleared whenever the cube moves. buildGizmo lengthens each arm by the inverse of
        its foreshortening at this angle, which is only meaningful if the angle is
        actually held: under a free tumble the same rod swings side-on and reaches its
