@@ -37,7 +37,16 @@
      the circumscribed circle rather than one static outline. Every combination is
      spelled out — a two-class selector has to outrank the one-class rules above it. */
   :root.spin-stage                        { --stage-k: 1.95; }
-  :root.spin-stage.spread-stage           { --stage-k: 2.15; }
+  /* The free tumble presents the lattice edge-on and corner-on in turn, so its
+     footprint is the resting one — it is only the solved path that tilts steeply. */
+  :root.tumble-stage                        { --stage-k: 1.90; }
+  :root.tumble-stage.spread-stage           { --stage-k: 2.15; }
+  :root.tumble-stage.gizmo-off              { --stage-k: 1.75; }
+  :root.tumble-stage.gizmo-off.spread-stage { --stage-k: 1.25; }
+  /* The spread lattice is compact at the solved tilt, so the arms are what set the
+     footprint and 2.15 was reserving room nothing used. On a phone the box is
+     divided by this, so the slack came straight out of the slot size. */
+  :root.spin-stage.spread-stage           { --stage-k: 1.95; }
   :root.spin-stage.gizmo-off              { --stage-k: 1.72; }
   :root.spin-stage.gizmo-off.spread-stage { --stage-k: 1.25; }
 
@@ -245,6 +254,7 @@
     transform-origin: center center; pointer-events: none;
   }
   .cube-wrapper.spinning { animation: spin var(--spin-speed, 60s) linear infinite; }
+  .cube-wrapper.spinning.free-spin { animation-name: tumble; }
 
   /* Yaw at a pitch solved per cube size — see solveSpinView(). Sweeping the pitch as
      well (the old -30° → 330°) marches the view straight down a lattice axis four
@@ -269,6 +279,15 @@
   @keyframes spin {
     from { transform: rotateZ(0deg)    rotateX(var(--spin-pitch, -30deg)) rotateY(0deg); }
     to   { transform: rotateZ(-360deg) rotateX(var(--spin-pitch, -30deg)) rotateY(360deg); }
+  }
+
+  /* The original free tumble, kept as an option. It sweeps the pitch as well, so it
+     passes down a lattice axis and collapses the slots onto one another four times a
+     turn — separation zero. Nothing here can be sized around that, which is why the
+     solved path exists; this one is for when the fuller motion is worth the cost. */
+  @keyframes tumble {
+    from { transform: rotateX(-30deg)  rotateY(0deg); }
+    to   { transform: rotateX(330deg)  rotateY(360deg); }
   }
 
   .grid-cube { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
@@ -780,6 +799,14 @@
       <input type="number" id="rotationSpeed" value="60" min="5" max="300" />
     </div>
     <div class="setting-group">
+      <label>Rotation path</label>
+      <select id="spinPath">
+        <option value="solved">Solved — slots never overlap</option>
+        <option value="free">Free tumble — original</option>
+      </select>
+      <div class="hint" id="spinPathHint"></div>
+    </div>
+    <div class="setting-group">
       <label>Reference frame</label>
       <select id="frameMode">
         <option value="cube">Cube only (allocentric)</option>
@@ -1023,7 +1050,7 @@ const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
 /* Stamped into every block and into the export. Testers who pick the file up at
    different times will be on different snapshots, and without this you cannot tell
    which build produced which numbers. */
-const BUILD = '2026-08-23.3';
+const BUILD = '2026-08-23.5';
 
 /* ---- Relational complexity (Halford) ----
    Difficulty defined by how many variables are bound in one representation.
@@ -1464,6 +1491,7 @@ const cfg = {
   streams: { position: 'relational' },
   dim: 3,
   rotation: false,
+  spinPath: 'solved',     // 'solved' = non-degenerate turntable + roll, 'free' = original tumble
   spin: 60,
   frame: 'cube',                       // 'cube' | 'screen' | 'both'
   interval: 5000,
@@ -1673,6 +1701,7 @@ function loadProgress() {
     if (p.display) { cfg.gizmo = p.display.gizmo || cfg.gizmo;
                      cfg.cellVis = p.display.cellVis || cfg.cellVis;
                      cfg.layout = p.display.layout || cfg.layout;
+                     cfg.spinPath = p.display.spinPath || cfg.spinPath;
                      cfg.cubeScale = p.display.cubeScale || cfg.cubeScale;
                      if (p.display.dailyGoal != null) cfg.dailyGoal = p.display.dailyGoal;
                      cfg.buzzer = !!p.display.buzzer; }
@@ -1688,8 +1717,8 @@ function saveProgress() {
   progress.freeCfg = freeCfg; progress.mode = cfg.mode;
   progress.keyBinds = keyBinds;
   progress.display = { gizmo: cfg.gizmo, cellVis: cfg.cellVis, layout: cfg.layout,
-                       cubeScale: cfg.cubeScale, dailyGoal: cfg.dailyGoal,
-                       buzzer: cfg.buzzer };
+                       spinPath: cfg.spinPath, cubeScale: cfg.cubeScale,
+                       dailyGoal: cfg.dailyGoal, buzzer: cfg.buzzer };
   progress.stair = stairLog ? stairLog.map(v => +v.toFixed(4)) : null;
   progress.rcTier = rcTier;
   progress.profileName = activeProfile().name;
@@ -1900,7 +1929,11 @@ function buildCube(dim) {
      the previous size. */
   document.documentElement.classList.toggle('spread-stage', layout === 'spaced');
   document.documentElement.classList.toggle('gizmo-off', cfg.gizmo === 'off');
-  document.documentElement.classList.toggle('spin-stage', !!cfg.rotation);
+  /* Only the solved path tilts steeply and rolls; the free tumble keeps the resting
+     footprint. Both have to be settled before the lattice reads its own width. */
+  const solvedSpin = cfg.rotation && cfg.spinPath !== 'free';
+  document.documentElement.classList.toggle('spin-stage', solvedSpin);
+  document.documentElement.classList.toggle('tumble-stage', cfg.rotation && !solvedSpin);
 
   gridCube.innerHTML = '';
   state.cells = [];
@@ -1911,7 +1944,7 @@ function buildCube(dim) {
   let cellSize = step;
 
   /* Solved whenever the cube spins, layout aside: the gizmo arms are aimed at it too. */
-  spinView = cfg.rotation ? solveSpinView(dim) : null;
+  spinView = solvedSpin ? solveSpinView(dim) : null;
 
   if (layout === 'spaced') {
     /* Spread the lattice out and size the cells from the solved separation, so no two
@@ -1920,9 +1953,22 @@ function buildCube(dim) {
        given. While spinning the figures come from the tightest moment of the whole
        turn, which is what keeps the slots apart at every frame rather than at one. */
     const v = spinView || solveStaticView(dim);
-    step = size / Math.max(v.w, v.h);
+    /* The free tumble shows the lattice from every angle, including the one that lays
+       its long diagonal across the screen — the static outline is not what has to fit.
+       The 3D diameter is an exact bound that holds at every angle, so the figure keeps
+       a constant size instead of swelling past its box on the way round, which is what
+       the original did. */
+    const span = (cfg.rotation && !solvedSpin)
+      ? (dim - 1) * Math.sqrt(3)
+      : Math.max(v.w, v.h);
+    step = size / span;
     /* 0.82 leaves a visible gap at the tightest pair instead of exact tangency. */
     cellSize = v.sep * step * 0.82;
+    /* Cleared whenever the cube moves. buildGizmo lengthens each arm by the inverse of
+       its foreshortening at this angle, which is only meaningful if the angle is
+       actually held: under a free tumble the same rod swings side-on and reaches its
+       full 3D length across the screen, which is how the original threw its badges
+       clean outside the stage. */
     staticView = cfg.rotation ? null : v;
   } else {
     staticView = null;
@@ -2139,8 +2185,10 @@ function applyRotation() {
   cubeWrapper.style.setProperty('--spin-speed', cfg.spin + 's');
   /* The keyframes read the pitch from here, so it has to be in place before the
      animation starts. */
-  const sv = cfg.rotation ? solveSpinView(cfg.dim) : null;
+  const freeSpin = cfg.spinPath === 'free';
+  const sv = cfg.rotation && !freeSpin ? solveSpinView(cfg.dim) : null;
   cubeWrapper.style.setProperty('--spin-pitch', (sv ? sv.ax : -30) + 'deg');
+  cubeWrapper.classList.toggle('free-spin', freeSpin);
   /* Restart rather than retarget: a running animation does not re-read a custom
      property it already sampled, so changing cube size mid-spin would keep the old
      tilt and its collapses. */
@@ -3660,6 +3708,14 @@ function syncSettingsUI() {
   $('intervalMs').value = freeCfg.interval;
   $('blockLengthF').value = freeCfg.blockLength;
   $('cubeDimension').value = freeCfg.dim;
+  $('spinPath').value = cfg.spinPath;
+  $('spinPathHint').textContent = cfg.spinPath === 'free'
+    ? 'Sweeps the tilt as well as the turn, so four times a revolution the view looks '
+      + 'straight down a cube axis and a whole column of slots lands on one point. '
+      + 'Fuller motion; the active slot is briefly unreadable.'
+    : 'Turntable at a solved tilt plus an in-plane roll. No two slots ever coincide, '
+      + 'and every axis still sweeps every screen direction. Costs the exploded '
+      + 'layout about half its slot size, since cells must fit the tightest moment.';
   $('rotationOn').checked = freeCfg.rotation;
   $('rotationSpeed').value = freeCfg.spin;
   $('frameMode').value = freeCfg.frame;
@@ -3766,6 +3822,7 @@ function importJSON(text) {
   if (progress.display) {
     cfg.gizmo = progress.display.gizmo || cfg.gizmo;
     cfg.cellVis = progress.display.cellVis || cfg.cellVis;
+    cfg.spinPath = progress.display.spinPath || cfg.spinPath;
   }
   setMode(progress.mode || 'progression');
   renderDataPanel();
@@ -3975,6 +4032,12 @@ $('feedbackModeF').onchange = e => { freeCfg.feedback = e.target.value; cfg.feed
    a smaller footprint, so the lattice grows to fill it and the arm lengths — which
    are computed in px at build time — no longer match. */
 $('gizmoMode').onchange = e => { cfg.gizmo = e.target.value; onConfigChanged(true); saveProgress(); };
+/* Rebuilds: the two paths want different stage footprints, and the spaced layout
+   sizes its cells from whichever view is actually going to be held. */
+$('spinPath').onchange  = e => {
+  cfg.spinPath = e.target.value;
+  onConfigChanged(true); syncSettingsUI(); updateHUD(); saveProgress();
+};
 $('cellVis').onchange   = e => { cfg.cellVis = e.target.value; applyCellVis(); saveProgress(); };
 $('dailyGoal').oninput = e => {
   cfg.dailyGoal = Math.max(0, +e.target.value || 0);
