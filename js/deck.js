@@ -53,9 +53,14 @@ function assignKeys(groups) {
   return map;
 }
 
-const keyLabel = k => !k ? '—' : k === ' ' ? 'Spc'
-  : k.startsWith('arrow') ? ({arrowleft:'←',arrowright:'→',arrowup:'↑',arrowdown:'↓'})[k]
-  : k.toUpperCase();
+/* KeyboardEvent.key spells the non-printing keys as words, and uppercasing them the
+   way a letter is uppercased gave key caps reading ENTER and ESCAPE. */
+const KEY_NAMES = {
+  ' ':'Spc', enter:'Enter', escape:'Esc', backspace:'Bksp', delete:'Del', tab:'Tab',
+  arrowleft:'←', arrowright:'→', arrowup:'↑', arrowdown:'↓',
+  home:'Home', end:'End', pageup:'PgUp', pagedown:'PgDn', insert:'Ins',
+};
+const keyLabel = k => !k ? '—' : KEY_NAMES[k] || k.toUpperCase();
 
 function buildDeck() {
   deckEl.innerHTML = '';
