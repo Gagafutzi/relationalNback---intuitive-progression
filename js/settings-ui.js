@@ -164,8 +164,17 @@ function renderLadderState() {
 
   $('rcTier').value = String(rcTier);
   $('rcHint').textContent = rcTier >= 4
-    ? 'Quaternary binds two relations into one representation — Halford\'s documented adult ceiling. Its own ladder, independent of the ternary one.'
-    : 'Ternary binds two positions and the direction relating them. The standard track.';
+    ? 'Quaternary binds two relations into one representation — Halford\'s documented adult ceiling. Its own ladder, its own staircase and its own targets, independent of the ternary track.'
+    : 'Ternary binds two positions and the direction relating them. The standard track. Its ladder and its targets are its own — editing them leaves quaternary untouched.';
+
+  /* Every section whose numbers are stored per tier is stamped with the tier they
+     belong to. Without it, the same four panels showing different values depending on
+     a dropdown further up reads as a bug rather than as the point. */
+  document.querySelectorAll('.tier-tag').forEach(el => {
+    el.textContent = `RC ${rcTier}`;
+    el.title = `Saved separately for each relational-complexity tier. ` +
+               `You are editing the RC ${rcTier} track.`;
+  });
 
   $('adaptHint').textContent = tune.adapt === 'bayes'
     ? 'Estimates your speed threshold and places each block where it learns most. Carries what it knows across milestones instead of restarting at the top.'

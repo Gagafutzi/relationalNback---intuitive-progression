@@ -26,10 +26,16 @@
 <button class="settings-btn" id="settingsBtn">⚙ Settings</button>
 
 <aside class="settings" id="settingsPanel">
-  <h2>Relational N-Back</h2>
-  <div class="hint"><a href="https://discord.gg/brain" style="color:#8ab4ff">Mindbuilding Discord</a></div>
+  <header class="settings-head">
+    <div class="settings-title">
+      <h2>Relational N-Back</h2>
+      <a class="head-link" href="https://discord.gg/brain">Mindbuilding Discord</a>
+    </div>
+    <button class="head-close" id="settingsClose" aria-label="Close settings">✕</button>
+  </header>
 
-  <h3>Mode</h3>
+  <div class="settings-body">
+  <div class="mode-head">Mode</div>
   <div class="mode-toggle">
     <button id="modeProgression">Progression</button>
     <button id="modeFree">Free Play</button>
@@ -47,353 +53,415 @@
       <div class="hint" id="rcHint"></div>
     </div>
 
-    <h3>Where you are</h3>
-    <div class="ladder" id="ladderState"></div>
-    <div class="next-up" id="nextUp"></div>
-
-    <h3>Feedback</h3>
-    <div class="setting-group">
-      <select id="feedbackMode">
-        <option value="reveal">Immediate + reveal answers</option>
-        <option value="immediate">Immediate only</option>
-        <option value="off">None (test conditions)</option>
-      </select>
-    </div>
-
-    <h3>Speed ladder</h3>
-    <div class="setting-group">
-      <label>Adaptation</label>
-      <select id="adaptMode">
-        <option value="bayes">Bayesian staircase</option>
-        <option value="fixed">Fixed steps</option>
-      </select>
-      <div class="hint" id="adaptHint"></div>
-    </div>
-    <div class="setting-group pair">
-      <div>
-        <label>Start (s)</label>
-        <input type="number" id="startInterval" value="5" min="2" max="15" step="0.1" />
+    <details class="sect" open>
+      <summary>Where you are</summary>
+      <div class="sect-body">
+      <div class="ladder" id="ladderState"></div>
+      <div class="next-up" id="nextUp"></div>
       </div>
-      <div>
-        <label>Target (s)</label>
-        <input type="number" id="targetInterval" value="3" min="1" max="10" step="0.1" />
-      </div>
-    </div>
-    <div class="setting-group">
-      <label>Step per block (s)</label>
-      <input type="number" id="intervalStep" value="0.25" min="0.05" max="2" step="0.05" />
-    </div>
-    <div class="hint">Beat a block and the interval drops one step. Reach the target and
-      you clear the milestone — the interval resets and the next difficulty comes in.</div>
+    </details>
 
-    <h3>Rotation ladder</h3>
-    <div class="setting-group pair">
-      <div>
-        <label>Slowest (s/turn)</label>
-        <input type="number" id="spinStart" value="100" min="10" max="300" step="5" />
+    <details class="sect">
+      <summary>Feedback</summary>
+      <div class="sect-body">
+      <div class="setting-group">
+        <select id="feedbackMode">
+          <option value="reveal">Immediate + reveal answers</option>
+          <option value="immediate">Immediate only</option>
+          <option value="off">None (test conditions)</option>
+        </select>
       </div>
-      <div>
-        <label>Fastest (s/turn)</label>
-        <input type="number" id="spinEnd" value="20" min="5" max="200" step="5" />
       </div>
-    </div>
-    <div class="setting-group">
-      <label>Step (s)</label>
-      <input type="number" id="spinStep" value="10" min="1" max="50" step="1" />
-    </div>
-    <div class="hint" id="spinLadderHint"></div>
+    </details>
 
-    <h3>N ladder</h3>
-    <div class="setting-group pair">
-      <div>
-        <label>Max N</label>
-        <input type="number" id="nMax" value="3" min="1" max="9" />
+    <details class="sect">
+      <summary>Speed ladder<span class="sect-tag tier-tag"></span></summary>
+      <div class="sect-body">
+      <div class="setting-group">
+        <label>Adaptation</label>
+        <select id="adaptMode">
+          <option value="bayes">Bayesian staircase</option>
+          <option value="fixed">Fixed steps</option>
+        </select>
+        <div class="hint" id="adaptHint"></div>
       </div>
-      <div>
-        <label>N after new stimulus</label>
-        <input type="number" id="nAfterStimulus" value="2" min="1" max="5" />
+      <div class="setting-group pair">
+        <div>
+          <label>Start (s)</label>
+          <input type="number" id="startInterval" value="5" min="2" max="15" step="0.1" />
+        </div>
+        <div>
+          <label>Target (s)</label>
+          <input type="number" id="targetInterval" value="3" min="1" max="10" step="0.1" />
+        </div>
       </div>
-    </div>
+      <div class="setting-group">
+        <label>Step per block (s)</label>
+        <input type="number" id="intervalStep" value="0.25" min="0.05" max="2" step="0.05" />
+      </div>
+      <div class="hint">Beat a block and the interval drops one step. Reach the target and
+        you clear the milestone — the interval resets and the next difficulty comes in.</div>
+      </div>
+    </details>
 
-    <h3>Trials</h3>
-    <div class="setting-group">
-      <label>Trials per block</label>
-      <input type="number" id="blockLengthP" value="20" min="5" max="80" />
-    </div>
+    <details class="sect">
+      <summary>Rotation ladder<span class="sect-tag tier-tag"></span></summary>
+      <div class="sect-body">
+      <div class="setting-group pair">
+        <div>
+          <label>Slowest (s/turn)</label>
+          <input type="number" id="spinStart" value="100" min="10" max="300" step="5" />
+        </div>
+        <div>
+          <label>Fastest (s/turn)</label>
+          <input type="number" id="spinEnd" value="20" min="5" max="200" step="5" />
+        </div>
+      </div>
+      <div class="setting-group">
+        <label>Step (s)</label>
+        <input type="number" id="spinStep" value="10" min="1" max="50" step="1" />
+      </div>
+      <div class="hint" id="spinLadderHint"></div>
+      </div>
+    </details>
 
-    <h3>Reset</h3>
-    <div class="setting-group">
-      <button class="rbtn" id="resetProgress" style="width:100%;padding:8px">Reset all progress</button>
-    </div>
+    <details class="sect">
+      <summary>N ladder<span class="sect-tag tier-tag"></span></summary>
+      <div class="sect-body">
+      <div class="setting-group pair">
+        <div>
+          <label>Max N</label>
+          <input type="number" id="nMax" value="3" min="1" max="9" />
+        </div>
+        <div>
+          <label>N after new stimulus</label>
+          <input type="number" id="nAfterStimulus" value="2" min="1" max="5" />
+        </div>
+      </div>
+      </div>
+    </details>
+
+    <details class="sect">
+      <summary>Trials<span class="sect-tag tier-tag"></span></summary>
+      <div class="sect-body">
+      <div class="setting-group">
+        <label>Trials per block</label>
+        <input type="number" id="blockLengthP" value="20" min="5" max="80" />
+      </div>
+      </div>
+    </details>
+
+    <details class="sect">
+      <summary>Reset</summary>
+      <div class="sect-body">
+      <div class="setting-group">
+        <button class="rbtn" id="resetProgress" style="width:100%;padding:8px">Reset all progress</button>
+      </div>
+      </div>
+    </details>
+
   </div>
 
   <!-- ============ FREE PLAY ============ -->
   <div id="freePane" style="display:none">
-    <h3>Streams</h3>
-    <div id="streamRows"></div>
-    <div class="hint">
-      <b>Identity</b> = "same as N ago?" &nbsp;·&nbsp; <b>Relational</b> = "which way did it
-      move from N ago?"
-    </div>
+    <details class="sect">
+      <summary>Streams</summary>
+      <div class="sect-body">
+      <div id="streamRows"></div>
+      <div class="hint">
+        <b>Identity</b> = "same as N ago?" &nbsp;·&nbsp; <b>Relational</b> = "which way did it
+        move from N ago?"
+      </div>
+      </div>
+    </details>
 
-    <h3>Task</h3>
+    <details class="sect">
+      <summary>Task</summary>
+      <div class="sect-body">
+      <div class="setting-group">
+        <label>N</label>
+        <input type="number" id="nValue" value="2" min="1" max="9" />
+      </div>
+      <div class="setting-group">
+        <label>Stimulus interval (ms)</label>
+        <input type="number" id="intervalMs" value="2500" min="800" max="10000" step="100" />
+      </div>
+      <div class="setting-group">
+        <label>Trials per block</label>
+        <input type="number" id="blockLengthF" value="20" min="5" max="80" />
+      </div>
+      <div class="setting-group">
+        <label>Feedback</label>
+        <select id="feedbackModeF">
+          <option value="reveal">Immediate + reveal answers</option>
+          <option value="immediate">Immediate only</option>
+          <option value="off">None (test conditions)</option>
+        </select>
+      </div>
+      </div>
+    </details>
+
+    <details class="sect">
+      <summary>Advanced mechanics</summary>
+      <div class="sect-body">
+      <div class="setting-group">
+        <label><input type="checkbox" id="varPriority" style="width:auto"> Variable
+          priority</label>
+        <div class="hint">Each block cues one stream to <b>focus on without dropping the
+          others</b>, rotating through them. Practising the priority shift itself is what
+          transfers better than steady equal emphasis.</div>
+      </div>
+      <div class="setting-group">
+        <label><input type="checkbox" id="metaOn" style="width:auto"> Meta-relations
+          (2nd order)</label>
+        <div class="hint">Report how this move relates to the move you reported N trials
+          ago — <b>same</b>, <b>opposite</b>, or a <b>different axis</b> — instead of
+          which way it went. Forces every move to be axis-aligned, otherwise
+          "same/opposite" has no answer for a diagonal. Punishing above N=2.</div>
+      </div>
+      <div class="setting-group">
+        <label>Gate closing (compare-only trials)</label>
+        <select id="gateOn">
+          <option value="0">Off</option>
+          <option value="0.2">20% of trials</option>
+          <option value="0.3">30% of trials</option>
+          <option value="0.4">40% of trials</option>
+        </select>
+        <div class="hint">Dashed orange cells must be <b>judged but not remembered</b> —
+          they never become anyone's N-back item. Trains holding the gate shut, which
+          ordinary N-back never asks for.</div>
+      </div>
+      <div class="setting-group">
+        <label>Retro-cue (output gating)</label>
+        <select id="retroOn">
+          <option value="0">Off</option>
+          <option value="2">2 lags</option>
+          <option value="3">3 lags</option>
+        </select>
+        <div class="hint">The stimulus vanishes, then a cue names <em>which</em> adjacent
+          pair to report. You must hold every recent item, not just the one N-back would
+          have picked. Overrides N, can't combine with meta-relations, and forces the
+          interval to at least 1.30s so there is time to answer after the cue.</div>
+      </div>
+      <div class="setting-group">
+        <label><input type="checkbox" id="fixedGlyphMap" style="width:auto"> Fixed symbol
+          map</label>
+        <div class="hint">Normally the 2×2 map of symbol sets reshuffles every session so
+          it must be re-learned. Fixed keeps one layout forever — much easier, and it
+          removes the re-memorisation the shuffle is there to force.</div>
+      </div>
+      <div class="setting-group">
+        <label>Lure rate: <span id="lureVal">20</span>%</label>
+        <input type="number" id="lureRateF" value="20" min="10" max="50" step="5" />
+        <div class="hint">Share of trials that match N±1 but not N — familiarity says
+          yes, recollection says no.</div>
+      </div>
+      </div>
+    </details>
+
+    <details class="sect">
+      <summary>Cube</summary>
+      <div class="sect-body">
+      <div class="setting-group">
+        <label>Dimension</label>
+        <select id="cubeDimension">
+          <option value="3">3 × 3 × 3 (27)</option>
+          <option value="4">4 × 4 × 4 (64)</option>
+        </select>
+      </div>
+      <div class="setting-group">
+        <label><input type="checkbox" id="rotationOn" style="width:auto"> Rotate cube</label>
+      </div>
+      <div class="setting-group">
+        <label>Rotation period (seconds)</label>
+        <input type="number" id="rotationSpeed" value="60" min="5" max="300" />
+      </div>
+      <div class="setting-group">
+        <label>Rotation path</label>
+        <select id="spinPath">
+          <option value="solved">Solved — slots never overlap</option>
+          <option value="free">Free tumble — original</option>
+        </select>
+        <div class="hint" id="spinPathHint"></div>
+      </div>
+      <div class="setting-group">
+        <label>Reference frame</label>
+        <select id="frameMode">
+          <option value="cube">Cube only (allocentric)</option>
+          <option value="screen">Screen only (egocentric)</option>
+          <option value="both">Both at once</option>
+        </select>
+        <div class="hint">Screen frame projects the movement through the cube's live
+          rotation — you answer in what you <em>see</em>. <b>Both</b> asks for the same
+          movement in each frame simultaneously.</div>
+      </div>
+      </div>
+    </details>
+
+  </div>
+
+  <details class="sect">
+    <summary>Display</summary>
+    <div class="sect-body">
     <div class="setting-group">
-      <label>N</label>
-      <input type="number" id="nValue" value="2" min="1" max="9" />
+      <label>Slot visibility</label>
+      <select id="cellVis">
+        <option value="lattice">Lattice — every cell drawn</option>
+        <option value="contrast">Contrast — inactive cells faded</option>
+        <option value="guides">Guides — + axis rails through the slot</option>
+        <option value="solo">Solo — only the lit cell</option>
+      </select>
+      <div class="hint" id="cellVisHint"></div>
     </div>
     <div class="setting-group">
-      <label>Stimulus interval (ms)</label>
-      <input type="number" id="intervalMs" value="2500" min="800" max="10000" step="100" />
+      <label>Daily goal (minutes, 0 = off)</label>
+      <input type="number" id="dailyGoal" value="20" min="0" max="240" step="5" />
+      <div class="hint">Counts time inside blocks only, and ticks live while you play.
+        Turns green once you hit it.</div>
     </div>
     <div class="setting-group">
-      <label>Trials per block</label>
-      <input type="number" id="blockLengthF" value="20" min="5" max="80" />
+      <label><input type="checkbox" id="buzzer" style="width:auto"> Buzz on wrong
+        answer</label>
+      <div class="hint">Two distinct error sounds: a descending slide for a
+        <b>wrong press</b>, two low pulses for a <b>miss</b> (a target you never
+        answered). Independent of the Feedback setting, so you can keep the audio cue
+        with the visuals off.</div>
     </div>
     <div class="setting-group">
-      <label>Feedback</label>
-      <select id="feedbackModeF">
-        <option value="reveal">Immediate + reveal answers</option>
-        <option value="immediate">Immediate only</option>
-        <option value="off">None (test conditions)</option>
+      <label>Axis gizmo</label>
+      <select id="gizmoMode">
+        <option value="full">Arrows + letters</option>
+        <option value="letters">Letters only</option>
+        <option value="off">Off (hard mode)</option>
       </select>
     </div>
 
-    <h3>Advanced mechanics</h3>
     <div class="setting-group">
-      <label><input type="checkbox" id="varPriority" style="width:auto"> Variable
-        priority</label>
-      <div class="hint">Each block cues one stream to <b>focus on without dropping the
-        others</b>, rotating through them. Practising the priority shift itself is what
-        transfers better than steady equal emphasis.</div>
-    </div>
-    <div class="setting-group">
-      <label><input type="checkbox" id="metaOn" style="width:auto"> Meta-relations
-        (2nd order)</label>
-      <div class="hint">Report how this move relates to the move you reported N trials
-        ago — <b>same</b>, <b>opposite</b>, or a <b>different axis</b> — instead of
-        which way it went. Forces every move to be axis-aligned, otherwise
-        "same/opposite" has no answer for a diagonal. Punishing above N=2.</div>
-    </div>
-    <div class="setting-group">
-      <label>Gate closing (compare-only trials)</label>
-      <select id="gateOn">
-        <option value="0">Off</option>
-        <option value="0.2">20% of trials</option>
-        <option value="0.3">30% of trials</option>
-        <option value="0.4">40% of trials</option>
+      <label>Cube layout</label>
+      <select id="cubeLayout">
+        <option value="dense">Dense — true cube</option>
+        <option value="spaced">Spaced — gaps between cells</option>
       </select>
-      <div class="hint">Dashed orange cells must be <b>judged but not remembered</b> —
-        they never become anyone's N-back item. Trains holding the gate shut, which
-        ordinary N-back never asks for.</div>
+      <div class="hint" id="layoutHint"></div>
     </div>
     <div class="setting-group">
-      <label>Retro-cue (output gating)</label>
-      <select id="retroOn">
-        <option value="0">Off</option>
-        <option value="2">2 lags</option>
-        <option value="3">3 lags</option>
+      <label>Cube size: <span id="cubeSizeVal">100</span>%</label>
+      <input type="range" id="cubeSize" min="60" max="190" step="5" value="100" />
+      <div class="hint">Spaced layout scales its spread to match, so a bigger cube means
+        bigger gaps rather than just bigger cells.</div>
+    </div>
+    </div>
+  </details>
+
+  <details class="sect">
+    <summary>Appearance</summary>
+    <div class="sect-body">
+    <div class="setting-group">
+      <label>Theme</label>
+      <div class="theme-grid" id="themeGrid"></div>
+    </div>
+    <div class="setting-group">
+      <label>Accent</label>
+      <div class="swatch-row" id="accentRow"></div>
+      <input type="color" id="accentCustom" style="margin-top:7px" />
+    </div>
+    <div class="setting-group">
+      <label>Background image</label>
+      <input type="file" id="bgFile" accept="image/*" />
+      <div class="pair" style="margin-top:7px">
+        <div><button class="rbtn" id="bgClear" style="width:100%;padding:7px">Clear</button></div>
+        <div><button class="rbtn" id="bgFit" style="width:100%;padding:7px">Cover / Contain</button></div>
+      </div>
+      <div class="hint" id="bgStatus">Downscaled and stored separately from your training
+        data, so a large photo can never push out block history.</div>
+    </div>
+    <div class="setting-group">
+      <label>Background dim: <span id="dimVal">68</span>%</label>
+      <input type="range" id="bgDim" min="0" max="95" value="68" />
+    </div>
+    <div class="setting-group">
+      <label>Axis palette</label>
+      <select id="axisPalette">
+        <option value="default">Default</option>
+        <option value="cb">Colour-blind safe (Okabe–Ito)</option>
       </select>
-      <div class="hint">The stimulus vanishes, then a cue names <em>which</em> adjacent
-        pair to report. You must hold every recent item, not just the one N-back would
-        have picked. Overrides N, can't combine with meta-relations, and forces the
-        interval to at least 1.30s so there is time to answer after the cue.</div>
+      <div class="hint">The six axis colours carry meaning — they match the response
+        buttons — so this swaps the whole set together.</div>
     </div>
     <div class="setting-group">
-      <label><input type="checkbox" id="fixedGlyphMap" style="width:auto"> Fixed symbol
-        map</label>
-      <div class="hint">Normally the 2×2 map of symbol sets reshuffles every session so
-        it must be re-learned. Fixed keeps one layout forever — much easier, and it
-        removes the re-memorisation the shuffle is there to force.</div>
+      <label><input type="checkbox" id="flatMode" style="width:auto"> Reduce effects</label>
+      <div class="hint">Turns off glows, shadows and blurs. Lighter on weak hardware.</div>
     </div>
-    <div class="setting-group">
-      <label>Lure rate: <span id="lureVal">20</span>%</label>
-      <input type="number" id="lureRateF" value="20" min="10" max="50" step="5" />
-      <div class="hint">Share of trials that match N±1 but not N — familiarity says
-        yes, recollection says no.</div>
     </div>
+  </details>
 
-    <h3>Cube</h3>
-    <div class="setting-group">
-      <label>Dimension</label>
-      <select id="cubeDimension">
-        <option value="3">3 × 3 × 3 (27)</option>
-        <option value="4">4 × 4 × 4 (64)</option>
-      </select>
+  <details class="sect">
+    <summary>Shortcuts</summary>
+    <div class="sect-body">
+    <div id="shortcutList"></div>
+    <button class="rbtn" id="resetShortcuts" style="width:100%;padding:8px;margin-top:12px">
+      Reset to defaults</button>
+    <div class="hint">The keys that drive the session, as opposed to the response
+      buttons below. Click one to rebind, then press the new key. <b>Esc</b> cancels and
+      <b>Backspace</b> restores the default, so neither of those can itself be bound.
+      A key shown in red is one a response button is currently using — that button
+      answers first, so the shortcut stays dead until the stream is switched off.</div>
     </div>
-    <div class="setting-group">
-      <label><input type="checkbox" id="rotationOn" style="width:auto"> Rotate cube</label>
-    </div>
-    <div class="setting-group">
-      <label>Rotation period (seconds)</label>
-      <input type="number" id="rotationSpeed" value="60" min="5" max="300" />
-    </div>
-    <div class="setting-group">
-      <label>Rotation path</label>
-      <select id="spinPath">
-        <option value="solved">Solved — slots never overlap</option>
-        <option value="free">Free tumble — original</option>
-      </select>
-      <div class="hint" id="spinPathHint"></div>
-    </div>
-    <div class="setting-group">
-      <label>Reference frame</label>
-      <select id="frameMode">
-        <option value="cube">Cube only (allocentric)</option>
-        <option value="screen">Screen only (egocentric)</option>
-        <option value="both">Both at once</option>
-      </select>
-      <div class="hint">Screen frame projects the movement through the cube's live
-        rotation — you answer in what you <em>see</em>. <b>Both</b> asks for the same
-        movement in each frame simultaneously.</div>
-    </div>
-  </div>
+  </details>
 
-  <h3>Display</h3>
-  <div class="setting-group">
-    <label>Slot visibility</label>
-    <select id="cellVis">
-      <option value="lattice">Lattice — every cell drawn</option>
-      <option value="contrast">Contrast — inactive cells faded</option>
-      <option value="guides">Guides — + axis rails through the slot</option>
-      <option value="solo">Solo — only the lit cell</option>
-    </select>
-    <div class="hint" id="cellVisHint"></div>
-  </div>
-  <div class="setting-group">
-    <label>Daily goal (minutes, 0 = off)</label>
-    <input type="number" id="dailyGoal" value="20" min="0" max="240" step="5" />
-    <div class="hint">Counts time inside blocks only, and ticks live while you play.
-      Turns green once you hit it.</div>
-  </div>
-  <div class="setting-group">
-    <label><input type="checkbox" id="buzzer" style="width:auto"> Buzz on wrong
-      answer</label>
-    <div class="hint">Two distinct error sounds: a descending slide for a
-      <b>wrong press</b>, two low pulses for a <b>miss</b> (a target you never
-      answered). Independent of the Feedback setting, so you can keep the audio cue
-      with the visuals off.</div>
-  </div>
-  <div class="setting-group">
-    <label>Axis gizmo</label>
-    <select id="gizmoMode">
-      <option value="full">Arrows + letters</option>
-      <option value="letters">Letters only</option>
-      <option value="off">Off (hard mode)</option>
-    </select>
-  </div>
-
-  <div class="setting-group">
-    <label>Cube layout</label>
-    <select id="cubeLayout">
-      <option value="dense">Dense — true cube</option>
-      <option value="spaced">Spaced — gaps between cells</option>
-    </select>
-    <div class="hint" id="layoutHint"></div>
-  </div>
-  <div class="setting-group">
-    <label>Cube size: <span id="cubeSizeVal">100</span>%</label>
-    <input type="range" id="cubeSize" min="60" max="190" step="5" value="100" />
-    <div class="hint">Spaced layout scales its spread to match, so a bigger cube means
-      bigger gaps rather than just bigger cells.</div>
-  </div>
-
-  <h3>Appearance</h3>
-  <div class="setting-group">
-    <label>Theme</label>
-    <select id="themeSel">
-      <option value="midnight">Midnight</option>
-      <option value="slate">Slate</option>
-      <option value="void">Void</option>
-      <option value="nebula">Nebula</option>
-      <option value="forest">Forest</option>
-    </select>
-  </div>
-  <div class="setting-group">
-    <label>Accent</label>
-    <div class="swatch-row" id="accentRow"></div>
-    <input type="color" id="accentCustom" style="margin-top:7px" />
-  </div>
-  <div class="setting-group">
-    <label>Background image</label>
-    <input type="file" id="bgFile" accept="image/*" />
-    <div class="pair" style="margin-top:7px">
-      <div><button class="rbtn" id="bgClear" style="width:100%;padding:7px">Clear</button></div>
-      <div><button class="rbtn" id="bgFit" style="width:100%;padding:7px">Cover / Contain</button></div>
-    </div>
-    <div class="hint" id="bgStatus">Downscaled and stored separately from your training
-      data, so a large photo can never push out block history.</div>
-  </div>
-  <div class="setting-group">
-    <label>Background dim: <span id="dimVal">68</span>%</label>
-    <input type="range" id="bgDim" min="0" max="95" value="68" />
-  </div>
-  <div class="setting-group">
-    <label>Axis palette</label>
-    <select id="axisPalette">
-      <option value="default">Default</option>
-      <option value="cb">Colour-blind safe (Okabe–Ito)</option>
-    </select>
-    <div class="hint">The six axis colours carry meaning — they match the response
-      buttons — so this swaps the whole set together.</div>
-  </div>
-  <div class="setting-group">
-    <label><input type="checkbox" id="flatMode" style="width:auto"> Reduce effects</label>
-    <div class="hint">Turns off glows, shadows and blurs. Lighter on weak hardware.</div>
-  </div>
-
-  <h3>Shortcuts</h3>
-  <div id="shortcutList"></div>
-  <button class="rbtn" id="resetShortcuts" style="width:100%;padding:8px;margin-top:12px">
-    Reset to defaults</button>
-  <div class="hint">The keys that drive the session, as opposed to the response
-    buttons below. Click one to rebind, then press the new key. <b>Esc</b> cancels and
-    <b>Backspace</b> restores the default, so neither of those can itself be bound.
-    A key shown in red is one a response button is currently using — that button
-    answers first, so the shortcut stays dead until the stream is switched off.</div>
-
-  <h3>Keybinds</h3>
-  <details id="keybindDetails">
-    <summary>Show all bindings</summary>
+  <details class="sect">
+    <summary>Keybinds</summary>
+    <div class="sect-body">
     <div id="keybindList"></div>
     <button class="rbtn" id="resetKeybinds" style="width:100%;padding:8px;margin-top:12px">
       Reset to defaults</button>
-  </details>
-  <div class="hint">Click a key to rebind, then press the new one.
-    <b>Esc</b> cancels, <b>Backspace</b> restores the default. Bindings apply in both
-    modes and are saved.</div>
-
-  <h3>Profile</h3>
-  <div class="setting-group">
-    <select id="profileSel"></select>
-    <div class="pair" style="margin-top:7px">
-      <div><button class="rbtn" id="profileNew" style="width:100%;padding:7px">New</button></div>
-      <div><button class="rbtn" id="profileRename" style="width:100%;padding:7px">Rename</button></div>
+    <div class="hint">Click a key to rebind, then press the new one.
+      <b>Esc</b> cancels, <b>Backspace</b> restores the default. Bindings apply in both
+      modes and are saved.</div>
     </div>
-    <button class="rbtn" id="profileDelete" style="width:100%;padding:7px;margin-top:6px">
-      Delete this profile</button>
-    <div class="hint" id="profileHint"></div>
-  </div>
+  </details>
 
-  <h3>Data</h3>
-  <div class="setting-group">
-    <label>Today: <span id="minutesToday">0</span> min &nbsp;·&nbsp; Best load:
-      <span id="bestLoad">0</span></label>
-  </div>
-  <div class="setting-group">
-    <label>Tester label (goes in the export)</label>
-    <input type="text" id="testerLabel" placeholder="e.g. alex" />
-  </div>
-  <div class="setting-group pair">
-    <div><button class="rbtn" id="exportJson" style="width:100%;padding:8px">Download
-      JSON</button></div>
-    <div><button class="rbtn" id="copyJson" style="width:100%;padding:8px">Copy
-      JSON</button></div>
-  </div>
-  <div class="setting-group">
-    <label>Restore from a downloaded file</label>
-    <input type="file" id="importJson" accept="application/json,.json" />
-  </div>
-  <div class="hint" id="dataStatus"></div>
+  <details class="sect">
+    <summary>Profile</summary>
+    <div class="sect-body">
+    <div class="setting-group">
+      <select id="profileSel"></select>
+      <div class="pair" style="margin-top:7px">
+        <div><button class="rbtn" id="profileNew" style="width:100%;padding:7px">New</button></div>
+        <div><button class="rbtn" id="profileRename" style="width:100%;padding:7px">Rename</button></div>
+      </div>
+      <button class="rbtn" id="profileDelete" style="width:100%;padding:7px;margin-top:6px">
+        Delete this profile</button>
+      <div class="hint" id="profileHint"></div>
+    </div>
+    </div>
+  </details>
+
+  <details class="sect">
+    <summary>Data</summary>
+    <div class="sect-body">
+    <div class="setting-group">
+      <label>Today: <span id="minutesToday">0</span> min &nbsp;·&nbsp; Best load:
+        <span id="bestLoad">0</span></label>
+    </div>
+    <div class="setting-group">
+      <label>Tester label (goes in the export)</label>
+      <input type="text" id="testerLabel" placeholder="e.g. alex" />
+    </div>
+    <div class="setting-group pair">
+      <div><button class="rbtn" id="exportJson" style="width:100%;padding:8px">Download
+        JSON</button></div>
+      <div><button class="rbtn" id="copyJson" style="width:100%;padding:8px">Copy
+        JSON</button></div>
+    </div>
+    <div class="setting-group">
+      <label>Restore from a downloaded file</label>
+      <input type="file" id="importJson" accept="application/json,.json" />
+    </div>
+    <div class="hint" id="dataStatus"></div>
+    </div>
+  </details>
+  </div><!-- /.settings-body -->
 </aside>
 
 <div class="hud">
@@ -454,6 +522,7 @@
 <script src="js/trials.js"></script>
 <script src="js/judgments.js"></script>
 <script src="js/deck.js"></script>
+<script src="js/appearance.js"></script>
 <script src="js/block.js"></script>
 <script src="js/hud.js"></script>
 <script src="js/settings-ui.js"></script>

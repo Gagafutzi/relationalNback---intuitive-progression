@@ -8,6 +8,9 @@
   --cell-active: rgba(120, 200, 255, 0.62);
   --text: #e6ebff;
   --muted: rgba(230, 235, 255, 0.55);
+  /* Surface for text inputs, selects and key caps. Themed, so a lighter panel does
+     not leave near-black boxes punched through it. */
+  --input-bg: #0e121a;
   --good: #51cf66;
   --bad: #ff6b6b;
   --cube-scale: 1;

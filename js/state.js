@@ -39,32 +39,48 @@ const freeCfg = {
   varPriority: true, fixedGlyphMap: false,
 };
 
-const tune = {
+const TUNE_DEFAULTS = {
   adapt: 'bayes',                    // 'bayes' | 'fixed'
   startInterval: 5000, targetInterval: 3000, intervalStep: 250, maxInterval: 6500,
   spinStart: 100, spinEnd: 20, spinStep: 10,
   nMax: 3, nAfterStimulus: 2, blockLength: 20,
 };
 
+/* The tunables for the tier you are on. Always mutated in place, never reassigned —
+   the input handlers and every ladder function close over this object. Switching
+   tiers copies values through it rather than swapping the reference. */
+const tune = { ...TUNE_DEFAULTS };
+
 let prog = { streamCount: 1, n: 1, spinLevel: 0, interval: 5000, lureRate: 0.20 };
 
-/* Each relational-complexity tier keeps its own ladder and its own staircase, so
-   quaternary is a parallel track rather than something gated behind ~20 hours of
-   ternary. Enthusiasts can start at the ceiling; the ladder underneath still works. */
+/* Each relational-complexity tier keeps its own ladder, its own staircase and its
+   own tunables, so quaternary is a parallel track rather than something gated behind
+   ~20 hours of ternary. Enthusiasts can start at the ceiling; the ladder underneath
+   still works. The tunables belong here for the same reason the ladder does: a target
+   speed that is right for ternary is not the same target under a heavier relational
+   load, and editing one used to silently edit the other. */
 let rcTier = 3;
 const tiers = {};
 function tierState(rc) {
   return tiers[rc] || (tiers[rc] = {
     prog: { streamCount: 1, n: 1, spinLevel: 0, interval: 5000, lureRate: 0.20 },
     stair: null,
+    /* A tier first visited mid-session inherits the settings you are already using,
+       so the first switch carries your speeds across instead of dropping you on the
+       factory defaults. They diverge from there. */
+    tune: { ...tune },
   });
 }
 function switchTier(rc) {
   const cur = tierState(rcTier);
   cur.prog = { ...prog }; cur.stair = stairLog ? stairLog.slice() : null;
+  cur.tune = { ...tune };
   rcTier = rc;
+  /* Read before the assign below: a tier being created right now copies `tune` as it
+     still stands, which is what makes the inheritance above work. */
   const nx = tierState(rc);
   prog = { ...nx.prog };
+  Object.assign(tune, nx.tune);
   stairLog = nx.stair ? nx.stair.slice() : null;
   if (!stairLog) stairInit(tune.startInterval);
 }

@@ -4,7 +4,18 @@
    17. WIRING
    ============================================================ */
 
-$('settingsBtn').onclick = () => $('settingsPanel').classList.toggle('open');
+/* One place decides whether the panel is open. The body class is what hides the
+   floating ⚙ button while it is — the button is fixed at the top-left, exactly where
+   the panel's own header goes, and it used to sit on top of the first control. */
+function setSettingsOpen(open) {
+  $('settingsPanel').classList.toggle('open', open);
+  document.body.classList.toggle('settings-open', open);
+}
+const toggleSettings = () =>
+  setSettingsOpen(!$('settingsPanel').classList.contains('open'));
+
+$('settingsBtn').onclick = toggleSettings;
+$('settingsClose').onclick = () => setSettingsOpen(false);
 $('modeProgression').onclick = () => setMode('progression');
 $('modeFree').onclick = () => setMode('free');
 
@@ -32,7 +43,6 @@ $('feedbackMode').onchange = e => {
 };
 
 /* --- appearance --- */
-$('themeSel').onchange     = e => { appearance.theme = e.target.value; applyAppearance(); saveAppearance(); };
 $('accentCustom').oninput  = e => { appearance.accent = e.target.value; applyAppearance(); saveAppearance(); };
 $('axisPalette').onchange  = e => { appearance.palette = e.target.value; applyAppearance(); saveAppearance(); };
 $('flatMode').onchange     = e => { appearance.flat = e.target.checked; applyAppearance(); saveAppearance(); };
@@ -84,12 +94,14 @@ $('adaptMode').onchange = e => {
 $('resetProgress').onclick = () => {
   if (!confirm('Erase the ladder, all history and settings? This cannot be undone.')) return;
   localStorage.removeItem(storeKey());
-  prog = { streamCount:1, n:1, spinLevel:0, interval:5000 };
+  /* Reset through the one function that knows the whole picture. Clearing the fields
+     by hand here left every OTHER tier's ladder untouched, so an erased profile got
+     its quaternary progress back on the next save — and now that the tunables live
+     per tier as well, they would have come back with it. */
+  resetInMemoryState();
   progress = { version:2, bestLoad:0, dailyMinutes:{}, blocks:[] };
-  keyBinds = {};
-  actionBinds = {};
   stairInit(tune.startInterval);
-  setMode('progression');
+  setMode('progression');       // re-syncs the whole panel on its way through
   renderDataPanel();
 };
 
@@ -255,7 +267,7 @@ $('cubeLayout').onchange = e => {
 
 /* --- run controls --- */
 $('startBtn').onclick = () => {
-  $('settingsPanel').classList.remove('open');
+  setSettingsOpen(false);
   if (cfg.streams.glyph === 'relational') showGlyphIntro(startBlock);
   else startBlock();
 };
@@ -271,7 +283,7 @@ const ACTION_RUN = {
   stop:     () => stopBlock(false),
   pause:    () => { if (state.paused) resumeFromPause();
                     else if (state.running) pauseBlock(PAUSE_WHY.manual); },
-  settings: () => $('settingsPanel').classList.toggle('open'),
+  settings: () => toggleSettings(),
 };
 
 /* Bare modifiers make useless bindings — a shortcut on Shift would fire every time

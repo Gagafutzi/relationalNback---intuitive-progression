@@ -67,11 +67,7 @@ function resetInMemoryState() {
   keyBinds = {};
   actionBinds = {};
   state.glyphMap = null;
-  Object.assign(tune, {
-    adapt:'bayes', startInterval:5000, targetInterval:3000, intervalStep:250,
-    maxInterval:6500, spinStart:100, spinEnd:20, spinStep:10,
-    nMax:3, nAfterStimulus:2, blockLength:20,
-  });
+  Object.assign(tune, TUNE_DEFAULTS);
   Object.assign(freeCfg, {
     n:2, streams:{ position:'relational' }, dim:3, rotation:false, spin:60,
     frame:'cube', interval:2500, blockLength:20, feedback:'reveal',
@@ -110,7 +106,11 @@ function loadProgress() {
     if (Array.isArray(p.stair) && p.stair.length === STAIR.steps) stairLog = p.stair.slice();
     if (p.tiers) Object.entries(p.tiers).forEach(([k, v]) => {
       tiers[k] = { prog: v.prog,
-        stair: Array.isArray(v.stair) && v.stair.length === STAIR.steps ? v.stair.slice() : null };
+        stair: Array.isArray(v.stair) && v.stair.length === STAIR.steps ? v.stair.slice() : null,
+        /* Records written before the tunables were per-tier carry no v.tune. Seeding
+           every tier from the one global set that record does have keeps whatever was
+           configured, rather than resetting a tuned ladder to the factory numbers. */
+        tune: { ...TUNE_DEFAULTS, ...(v.tune || p.tune || {}) } };
     });
     if (p.rcTier) rcTier = p.rcTier;
     /* A fixed symbol map is only fixed if it outlives the session that made it. */
@@ -144,8 +144,10 @@ function saveProgress() {
   else delete progress.glyphMap;
   tierState(rcTier).prog = { ...prog };
   tierState(rcTier).stair = stairLog ? stairLog.slice() : null;
+  tierState(rcTier).tune = { ...tune };
   progress.tiers = Object.fromEntries(Object.entries(tiers).map(([k, v]) =>
-    [k, { prog: v.prog, stair: v.stair ? v.stair.map(x => +x.toFixed(4)) : null }]));
+    [k, { prog: v.prog, tune: v.tune,
+          stair: v.stair ? v.stair.map(x => +x.toFixed(4)) : null }]));
 
   try {
     localStorage.setItem(storeKey(), JSON.stringify(progress));

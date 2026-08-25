@@ -3,28 +3,123 @@
   position: fixed; top: 14px; left: 14px; z-index: 30;
   background: var(--panel); border: 1px solid var(--border-outer);
   color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;
+  transition: opacity .2s ease, transform .2s ease;
+}
+.settings-btn:hover { border-color: var(--accent, #4d7fd6); }
+/* The button lives exactly where the open panel puts its own header, so it used to
+   sit on top of the first control. It gets out of the way instead of fighting for
+   the space with z-index. */
+body.settings-open .settings-btn {
+  opacity: 0; pointer-events: none; transform: translateX(-8px);
 }
 
 .settings {
   position: fixed; top: 0; left: 0; height: 100vh; height: 100dvh;
-  width: min(340px, 88vw);
+  width: min(356px, 90vw);
+  display: flex; flex-direction: column;
   background: linear-gradient(180deg, var(--panel), var(--panel-2));
   border-right: 1px solid var(--border-outer);
-  padding: 56px 18px 18px; transform: translateX(-100%);
-  transition: transform .28s ease; z-index: 29; overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform .28s cubic-bezier(.32, .72, 0, 1); z-index: 29;
 }
-.settings.open { transform: translateX(0); }
-.settings h2 { margin: 0 0 4px; font-size: 17px; }
-.settings h3 {
-  margin: 20px 0 8px; font-size: 11px; letter-spacing: .12em;
-  text-transform: uppercase; color: var(--muted);
-  border-bottom: 1px solid var(--border-inner); padding-bottom: 6px;
+.settings.open { transform: translateX(0); box-shadow: 22px 0 60px -30px #000; }
+
+/* Header is outside the scroller, so the title and the close button stay put however
+   far down the panel you are. */
+.settings-head {
+  flex: none; display: flex; align-items: flex-start; gap: 10px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border-inner);
+  background: var(--panel);
 }
+.settings-title { flex: 1; min-width: 0; }
+.settings h2 { margin: 0; font-size: 16px; letter-spacing: .01em; }
+.head-link {
+  display: inline-block; margin-top: 3px; font-size: 11px;
+  color: var(--accent, #8ab4ff); text-decoration: none; opacity: .85;
+}
+.head-link:hover { text-decoration: underline; opacity: 1; }
+.head-close {
+  flex: none; width: 28px; height: 28px; border-radius: 7px; cursor: pointer;
+  background: transparent; border: 1px solid var(--border-inner);
+  color: var(--muted); font-size: 13px; line-height: 1;
+}
+.head-close:hover { color: var(--text); border-color: var(--border-outer); }
+
+.settings-body {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px 22px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-inner) transparent;
+}
+.settings-body::-webkit-scrollbar { width: 9px; }
+.settings-body::-webkit-scrollbar-thumb {
+  background: var(--border-inner); border-radius: 5px;
+  border: 2px solid transparent; background-clip: content-box;
+}
+.settings-body::-webkit-scrollbar-thumb:hover { background: var(--border-outer); background-clip: content-box; }
+
+/* ---- collapsible sections ----
+   The panel carries eighteen groups. Flat, that is a very long scroll to reach the
+   one you want; as cards that fold shut it is a table of contents you can open. */
+.mode-head, .sect > summary {
+  font-size: 11px; letter-spacing: .11em; text-transform: uppercase;
+  color: var(--muted);
+}
+.mode-head { margin: 2px 0 8px; }
+.sect {
+  border: 1px solid var(--border-inner); border-radius: 10px;
+  background: var(--panel-2);
+  background: color-mix(in srgb, var(--panel-2) 70%, transparent);
+  margin-bottom: 8px; overflow: hidden;
+}
+.sect > summary {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; cursor: pointer; list-style: none; user-select: none;
+}
+.sect > summary::-webkit-details-marker { display: none; }
+.sect > summary::after {
+  content: ''; margin-left: auto; flex: none;
+  width: 7px; height: 7px; border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor; transform: rotate(-45deg) translate(-2px, 0);
+  transition: transform .18s ease; opacity: .7;
+}
+.sect[open] > summary::after { transform: rotate(45deg) translate(-2px, -2px); }
+.sect > summary:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, .05);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+.sect[open] > summary { color: var(--text); border-bottom: 1px solid var(--border-inner); }
+.sect-body { padding: 12px; }
+.sect-body > :last-child { margin-bottom: 0; }
+
+/* Marks a group whose values are stored per relational-complexity tier. */
+.sect-tag {
+  font-size: 9.5px; letter-spacing: .06em; padding: 2px 6px; border-radius: 20px;
+  text-transform: none; font-weight: 600;
+  color: var(--accent, #8ab4ff);
+  border: 1px solid var(--accent, #4d7fd6);
+  border-color: color-mix(in srgb, var(--accent, #4d7fd6) 55%, transparent);
+  background: rgba(77, 127, 214, .15);
+  background: color-mix(in srgb, var(--accent, #4d7fd6) 15%, transparent);
+}
+
 .setting-group { margin-bottom: 12px; }
 .settings label { display: block; margin-bottom: 5px; font-size: 13px; opacity: .85; }
 select, input[type=number], input[type=text], input[type=file] {
-  width: 100%; padding: 7px; background: #0e121a; color: var(--text);
-  border: 1px solid var(--border-inner); border-radius: 6px; font-size: 13px;
+  width: 100%; padding: 7px 8px; background: var(--input-bg); color: var(--text);
+  border: 1px solid var(--border-inner); border-radius: 7px; font-size: 13px;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+select:hover, input[type=number]:hover, input[type=text]:hover {
+  border-color: var(--border-outer);
+}
+select:focus-visible, input:focus-visible, .kb-key:focus-visible,
+.head-close:focus-visible, .theme-swatch:focus-visible, .swatch-btn:focus-visible,
+.sect > summary:focus-visible {
+  outline: none; border-color: var(--accent, #4d7fd6);
+  box-shadow: 0 0 0 3px rgba(77, 127, 214, .3);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #4d7fd6) 28%, transparent);
 }
 input[type=file] { padding: 5px; font-size: 11px; }
 select:disabled, input:disabled { opacity: .4; cursor: not-allowed; }
@@ -32,13 +127,48 @@ select:disabled, input:disabled { opacity: .4; cursor: not-allowed; }
 .pair { display: flex; gap: 8px; }
 .pair > div { flex: 1; }
 
+/* Settings buttons borrow .rbtn from the deck, where the bottom padding exists to
+   clear the key cap. There is no key cap in here. The coarse-pointer min-height is
+   deliberately left alone — a 46px target is right for a thumb either way. */
+.settings .rbtn {
+  padding: 8px 10px; border-radius: 8px; font-size: 12.5px; font-weight: 500;
+}
+.settings .rbtn:hover { border-color: var(--accent, #4d7fd6); }
+
 .mode-toggle { display: flex; gap: 6px; margin-bottom: 4px; }
 .mode-toggle button {
   flex: 1; padding: 9px 6px; border-radius: 8px; cursor: pointer; font-size: 13px;
   background: var(--panel-2); border: 1px solid var(--border-inner); color: var(--muted);
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
+.mode-toggle button:hover { color: var(--text); border-color: var(--border-outer); }
+/* Follows the accent rather than a fixed blue, so it does not clash with a theme. */
 .mode-toggle button.on {
-  background: #2b4a8a; border-color: #4d7fd6; color: var(--text); font-weight: 600;
+  background: rgba(77, 127, 214, .34);
+  background: color-mix(in srgb, var(--accent, #4d7fd6) 34%, transparent);
+  border-color: var(--accent, #4d7fd6); color: var(--text); font-weight: 600;
+}
+
+/* ---- theme picker ----
+   Each swatch is painted in the tokens it would apply, so the grid previews itself. */
+.theme-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px;
+}
+.theme-swatch {
+  position: relative; padding: 9px 7px 8px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--border-inner); overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  transition: border-color .15s ease, transform .12s ease;
+}
+.theme-swatch:hover { transform: translateY(-1px); }
+.theme-swatch .tsw-chip {
+  width: 100%; height: 13px; border-radius: 4px; border: 1px solid;
+}
+.theme-swatch .tsw-nm { font-size: 10.5px; line-height: 1; }
+.theme-swatch.on { border-color: var(--accent, #4d7fd6); }
+.theme-swatch.on::after {
+  content: ''; position: absolute; inset: 0; border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--accent, #4d7fd6);
 }
 
 /* stream mode rows */
@@ -68,15 +198,12 @@ select:disabled, input:disabled { opacity: .4; cursor: not-allowed; }
 .kb-row .kb-label { flex: 1; font-size: 12.5px; }
 .kb-key {
   width: 70px; flex: none; padding: 4px 6px; font-size: 11px; text-align: center;
-  background: #0e121a; border: 1px solid var(--border-inner); border-radius: 5px;
+  background: var(--input-bg); border: 1px solid var(--border-inner); border-radius: 5px;
   color: var(--text); cursor: pointer; font-family: ui-monospace, monospace;
 }
 .kb-key.custom { border-color: #4d7fd6; color: #8ab4ff; }
 .kb-key.capturing { border-color: #4d7fd6; background: #1b2740; color: #8ab4ff; }
 .kb-key.clash { border-color: var(--bad); color: var(--bad); }
-#keybindDetails summary {
-  cursor: pointer; font-size: 12.5px; color: var(--muted); padding: 2px 0;
-}
 
 /* Shortcut rows carry no glyph, so the label column runs full width and the
    explanation sits under it rather than in a tooltip nobody opens. */
