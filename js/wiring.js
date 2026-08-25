@@ -87,6 +87,7 @@ $('resetProgress').onclick = () => {
   prog = { streamCount:1, n:1, spinLevel:0, interval:5000 };
   progress = { version:2, bestLoad:0, dailyMinutes:{}, blocks:[] };
   keyBinds = {};
+  actionBinds = {};
   stairInit(tune.startInterval);
   setMode('progression');
   renderDataPanel();
@@ -175,7 +176,14 @@ $('importJson').onchange = e => {
 
 $('resetKeybinds').onclick = () => {
   keyBinds = {};
-  buildDeck(); renderKeybinds(); saveProgress();
+  buildDeck(); renderKeybinds(); renderShortcuts(); saveProgress();
+};
+
+$('resetShortcuts').onclick = () => {
+  actionBinds = {};
+  /* The deck avoids whatever keys the shortcuts hold, so restoring the defaults can
+     change which pool key a button ends up on. */
+  buildDeck(); renderKeybinds(); renderShortcuts(); saveProgress();
 };
 
 /* --- free play --- */
@@ -253,6 +261,25 @@ $('startBtn').onclick = () => {
 };
 $('stopBtn').onclick = () => stopBlock(false);
 
+/* What each shortcut actually does. The guards are the point: Start must not be able
+   to restart a block that is already running, and Pause must not fire when there is
+   nothing to pause. Stop is deliberately unguarded — pressing it with no block in
+   progress clears the last block's feedback off the HUD, which is the behaviour it
+   has always had. */
+const ACTION_RUN = {
+  start:    () => { if (!state.running) $('startBtn').click(); },
+  stop:     () => stopBlock(false),
+  pause:    () => { if (state.paused) resumeFromPause();
+                    else if (state.running) pauseBlock(PAUSE_WHY.manual); },
+  settings: () => $('settingsPanel').classList.toggle('open'),
+};
+
+/* Bare modifiers make useless bindings — a shortcut on Shift would fire every time
+   you reached for a capital — so a modifier does not end the capture. Hold it, press
+   a real key, and that key is what gets bound. */
+const UNBINDABLE = new Set(['shift', 'control', 'alt', 'meta', 'altgraph',
+                            'capslock', 'dead', 'unidentified']);
+
 document.addEventListener('keydown', e => {
   /* Rebinding swallows the next key, whatever it is — including keys that would
      otherwise be responses or shortcuts. */
@@ -264,22 +291,47 @@ document.addEventListener('keydown', e => {
     if (k === 'backspace' || k === 'delete') clearBind(id); else rebind(id, k);
     return;
   }
+  if (capturingAction) {
+    e.preventDefault(); e.stopPropagation();
+    const id = capturingAction, k = e.key.toLowerCase();
+    if (UNBINDABLE.has(k)) return;
+    if (k === 'escape') { renderShortcuts(); return; }
+    capturingAction = null;
+    if (k === 'backspace' || k === 'delete') clearActionBind(id);
+    else rebindAction(id, k);
+    return;
+  }
   /* e.target can be `document` (no .matches), which would throw and swallow the
      keypress. Guard on Element before testing. */
   if (e.target instanceof Element && e.target.closest('input, select, textarea')) return;
   const k = e.key.toLowerCase();
+  /* Responses are checked before shortcuts and that order is not negotiable: a deck
+     key is pressed under time pressure and must never be second-guessed. A shortcut
+     parked on the same key is the one that gives way, and the editor marks it red. */
   const ch = state.keyIndex[k];
   if (ch) { e.preventDefault(); press(ch); return; }
-  if (k === 'enter' && !state.running) { e.preventDefault(); $('startBtn').click(); }
-  if (k === 'escape') { e.preventDefault(); stopBlock(false); }
+  const act = actionForKey(k);
+  const run = act && ACTION_RUN[act.id];
+  if (run) { e.preventDefault(); run(); }
 });
 
-/* ---- Pause when the tab is hidden ----
+/* ---- Pausing ----
    A hidden tab has its timers clamped to ~1 Hz, so a block left running in the
    background would present trials at the wrong interval and log reaction times
    measured against a stretched clock. Both would quietly corrupt the record, so the
-   block stops and the interruption is flagged on the saved block. */
-function pauseForHidden() {
+   block stops and the interruption is flagged on the saved block.
+
+   The manual pause shortcut runs through exactly the same path, which is what keeps
+   it honest: it costs you the trial on screen and stamps the block as interrupted,
+   so it cannot be used to buy a moment's thinking time mid-trial. */
+const PAUSE_WHY = {
+  hidden: 'The tab lost focus, so the block was paused — browsers slow background ' +
+          'timers and the pacing would have been wrong.',
+  manual: 'Paused by hand. The trial that was on screen has been discarded and the ' +
+          'block is flagged as interrupted in your record.',
+};
+
+function pauseBlock(why) {
   if (!state.running || state.paused) return;
   clearInterval(state.timer); state.timer = null;
   clearTimeout(state.cueTimer);
@@ -293,6 +345,7 @@ function pauseForHidden() {
   state.presses.clear();
   clearCells();
   $('retroCue').classList.remove('show');
+  $('pauseText').textContent = why;
   $('pauseVeil').classList.add('show');
 }
 
@@ -306,7 +359,7 @@ function resumeFromPause() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) pauseForHidden();
+  if (document.hidden) pauseBlock(PAUSE_WHY.hidden);
 });
 $('pauseResume').onclick = resumeFromPause;
 

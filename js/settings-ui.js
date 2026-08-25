@@ -64,6 +64,7 @@ function renderKeybinds() {
           `active button already has it — using ${keyLabel(live)} instead.`;
         else if (!live) btn.title = 'This stream is not active right now.';
         btn.onclick = () => {
+          if (capturingAction) renderShortcuts();   // only one editor may await a key
           wrap.querySelectorAll('.kb-key.capturing').forEach(b => {
             b.classList.remove('capturing');
             b.textContent = keyLabel(effectiveKey(b.dataset.id));
@@ -83,6 +84,61 @@ function renderKeybinds() {
 function runtimeKey(id) {
   for (const k in state.keyIndex) if (state.keyIndex[k] === id) return k;
   return undefined;
+}
+
+let capturingAction = null;
+
+/* Drop a capture that is waiting in this list. Kept separate from a full re-render
+   because the click handler below runs on a button inside it — re-rendering would
+   detach the very element about to be styled. */
+function clearShortcutCapture(wrap) {
+  wrap.querySelectorAll('.kb-key.capturing').forEach(b => {
+    b.classList.remove('capturing');
+    b.textContent = keyLabel(effectiveAction(b.dataset.action));
+  });
+  capturingAction = null;
+}
+
+/* The shortcut editor. Same widget as the keybind rows, but the clash it warns about
+   runs the other way. There, a channel loses its preferred key to another channel and
+   is handed a replacement. Here nothing is handed over: the keydown handler consults
+   the deck first, so a response button sitting on a shortcut's key just makes the
+   shortcut stop working, with nothing on screen to say why. Hence the red key and the
+   explicit tooltip. */
+function renderShortcuts() {
+  const wrap = $('shortcutList');
+  capturingAction = null;
+  wrap.innerHTML = '';
+
+  ACTIONS.forEach(a => {
+    const key = effectiveAction(a.id);
+    const row = document.createElement('div');
+    row.className = 'kb-row';
+    row.innerHTML = `<span class="kb-label">${a.label}
+      <span class="kb-note">${a.hint}</span></span>`;
+
+    const shadow = key ? state.keyIndex[key] : undefined;
+    const btn = document.createElement('button');
+    btn.className = 'kb-key' + (key !== ACTION_BY_ID[a.id].key ? ' custom' : '')
+                             + (shadow ? ' clash' : '');
+    btn.dataset.action = a.id;
+    btn.textContent = keyLabel(key);
+    btn.title = shadow
+      ? `${keyLabel(key)} is a live response button right now (${
+          (CHANNEL_BY_ID[shadow] || {}).label || shadow}), so it answers the task ` +
+        `instead of running this. Pick another key.`
+      : key ? 'Click, then press the key you want.'
+            : 'Not bound to anything. Click, then press the key you want.';
+    btn.onclick = () => {
+      if (capturingId) renderKeybinds();   // only one editor may await a key
+      clearShortcutCapture(wrap);
+      capturingAction = a.id;
+      btn.classList.add('capturing');
+      btn.textContent = 'press…';
+    };
+    row.appendChild(btn);
+    wrap.appendChild(row);
+  });
 }
 
 function renderLadderState() {
@@ -175,6 +231,7 @@ function syncSettingsUI() {
   renderStreamRows();
   renderLadderState();
   renderKeybinds();
+  renderShortcuts();
 }
 
 function onConfigChanged(rebuildCube) {
@@ -184,6 +241,7 @@ function onConfigChanged(rebuildCube) {
   buildDeck();
   renderGlyphLegend();
   renderKeybinds();   // live/dormant state changes with the active streams
+  renderShortcuts();  // and with them, which shortcut keys the deck is shadowing
   updateHUD();        // single place, so the readout can never drift from cfg
 }
 
@@ -250,6 +308,7 @@ function importJSON(text) {
   if (progress.tune) Object.assign(tune, progress.tune);
   if (progress.freeCfg) Object.assign(freeCfg, progress.freeCfg);
   if (progress.keyBinds) keyBinds = progress.keyBinds;
+  if (progress.actionBinds) actionBinds = progress.actionBinds;
   if (Array.isArray(progress.stair) && progress.stair.length === STAIR.steps)
     stairLog = progress.stair.slice();
   if (progress.display) {

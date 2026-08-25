@@ -44,7 +44,7 @@ const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
 /* Stamped into every block and into the export. Testers who pick the file up at
    different times will be on different snapshots, and without this you cannot tell
    which build produced which numbers. */
-const BUILD = '2026-08-23.7';
+const BUILD = '2026-08-25.1';
 
 /* ---- Relational complexity (Halford) ----
    Difficulty defined by how many variables are bound in one representation.
@@ -200,3 +200,64 @@ function clearBind(id) {
   buildDeck(); renderKeybinds(); saveProgress();
 }
 
+/* ---- App shortcuts ----
+   The deck keys above answer the task; these drive the session around it. They are
+   kept in their own table rather than folded into CHANNELS because they are always
+   live: a response key only exists while its stream is switched on, whereas Stop has
+   to work in every configuration. What each one does, and when it is allowed to do
+   it, lives with the rest of the wiring in ACTION_RUN.
+
+   Defaults are chosen from keys no response channel claims, so a fresh install never
+   ships a shortcut that a deck button is already sitting on. Pause ships unbound on
+   purpose: it discards the trial on screen, and there is no letter left that is far
+   enough from the response cluster to be safe to press by accident. Anyone who wants
+   it can give it a key here — which is rather the point of this panel. */
+const ACTIONS = [
+  { id:'start',    key:'enter',  label:'Start block',
+    hint:'Ignored while a block is already running.' },
+  { id:'stop',     key:'escape', label:'Stop block',
+    hint:'Ends the block without scoring it.' },
+  { id:'pause',    key:null,     label:'Pause / resume',
+    hint:'Unbound by default. Pausing is handled exactly like losing the tab: the ' +
+         'trial on screen is discarded and the block is flagged interrupted, so it ' +
+         'cannot buy thinking time mid-trial.' },
+  { id:'settings', key:'c',      label:'Open / close settings',
+    hint:'Toggles the panel, wherever you are. Does not stop a running block.' },
+];
+const ACTION_BY_ID = Object.fromEntries(ACTIONS.map(a => [a.id, a]));
+
+let actionBinds = {};                     // actionId -> key, or null for unbound
+
+/* An own property always wins, INCLUDING an explicit null. That null is what makes
+   an action unbound rather than falling back to its default — rebindAction relies on
+   it when a key is taken off an action that had no default to return to. */
+const effectiveAction = id =>
+  Object.prototype.hasOwnProperty.call(actionBinds, id)
+    ? actionBinds[id] || null
+    : (ACTION_BY_ID[id] || {}).key || null;
+
+/* Every shortcut key currently spoken for. buildDeck() reads this so its automatic
+   pool assignment never quietly swallows one. */
+const reservedActionKeys = () =>
+  new Set(ACTIONS.map(a => effectiveAction(a.id)).filter(Boolean));
+
+/* The action a key fires, or undefined. Unlike channels, no two shortcuts can share
+   a key — there is no "only one of these is on screen at a time" to make sharing
+   safe — so a rebind hands the old key to whoever held the new one. */
+const actionForKey = key =>
+  key ? ACTIONS.find(a => effectiveAction(a.id) === key) : undefined;
+
+function rebindAction(id, key) {
+  const old = effectiveAction(id);
+  const holder = ACTIONS.find(a => a.id !== id && effectiveAction(a.id) === key);
+  if (holder) actionBinds[holder.id] = old;     // null when `id` was itself unbound
+  actionBinds[id] = key;
+  /* A shortcut releasing a key can free the deck to stop avoiding it, and claiming
+     one can force a deck button off it — so the deck is rebuilt either way. */
+  buildDeck(); renderKeybinds(); renderShortcuts(); saveProgress();
+}
+
+function clearActionBind(id) {
+  delete actionBinds[id];                       // back to the built-in default
+  buildDeck(); renderKeybinds(); renderShortcuts(); saveProgress();
+}

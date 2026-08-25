@@ -78,3 +78,11 @@ select:disabled, input:disabled { opacity: .4; cursor: not-allowed; }
   cursor: pointer; font-size: 12.5px; color: var(--muted); padding: 2px 0;
 }
 
+/* Shortcut rows carry no glyph, so the label column runs full width and the
+   explanation sits under it rather than in a tooltip nobody opens. */
+.kb-row .kb-note {
+  display: block; font-size: 11px; color: var(--muted);
+  line-height: 1.45; margin-top: 2px;
+}
+#shortcutList .kb-row { align-items: flex-start; margin-bottom: 9px; }
+#shortcutList .kb-key { margin-top: 1px; }

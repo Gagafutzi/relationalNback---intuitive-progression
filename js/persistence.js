@@ -65,6 +65,7 @@ function resetInMemoryState() {
   rcTier = 3;
   stairLog = null;
   keyBinds = {};
+  actionBinds = {};
   state.glyphMap = null;
   Object.assign(tune, {
     adapt:'bayes', startInterval:5000, targetInterval:3000, intervalStep:250,
@@ -103,6 +104,7 @@ function loadProgress() {
     if (p.tune) Object.assign(tune, p.tune);
     if (p.freeCfg) Object.assign(freeCfg, p.freeCfg);
     if (p.keyBinds) keyBinds = p.keyBinds;
+    if (p.actionBinds) actionBinds = p.actionBinds;
     /* Only accept a posterior that matches the current grid, so changing STAIR.steps
        can never silently reinterpret an old array against a different grid. */
     if (Array.isArray(p.stair) && p.stair.length === STAIR.steps) stairLog = p.stair.slice();
@@ -131,6 +133,7 @@ function saveProgress() {
   progress.prog = prog; progress.tune = tune;
   progress.freeCfg = freeCfg; progress.mode = cfg.mode;
   progress.keyBinds = keyBinds;
+  progress.actionBinds = actionBinds;
   progress.display = { gizmo: cfg.gizmo, cellVis: cfg.cellVis, layout: cfg.layout,
                        spinPath: cfg.spinPath, cubeScale: cfg.cubeScale,
                        dailyGoal: cfg.dailyGoal, buzzer: cfg.buzzer };

@@ -40,7 +40,16 @@ function assignKeys(groups) {
 
   all.forEach(c => claim(c, keyBinds[c.id]));
   all.forEach(c => { if (!map.has(c.id)) claim(c, c.key); });
-  all.forEach(c => { if (!map.has(c.id)) claim(c, KEY_POOL.find(k => !used.has(k))); });
+  /* The pool pass skips keys an app shortcut owns. The keydown handler checks the
+     deck first, so a key handed out here would silently kill the shortcut — and
+     unlike a bind the user chose, nobody asked for it. A deliberate bind on either
+     side may still collide; both editors flag that rather than preventing it.
+     The unreserved fallback only matters if the pool is exhausted, where a button
+     with no key at all is the worse outcome. */
+  const reserved = reservedActionKeys();
+  all.forEach(c => { if (!map.has(c.id)) claim(c,
+    KEY_POOL.find(k => !used.has(k) && !reserved.has(k)) ||
+    KEY_POOL.find(k => !used.has(k))); });
   return map;
 }
 
