@@ -134,6 +134,10 @@ const lighten = (c, t) => {
   const [r, g, b] = rgbOf(c).map(v => Math.round(v + (255 - v) * t));
   return `rgb(${r},${g},${b})`;
 };
+const darken = (c, t) => {
+  const [r, g, b] = rgbOf(c).map(v => Math.round(v * (1 - t)));
+  return `rgb(${r},${g},${b})`;
+};
 /* Rec. 709 luma, 0–1. Decides whether text on top of a colour should be dark. */
 const luma = c => { const [r, g, b] = rgbOf(c).map(v => v / 255);
                     return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
@@ -164,7 +168,16 @@ function applyAppearance() {
   r.setProperty('--accent', acc);
   r.setProperty('--hi', lighten(acc, 0.42));
   r.setProperty('--accent-glow', rgba(acc, 0.55));
-  r.setProperty('--accent-ink', luma(acc) > 0.55 ? '#0a0f14' : '#ffffff');
+  /* A filled button shades from --accent-hi to --accent-lo, and both stay near the
+     accent itself. --hi is far too light for that job: half the button ended up at
+     luma .68 with white text sitting on it. It is for text ON a dark ground, where
+     lifting it that far is exactly right. */
+  r.setProperty('--accent-hi', lighten(acc, 0.20));
+  r.setProperty('--accent-lo', darken(acc, 0.14));
+  /* One decision for the whole button, which is only sound because the gradient
+     stays close to the accent. Threshold at .6, so a mid-bright accent like Ember
+     takes dark ink rather than white at 2.6:1. */
+  r.setProperty('--accent-ink', luma(acc) > 0.6 ? '#0a0f14' : '#ffffff');
   r.setProperty('--cell-active', rgba(acc, 0.72));
   r.setProperty('--cell-active-solid', acc);
   r.setProperty('--cell-active-edge', lighten(acc, 0.65));
