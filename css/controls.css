@@ -1,0 +1,12 @@
+/* ---------- CONTROLS ---------- */
+.controls {
+  position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; z-index: 21;
+}
+.controls button {
+  padding: 8px 18px; background: var(--panel); border: 1px solid var(--border-outer);
+  color: var(--text); border-radius: 8px; cursor: pointer; font-size: 13px;
+}
+.controls button.primary { background: #2b4a8a; border-color: #4d7fd6; }
+
+

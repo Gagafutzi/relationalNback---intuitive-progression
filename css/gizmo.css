@@ -1,0 +1,28 @@
+/* ---------- AXIS GIZMO ---------- */
+.gizmo {
+  position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+  transform-style: preserve-3d; pointer-events: none;
+}
+.gizmo.hidden { display: none; }
+.arm { position: absolute; transform-style: preserve-3d; }
+.shaft {
+  position: absolute; height: 2px; top: -1px; left: 0;
+  transform-origin: 0 50%; opacity: .75;
+}
+.head {
+  position: absolute; transform-origin: 0 50%;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.badge { position: absolute; transform-style: preserve-3d; }
+.badge-face {
+  position: absolute; width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700; border-radius: 4px;
+  background: #0b0d10; user-select: none;
+  /* Opaque + no backfaces: otherwise the letters on the far side of the badge
+     show through mirrored, which is exactly the cue that has to stay legible. */
+  backface-visibility: hidden;
+}
+.arm.flash .badge-face { background: currentColor; color: #0b0d10 !important; }
+.gizmo.letters-only .shaft, .gizmo.letters-only .head { display: none; }
+

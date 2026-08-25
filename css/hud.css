@@ -1,0 +1,26 @@
+/* ---------- HUD ---------- */
+.hud {
+  position: fixed; top: 14px; right: 14px; z-index: 10;
+  font-size: 13px; text-align: right; min-width: 210px;
+}
+.hud .mode-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+.hud .row { display: flex; justify-content: flex-end; gap: 8px; color: var(--muted); }
+.hud .row b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.hud .load {
+  margin-top: 6px; font-size: 11px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted);
+}
+.hud .load b { font-size: 19px; color: #8ab4ff; letter-spacing: 0; }
+.speed-wrap { margin-top: 8px; }
+.speed-labels {
+  display: flex; justify-content: space-between; font-size: 10px; color: var(--muted);
+  margin-bottom: 3px; font-variant-numeric: tabular-nums;
+}
+.progress-track {
+  height: 5px; background: rgba(255,255,255,.09);
+  border-radius: 3px; overflow: hidden;
+}
+.progress-fill { display: block; height: 100%; width: 0%; background: #8ab4ff; transition: width .35s; }
+.hud .next { margin-top: 6px; font-size: 11px; color: var(--muted); max-width: 240px; }
+.hud .next b { color: #8ab4ff; font-weight: 600; }
+

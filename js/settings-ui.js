@@ -1,0 +1,264 @@
+"use strict";
+
+/* ============================================================
+   16. SETTINGS UI
+   ============================================================ */
+
+function renderStreamRows() {
+  const wrap = $('streamRows');
+  wrap.innerHTML = '';
+  STREAM_KEYS.forEach(k => {
+    const spec = STREAMS[k];
+    const row = document.createElement('div');
+    row.className = 'stream-row';
+    row.innerHTML = `<span class="swatch" style="background:${spec.color}"></span>
+      <span class="nm">${spec.label}</span>
+      <select data-stream="${k}">
+        <option value="off">Off</option>
+        <option value="identity">Identity</option>
+        <option value="relational">Relational</option>
+      </select>`;
+    const sel = row.querySelector('select');
+    sel.value = freeCfg.streams[k] || 'off';
+    sel.onchange = () => { freeCfg.streams[k] = sel.value; applyFree(); updateHUD(); saveProgress(); };
+    wrap.appendChild(row);
+  });
+}
+
+let capturingId = null;
+
+function renderKeybinds() {
+  capturingId = null;
+  const wrap = $('keybindList');
+  wrap.innerHTML = '';
+
+  STREAM_KEYS.forEach(k => {
+    const spec = STREAMS[k];
+    const head = document.createElement('div');
+    head.className = 'kb-stream';
+    head.innerHTML = `<span style="color:${spec.color}">■</span> ${spec.label}`;
+    wrap.appendChild(head);
+
+    ['identity', 'relational', 'relationalScreen'].forEach(mode => {
+      (spec[mode] || []).forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'kb-row';
+        row.innerHTML =
+          `<span class="kb-glyph" style="color:${c.color || spec.color}">${c.glyph}</span>
+           <span class="kb-label">${c.label}${
+             mode === 'relationalScreen' ? ' <span style="opacity:.45">screen</span>' :
+             mode === 'identity' ? ' <span style="opacity:.45">id</span>' : ''}</span>`;
+
+        /* For a channel that's live right now, show the key that ACTUALLY works —
+           assignKeys may have bumped it off its preferred key to keep the live deck
+           unambiguous. Dormant channels show their configured key instead. */
+        const live = runtimeKey(c.id);
+        const bumped = live && live !== effectiveKey(c.id);
+        if (!live) row.style.opacity = '.5';
+
+        const btn = document.createElement('button');
+        btn.className = 'kb-key' + (keyBinds[c.id] ? ' custom' : '') + (bumped ? ' clash' : '');
+        btn.dataset.id = c.id;
+        btn.textContent = keyLabel(live || effectiveKey(c.id));
+        if (bumped) btn.title = `Wanted ${keyLabel(effectiveKey(c.id))}, but another ` +
+          `active button already has it — using ${keyLabel(live)} instead.`;
+        else if (!live) btn.title = 'This stream is not active right now.';
+        btn.onclick = () => {
+          wrap.querySelectorAll('.kb-key.capturing').forEach(b => {
+            b.classList.remove('capturing');
+            b.textContent = keyLabel(effectiveKey(b.dataset.id));
+          });
+          capturingId = c.id;
+          btn.classList.add('capturing');
+          btn.textContent = 'press…';
+        };
+        row.appendChild(btn);
+        wrap.appendChild(row);
+      });
+    });
+  });
+}
+
+/* The key a channel responds to right now, or undefined if its stream is dormant. */
+function runtimeKey(id) {
+  for (const k in state.keyIndex) if (state.keyIndex[k] === id) return k;
+  return undefined;
+}
+
+function renderLadderState() {
+  const levels = spinLevels();
+  const active = PROG_STREAMS.slice(0, prog.streamCount);
+  const pos = ladderPosition();
+  $('ladderState').innerHTML = `
+    <div><span class="k">Milestone</span><b>${pos.index}</b> of ${pos.total}</div>
+    <div><span class="k">Stimuli</span><b>${active.length}</b> — ${
+      active.map(s => `${STREAMS[s.key].label}<span style="opacity:.5">·${s.mode === 'relational' ? 'rel' : 'id'}</span>`).join(', ')}</div>
+    <div><span class="k">N</span><b>${prog.n}</b></div>
+    <div><span class="k">Rotation</span><b>${prog.spinLevel === 0 ? 'still' : levels[prog.spinLevel] + 's/turn'}</b>${
+      prog.spinLevel > 0 ? ` <span style="opacity:.5">(step ${prog.spinLevel}/${levels.length - 1})</span>` : ''}</div>
+    <div><span class="k">Interval</span><b>${(prog.interval / 1000).toFixed(2)}s</b>
+      <span style="opacity:.5">→ ${(tune.targetInterval / 1000).toFixed(2)}s</span></div>
+    <div><span class="k">Lure rate</span><b>${Math.round((prog.lureRate ?? 0.2) * 100)}%</b>
+      <span style="opacity:.5">adapts on lure trials only</span></div>` +
+    (tune.adapt === 'bayes' && stairLog ? `
+    <div><span class="k">Threshold</span><b>${(stairThresholdMs() / 1000).toFixed(2)}s</b>
+      <span style="opacity:.5">90% CI ${stairCI(0.9).map(v => (v / 1000).toFixed(2)).join('–')}s</span></div>
+    <div><span class="k">Confidence</span><b>${Math.round(stairMassBelow(tune.targetInterval) * 100)}%</b>
+      <span style="opacity:.5">below target · need ${Math.round(STAIR.clearAt * 100)}%</span></div>` : '');
+
+  $('rcTier').value = String(rcTier);
+  $('rcHint').textContent = rcTier >= 4
+    ? 'Quaternary binds two relations into one representation — Halford\'s documented adult ceiling. Its own ladder, independent of the ternary one.'
+    : 'Ternary binds two positions and the direction relating them. The standard track.';
+
+  $('adaptHint').textContent = tune.adapt === 'bayes'
+    ? 'Estimates your speed threshold and places each block where it learns most. Carries what it knows across milestones instead of restarting at the top.'
+    : 'Walks the interval down one fixed step per good block, resetting to the start at every milestone.';
+
+  const nx = describeNext(prog);
+  $('nextUp').innerHTML = `Clear this milestone and <b>${nx.what}</b>.<br>
+    <span style="opacity:.75">${nx.why}</span>`;
+
+  $('spinLadderHint').textContent =
+    `${levels.length - 1} rotation steps: ${levels.slice(1).join('s, ')}s per turn.`;
+}
+
+function syncSettingsUI() {
+  $('feedbackMode').value = cfg.feedback;
+  $('feedbackModeF').value = freeCfg.feedback;
+  $('adaptMode').value = tune.adapt;
+  $('startInterval').value = tune.startInterval / 1000;
+  $('targetInterval').value = tune.targetInterval / 1000;
+  $('intervalStep').value = tune.intervalStep / 1000;
+  $('spinStart').value = tune.spinStart;
+  $('spinEnd').value = tune.spinEnd;
+  $('spinStep').value = tune.spinStep;
+  $('nMax').value = tune.nMax;
+  $('nAfterStimulus').value = tune.nAfterStimulus;
+  $('blockLengthP').value = tune.blockLength;
+
+  $('nValue').value = freeCfg.n;
+  $('intervalMs').value = freeCfg.interval;
+  $('blockLengthF').value = freeCfg.blockLength;
+  $('cubeDimension').value = freeCfg.dim;
+  $('spinPath').value = cfg.spinPath;
+  $('spinPathHint').textContent = cfg.spinPath === 'free'
+    ? 'Sweeps the tilt as well as the turn, so four times a revolution the view looks '
+      + 'straight down a cube axis and a whole column of slots lands on one point. '
+      + 'Fuller motion; the active slot is briefly unreadable.'
+    : 'Turntable at a solved tilt plus an in-plane roll. No two slots ever coincide, '
+      + 'and every axis still sweeps every screen direction. Costs the exploded '
+      + 'layout about half its slot size, since cells must fit the tightest moment.';
+  $('rotationOn').checked = freeCfg.rotation;
+  $('rotationSpeed').value = freeCfg.spin;
+  $('frameMode').value = freeCfg.frame;
+  $('varPriority').checked = !!freeCfg.varPriority;
+  $('fixedGlyphMap').checked = !!freeCfg.fixedGlyphMap;
+  $('metaOn').checked = !!freeCfg.meta;
+  $('gateOn').value = String(freeCfg.gate || 0);
+  $('retroOn').value = String(freeCfg.retro || 0);
+  $('retroOn').disabled = !!freeCfg.meta;
+  $('testerLabel').value = progress.tester || '';
+  $('lureRateF').value = Math.round(freeCfg.lureRate * 100);
+  $('lureVal').textContent = Math.round(freeCfg.lureRate * 100);
+  $('gizmoMode').value = cfg.gizmo;
+  $('cellVis').value = cfg.cellVis;
+  $('cubeLayout').value = cfg.layout;
+  $('layoutHint').textContent = LAYOUT_HINT[cfg.layout] || '';
+  $('dailyGoal').value = cfg.dailyGoal || 0;
+  $('buzzer').checked = !!cfg.buzzer;
+  $('cubeSize').value = Math.round((cfg.cubeScale || 1) * 100);
+  $('cubeSizeVal').textContent = Math.round((cfg.cubeScale || 1) * 100);
+  document.documentElement.style.setProperty('--cube-scale', cfg.cubeScale || 1);
+  applyCellVis();
+
+  renderStreamRows();
+  renderLadderState();
+  renderKeybinds();
+}
+
+function onConfigChanged(rebuildCube) {
+  if (rebuildCube) buildCube(cfg.dim);
+  applyRotation();
+  applyGizmoMode();
+  buildDeck();
+  renderGlyphLegend();
+  renderKeybinds();   // live/dormant state changes with the active streams
+  updateHUD();        // single place, so the readout can never drift from cfg
+}
+
+function renderDataPanel() {
+  $('minutesToday').textContent = Math.floor(progress.dailyMinutes[today()] || 0);
+  $('bestLoad').textContent = progress.bestLoad || 0;
+  const st = $('dataStatus');
+  if (!st) return;
+  const n = progress.blocks.length;
+  const days = Object.keys(progress.dailyMinutes || {}).length;
+  st.innerHTML = `Build <b>${BUILD}</b> · ${n} block${n === 1 ? '' : 's'} recorded` +
+    ` over ${days} day${days === 1 ? '' : 's'}` +
+    (progress.saveWarning ? `<br><span style="color:#ff6b6b">${progress.saveWarning}</span>` : '');
+}
+
+function renderProfileUI() {
+  const sel = $('profileSel');
+  if (!sel) return;
+  sel.innerHTML = '';
+  profiles.list.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.id; o.textContent = p.name;
+    sel.appendChild(o);
+  });
+  sel.value = profiles.active;
+  $('profileDelete').disabled = profiles.list.length < 2;
+  $('profileHint').innerHTML =
+    `${profiles.list.length} profile${profiles.list.length === 1 ? '' : 's'} on this ` +
+    `device. Each keeps its own ladder, staircase, keybinds and history. ` +
+    `<span style="opacity:.7">Appearance is shared.</span>`;
+}
+
+/* ---- export / import ---- */
+
+function exportPayload() {
+  return JSON.stringify({
+    build: BUILD,
+    tester: progress.tester || '',
+    profile: activeProfile().name,
+    exportedAt: new Date().toISOString(),
+    timezoneOffsetMin: new Date().getTimezoneOffset(),
+    data: progress,
+  }, null, 1);
+}
+
+function downloadJSON() {
+  const label = (progress.tester || activeProfile().name || 'tester').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase();
+  const name = `rnb-${label}-${today()}.json`;
+  const blob = new Blob([exportPayload()], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return name;
+}
+
+function importJSON(text) {
+  const parsed = JSON.parse(text);
+  const data = parsed && parsed.data ? parsed.data : parsed;
+  if (!data || !Array.isArray(data.blocks)) throw new Error('not a Relational N-Back export');
+  progress = data;
+  if (progress.prog) Object.assign(prog, progress.prog);
+  if (progress.tune) Object.assign(tune, progress.tune);
+  if (progress.freeCfg) Object.assign(freeCfg, progress.freeCfg);
+  if (progress.keyBinds) keyBinds = progress.keyBinds;
+  if (Array.isArray(progress.stair) && progress.stair.length === STAIR.steps)
+    stairLog = progress.stair.slice();
+  if (progress.display) {
+    cfg.gizmo = progress.display.gizmo || cfg.gizmo;
+    cfg.cellVis = progress.display.cellVis || cfg.cellVis;
+    cfg.spinPath = progress.display.spinPath || cfg.spinPath;
+  }
+  setMode(progress.mode || 'progression');
+  renderDataPanel();
+  return progress.blocks.length;
+}
+

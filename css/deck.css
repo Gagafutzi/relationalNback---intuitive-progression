@@ -1,0 +1,45 @@
+/* ---------- RESPONSE DECK ---------- */
+.deck {
+  display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+  padding: 0 16px; max-width: 980px; z-index: 20; margin-bottom: auto;
+}
+.deck-group {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 8px 10px 9px; border: 1px solid var(--border-inner);
+  border-radius: 10px; background: rgba(20, 24, 32, .55);
+}
+.deck-group.priority {
+  border-color: #ffd166 !important;
+  box-shadow: 0 0 0 1px #ffd166, 0 0 18px rgba(255, 209, 102, .28);
+  background: rgba(255, 209, 102, .07);
+}
+.deck-group.priority > .title { color: #ffd166; }
+.deck-group > .title {
+  font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--muted); text-align: center;
+}
+.deck-group .btns { display: flex; gap: 5px; }
+
+.rbtn {
+  position: relative; min-width: 46px; padding: 7px 9px 15px;
+  background: var(--panel); border: 1px solid var(--btn-color, var(--border-outer));
+  color: var(--text); border-radius: 8px; cursor: pointer;
+  font-size: 14px; line-height: 1.1; text-align: center;
+  transition: background .08s, transform .08s;
+  /* `manipulation` drops the double-tap-zoom wait the browser otherwise inserts
+     before every tap — the delay that made touch answers arrive late. */
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  user-select: none; -webkit-user-select: none;
+}
+/* Presses fire on pointerdown and cancel the default, so :active never latches on
+   touch — the class is the press feedback a phone actually gets. */
+.rbtn:active, .rbtn.down { transform: translateY(1px); }
+.rbtn .glyph { color: var(--btn-color, var(--text)); font-weight: 700; }
+.rbtn .kbd {
+  position: absolute; left: 0; right: 0; bottom: 3px;
+  font-size: 8.5px; letter-spacing: .05em; color: var(--muted);
+}
+.rbtn.hit  { background: rgba(81, 207, 102, .38); }
+.rbtn.miss { background: rgba(255, 107, 107, .38); }
+.rbtn.reveal { box-shadow: inset 0 0 0 2px var(--btn-color, #fff); }
+

@@ -1,0 +1,162 @@
+/* ---------- SCENE ---------- */
+/* Centred by auto margins on the children rather than justify-content: a centred
+   flex column that overflows pushes its FIRST child above scroll position 0, where
+   no amount of scrolling brings it back. On a phone that silently cropped the top
+   of the cube. Auto margins collapse instead of overflowing. */
+.scene {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-start; perspective: 1400px;
+  padding: 54px 0 62px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+
+/* The stage reserves the GIZMO's footprint, not the cube's — the arms reach well
+   past the lattice, so a stage sized to the cube alone clips the badges. The
+   multiplier lives on the body (see --stage-k) because --cube-size is derived from
+   it on a phone, and a custom property can only read another one from its own
+   element. */
+.cube-stage {
+  width: calc(var(--cube-size) * var(--stage-k));
+  height: calc(var(--cube-size) * var(--stage-k));
+  display: flex; align-items: center; justify-content: center;
+  flex: none; margin: auto auto 6px;
+}
+
+.cube-wrapper {
+  width: var(--cube-size); height: var(--cube-size); transform-style: preserve-3d;
+  transform: rotateX(-24deg) rotateY(-28deg);
+  transform-origin: center center; pointer-events: none;
+}
+.cube-wrapper.spinning { animation: spin var(--spin-speed, 60s) linear infinite; }
+.cube-wrapper.spinning.free-spin { animation-name: tumble; }
+
+/* Yaw at a pitch solved per cube size — see solveSpinView(). Sweeping the pitch as
+   well (the old -30° → 330°) marches the view straight down a lattice axis four
+   times a turn, and there every column of slots lands on a single screen point: the
+   cube reads as a flat grid and the active slot cannot be located.
+
+   The outer roll is what keeps north off the top of the screen. Under
+   rotateX(a) rotateY(b) the model's vertical axis projects to (0, cos a) — dead
+   vertical for EVERY pitch and yaw, so no tumble in those two angles can ever move
+   it. The old animation only flipped north top-to-bottom by driving the pitch
+   through ±90°, which is precisely the collapsed view. A roll is applied outside
+   the projection instead: it turns the finished picture in its own plane, so it
+   sweeps every axis through every screen direction while leaving every distance
+   between slots exactly as it was. The separation guarantee is untouched by it.
+
+   Against the yaw, deliberately, and the sign matters. The horizontal axes already
+   wind once clockwise per yaw turn while the vertical one does not wind at all, so
+   the roll has to be a number of turns that is neither 0 (which would leave north
+   pinned) nor +1 (which would cancel the horizontal axes and leave THEM rocking
+   about a fixed direction instead). -1 gives north one turn and the other two a
+   double sweep, and no axis holds still. */
+@keyframes spin {
+  from { transform: rotateZ(0deg)    rotateX(var(--spin-pitch, -30deg)) rotateY(0deg); }
+  to   { transform: rotateZ(-360deg) rotateX(var(--spin-pitch, -30deg)) rotateY(360deg); }
+}
+
+/* The original free tumble, kept as an option. It sweeps the pitch as well, so it
+   passes down a lattice axis and collapses the slots onto one another four times a
+   turn — separation zero. Nothing here can be sized around that, which is why the
+   solved path exists; this one is for when the fuller motion is worth the cost. */
+@keyframes tumble {
+  from { transform: rotateX(-30deg)  rotateY(0deg); }
+  to   { transform: rotateX(330deg)  rotateY(360deg); }
+}
+
+.grid-cube { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
+
+.cell { position: absolute; transform-style: preserve-3d; }
+.cell-face {
+  position: absolute; width: 100%; height: 100%;
+  background: var(--cell-fill); border: 1px solid var(--border-inner);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px; line-height: 1; color: var(--text); user-select: none;
+}
+.cell-face .g { font-size: 26px; line-height: 1; }
+.cell-face .q { font-size: 9px; letter-spacing: 1px; line-height: 1; opacity: .95; }
+.cell.active .cell-face { background: var(--cell-active); }
+
+/* Gate-closed (compare-only) trial. Border STYLE is the only channel no stimulus
+   dimension uses — colour, size and glyph are all taken. */
+.cell.gate-closed .cell-face {
+  border: 2px dashed #ff922b !important;
+  box-shadow: 0 0 14px 2px rgba(255, 146, 43, .6) !important;
+}
+.gate-banner {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 18; pointer-events: none; text-align: center;
+  font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+  color: #ff922b; opacity: 0; transition: opacity .12s;
+}
+.gate-banner.show { opacity: .95; }
+
+/* Browsers clamp setInterval to ~1 Hz in a hidden tab, so a block left running in
+   the background silently plays at the wrong pace and logs meaningless reaction
+   times. Pause instead. */
+.pause-veil {
+  position: fixed; inset: 0; z-index: 40; display: none;
+  align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+  background: rgba(4, 6, 10, .82); text-align: center;
+}
+.pause-veil.show { display: flex; }
+.pause-veil .t { font-size: 19px; font-weight: 600; }
+.pause-veil .s { font-size: 13px; color: var(--muted); max-width: 300px; line-height: 1.5; }
+
+/* Retro-cue: which pair of items to report on, revealed after the stimulus. */
+.retro-cue {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 19; pointer-events: none; text-align: center; display: none;
+}
+.retro-cue.show { display: block; }
+.retro-cue .pair {
+  font-size: 40px; font-weight: 700; color: #8ab4ff; font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 22px rgba(138, 180, 255, .55);
+}
+.retro-cue .cap {
+  font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--muted); margin-top: 6px;
+}
+
+/* ---------- SLOT VISIBILITY ----------
+   Inline styles from the colour stream deliberately beat these rules, so an active
+   cell shows its colour when that stream is on and the highlight fill when it isn't.
+   The glow and the text colour are class-only, so they apply either way. */
+.vis-contrast .cell-face, .vis-guides .cell-face {
+  background: rgba(120, 140, 255, .025);
+  border-color: rgba(180, 200, 255, .085);
+}
+.vis-contrast .cell.active .cell-face,
+.vis-guides   .cell.active .cell-face,
+.vis-solo     .cell.active .cell-face {
+  background: #7ad7ff;
+  border-color: #f2fbff;
+  box-shadow: 0 0 16px 2px rgba(122, 215, 255, .85);
+  color: #06202e;
+}
+/* Hidden, not display:none — the cells must keep their layout boxes. */
+.vis-solo .cell { visibility: hidden; }
+.vis-solo .cell.active { visibility: visible; }
+
+.cube-frame {
+  position: absolute; inset: 0; transform-style: preserve-3d;
+  pointer-events: none; display: none;
+}
+.vis-contrast .cube-frame, .vis-guides .cube-frame, .vis-solo .cube-frame { display: block; }
+.frame-face {
+  position: absolute; inset: 0;
+  border: 1px solid rgba(180, 200, 255, .30);
+}
+
+/* Axis rails through the active slot, coloured with the same gradient as the
+   gizmo arms they point at. Two crossed planes each, so they never vanish edge-on. */
+.guides { position: absolute; inset: 0; transform-style: preserve-3d;
+          pointer-events: none; display: none; }
+.vis-guides .guides { display: block; }
+/* Thicker and brighter than the 2px gizmo shafts, which share this palette —
+   otherwise the rails read as more gizmo arms rather than as slot indicators. */
+.rail {
+  position: absolute; height: 4px; border-radius: 2px;
+  transform-origin: 50% 50%; opacity: .95;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, .35));
+}
+

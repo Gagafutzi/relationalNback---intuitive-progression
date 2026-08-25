@@ -1,0 +1,80 @@
+/* ---------- SETTINGS ---------- */
+.settings-btn {
+  position: fixed; top: 14px; left: 14px; z-index: 30;
+  background: var(--panel); border: 1px solid var(--border-outer);
+  color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer;
+}
+
+.settings {
+  position: fixed; top: 0; left: 0; height: 100vh; height: 100dvh;
+  width: min(340px, 88vw);
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border-right: 1px solid var(--border-outer);
+  padding: 56px 18px 18px; transform: translateX(-100%);
+  transition: transform .28s ease; z-index: 29; overflow-y: auto;
+}
+.settings.open { transform: translateX(0); }
+.settings h2 { margin: 0 0 4px; font-size: 17px; }
+.settings h3 {
+  margin: 20px 0 8px; font-size: 11px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted);
+  border-bottom: 1px solid var(--border-inner); padding-bottom: 6px;
+}
+.setting-group { margin-bottom: 12px; }
+.settings label { display: block; margin-bottom: 5px; font-size: 13px; opacity: .85; }
+select, input[type=number], input[type=text], input[type=file] {
+  width: 100%; padding: 7px; background: #0e121a; color: var(--text);
+  border: 1px solid var(--border-inner); border-radius: 6px; font-size: 13px;
+}
+input[type=file] { padding: 5px; font-size: 11px; }
+select:disabled, input:disabled { opacity: .4; cursor: not-allowed; }
+.hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
+.pair { display: flex; gap: 8px; }
+.pair > div { flex: 1; }
+
+.mode-toggle { display: flex; gap: 6px; margin-bottom: 4px; }
+.mode-toggle button {
+  flex: 1; padding: 9px 6px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  background: var(--panel-2); border: 1px solid var(--border-inner); color: var(--muted);
+}
+.mode-toggle button.on {
+  background: #2b4a8a; border-color: #4d7fd6; color: var(--text); font-weight: 600;
+}
+
+/* stream mode rows */
+.stream-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.stream-row .swatch { width: 9px; height: 22px; border-radius: 3px; flex: none; }
+.stream-row .nm { flex: 1; font-size: 13px; }
+.stream-row select { width: 108px; flex: none; padding: 5px; font-size: 12px; }
+
+/* progression state readout */
+.ladder { font-size: 12.5px; line-height: 1.9; }
+.ladder .k { color: var(--muted); display: inline-block; width: 108px; }
+.ladder b { font-variant-numeric: tabular-nums; }
+.next-up {
+  margin-top: 10px; padding: 9px 11px; border-radius: 8px;
+  background: rgba(77, 127, 214, .13); border: 1px solid rgba(77, 127, 214, .4);
+  font-size: 12px; line-height: 1.5;
+}
+.next-up b { color: #8ab4ff; }
+
+/* keybind editor */
+.kb-stream {
+  margin: 12px 0 5px; font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted);
+}
+.kb-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.kb-row .kb-glyph { width: 24px; text-align: center; font-weight: 700; flex: none; }
+.kb-row .kb-label { flex: 1; font-size: 12.5px; }
+.kb-key {
+  width: 70px; flex: none; padding: 4px 6px; font-size: 11px; text-align: center;
+  background: #0e121a; border: 1px solid var(--border-inner); border-radius: 5px;
+  color: var(--text); cursor: pointer; font-family: ui-monospace, monospace;
+}
+.kb-key.custom { border-color: #4d7fd6; color: #8ab4ff; }
+.kb-key.capturing { border-color: #4d7fd6; background: #1b2740; color: #8ab4ff; }
+.kb-key.clash { border-color: var(--bad); color: var(--bad); }
+#keybindDetails summary {
+  cursor: pointer; font-size: 12.5px; color: var(--muted); padding: 2px 0;
+}
+

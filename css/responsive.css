@@ -1,0 +1,67 @@
+/* A coarse pointer means there is no hardware keyboard behind it, so the key caps
+   are dead weight — and the room they take is better spent on the target itself.
+   46px is the smallest square a fingertip hits reliably. */
+@media (pointer: coarse) {
+  .rbtn { min-height: 46px; padding: 11px 9px; }
+  .rbtn .kbd { display: none; }
+}
+
+@media (max-width: 700px) {
+  /* Sized the other way round from desktop: pick the footprint the phone can give
+     the stage, then divide by --stage-k for the lattice. 32vmin was reading off the
+     375px WIDTH of a portrait phone, so the cube came out at 120px — a quarter of
+     the screen. Width is what binds here; the vh term only steps in on a short
+     viewport, to keep the response deck reachable without scrolling. */
+  :root {
+    /* svh, not dvh: the dynamic viewport height changes every time the address bar
+       slides, and the cube is sized from this. On dvh a scroll gesture resized the
+       box, which forced a rebuild mid-block — restarting the spin and wiping the
+       stimulus off the screen. svh is the height with the chrome shown and does not
+       move. */
+    --stage-budget: min(96vw, 54vh);
+    --cube-size: min(
+      calc(var(--stage-budget) / var(--stage-k) * var(--cube-scale)),
+      /* Hard ceiling: the scale slider may shrink the cube but never push the
+         stage past the width the scene can actually paint. */
+      calc(96vw / var(--stage-k)));
+  }
+
+  /* Wider keys AND wider gutters. 40px keys 5px apart are narrower than the
+     fingertip aiming at them, so the neighbour of the intended answer was easy to
+     hit — and a neighbour is always the opposite direction on the same axis. */
+  .deck { padding: 0 6px; gap: 8px; }
+  .deck-group { padding: 7px 6px 8px; }
+  .deck-group .btns { gap: 7px; flex-wrap: wrap; justify-content: center; }
+  .rbtn { min-width: 50px; padding: 10px 6px; font-size: 15px; }
+  .rbtn .glyph { font-size: 16px; }
+
+  /* The HUD becomes a wrapping header strip. As a 210px floating column it sat on
+     top of the cube on anything narrower than a tablet. */
+  .hud {
+    top: 8px; right: 8px; left: 56px; min-width: 0; font-size: 11px;
+    display: flex; flex-wrap: wrap; justify-content: flex-end;
+    align-items: baseline; column-gap: 11px; row-gap: 2px;
+  }
+  .hud .mode-name { font-size: 12.5px; margin: 0; }
+  .hud .row { gap: 5px; }
+  .hud .load { margin: 0; display: flex; align-items: baseline; gap: 5px; }
+  .hud .load b { font-size: 14px; }
+  .speed-wrap { width: 100%; margin: 3px 0 0; }
+  .hud .next { width: 100%; max-width: none; font-size: 10px; line-height: 1.4; }
+  /* Mid-block the phone needs the pixels for the cube; the hint is only actionable
+     between blocks anyway. */
+  body.running .hud .next { display: none; }
+
+  .settings-btn { top: 8px; left: 8px; padding: 7px 9px; font-size: 12px; }
+  .scene { padding: 78px 4px 62px; }
+  .controls { bottom: 8px; }
+  .controls button { padding: 10px 20px; }
+  .glyph-legend { bottom: 54px; left: 8px; font-size: 10px; }
+}
+
+/* dvh so the address bar sliding in cannot push the deck off the bottom. Kept
+   behind @supports: a custom property holding an unknown unit fails at
+   computed-value time, which would leave --cube-size with no value at all. */
+@supports (height: 1svh) {
+  @media (max-width: 700px) { :root { --stage-budget: min(96vw, 54svh); } }
+}

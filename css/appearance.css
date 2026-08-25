@@ -1,0 +1,55 @@
+/* ---------- APPEARANCE ---------- */
+/* Background image sits on its own fixed layer with a dim veil on top, so a photo
+   can never make the HUD or the deck unreadable. */
+#bgLayer {
+  position: fixed; inset: 0; z-index: -2; pointer-events: none;
+  background-size: cover; background-position: center; background-repeat: no-repeat;
+  display: none;
+}
+#bgLayer.on { display: block; }
+#bgVeil {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--bg); opacity: var(--bg-dim, .55); display: none;
+}
+#bgLayer.on ~ #bgVeil { display: block; }
+
+/* With a photo behind it the HUD has nothing to sit on, and a busy image makes the
+   numbers unreadable at any dim setting. Give it its own backing rather than relying
+   on the user to tune the veil. */
+body.has-bg .hud, body.has-bg .glyph-legend {
+  /* Plain rgba first: if color-mix is unsupported the whole declaration is dropped,
+     and the HUD would sit unreadable directly on the photo. */
+  background: rgba(8, 10, 14, .74);
+  background: color-mix(in srgb, var(--bg) 74%, transparent);
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+  padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border-inner);
+}
+body.has-bg .settings-btn, body.has-bg .controls button {
+  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(7px);
+}
+
+/* Cheap mode: kills every glow, shadow and blur. Helps weak hardware and anyone
+   who finds the effects distracting. */
+body.flat *, body.flat *::before, body.flat *::after {
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+}
+
+.swatch-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.swatch-btn {
+  width: 30px; height: 30px; border-radius: 7px; cursor: pointer;
+  border: 2px solid transparent; padding: 0;
+}
+.swatch-btn.on { border-color: var(--text); }
+input[type=color] {
+  width: 100%; height: 34px; padding: 2px; background: #0e121a;
+  border: 1px solid var(--border-inner); border-radius: 6px; cursor: pointer;
+}
+input[type=range] { width: 100%; accent-color: var(--accent, #4d7fd6); }
+
+button { font-family: inherit; }
+

@@ -1,0 +1,59 @@
+:root {
+  --bg: #0b0d10;
+  --panel: #141820;
+  --panel-2: #0f1218;
+  --border-outer: rgba(180, 200, 255, 0.45);
+  --border-inner: rgba(180, 200, 255, 0.18);
+  --cell-fill: rgba(120, 140, 255, 0.10);
+  --cell-active: rgba(120, 200, 255, 0.62);
+  --text: #e6ebff;
+  --muted: rgba(230, 235, 255, 0.55);
+  --good: #51cf66;
+  --bad: #ff6b6b;
+  --cube-scale: 1;
+  /* How much wider than the lattice the stage has to be to hold the gizmo arms and
+     their badges. Measured, not guessed: badges reach ~1.85 × the lattice across at
+     the solved angle, ~2.05 when the lattice is spread. With the gizmo hidden the
+     only thing to fit is the projected cube itself, which is far tighter — so the
+     lattice can be much bigger for the same footprint. */
+  --stage-k: 1.9;
+  --cube-size: calc(min(34vmin, 240px) * var(--cube-scale));
+}
+/* On :root, not body — --cube-size is declared on :root and a var() there can only
+   read a custom property off :root itself. Setting these on body would leave the
+   lattice sized against the default 1.9 forever. */
+:root.spread-stage { --stage-k: 2.15; }
+:root.gizmo-off { --stage-k: 1.5; }
+:root.gizmo-off.spread-stage { --stage-k: 1.25; }
+/* Spinning needs more room than resting: the solved tilt is steeper than the resting
+   view, and the roll turns the silhouette through every angle, so the footprint is
+   the circumscribed circle rather than one static outline. Every combination is
+   spelled out — a two-class selector has to outrank the one-class rules above it. */
+:root.spin-stage                        { --stage-k: 1.95; }
+/* The free tumble presents the lattice edge-on and corner-on in turn, so its
+   footprint is the resting one — it is only the solved path that tilts steeply. */
+:root.tumble-stage                        { --stage-k: 1.80; }
+:root.tumble-stage.spread-stage           { --stage-k: 1.85; }
+:root.tumble-stage.gizmo-off              { --stage-k: 1.75; }
+:root.tumble-stage.gizmo-off.spread-stage { --stage-k: 1.25; }
+/* The spread lattice is compact at the solved tilt, so the arms are what set the
+   footprint and 2.15 was reserving room nothing used. On a phone the box is
+   divided by this, so the slack came straight out of the slot size. */
+:root.spin-stage.spread-stage           { --stage-k: 1.95; }
+:root.spin-stage.gizmo-off              { --stage-k: 1.72; }
+:root.spin-stage.gizmo-off.spread-stage { --stage-k: 1.25; }
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at 50% 0%, var(--bg-glow, #121728), var(--bg));
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+  /* dvh, not vh: a phone's vh is the height with the address bar RETRACTED, so a
+     100vh body with overflow:hidden puts its last ~60px permanently off-screen. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
