@@ -486,7 +486,15 @@
       <div class="gizmo" id="gizmo"></div>
     </div>
   </div>
-  <div class="deck" id="deck"></div>
+  <!-- The answer keys and the run controls are one cluster, not two things that
+       happen to be near the bottom. They live and centre together. -->
+  <div class="dock">
+    <div class="deck" id="deck"></div>
+    <div class="controls">
+      <button id="startBtn" class="primary">Start block</button>
+      <button id="stopBtn">Stop</button>
+    </div>
+  </div>
 </main>
 
 <div class="glyph-legend" id="glyphLegend"></div>
@@ -501,11 +509,6 @@
 <div class="retro-cue" id="retroCue">
   <div class="pair" id="retroPair"></div>
   <div class="cap">report this move</div>
-</div>
-
-<div class="controls">
-  <button id="startBtn" class="primary">Start block</button>
-  <button id="stopBtn">Stop</button>
 </div>
 
 <div class="modal" id="modal"><div class="modal-box" id="modalBox"></div></div>

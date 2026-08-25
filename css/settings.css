@@ -132,8 +132,12 @@ select:disabled, input:disabled { opacity: .4; cursor: not-allowed; }
    deliberately left alone — a 46px target is right for a thumb either way. */
 .settings .rbtn {
   padding: 8px 10px; border-radius: 8px; font-size: 12.5px; font-weight: 500;
+  background: var(--input-bg); border-color: var(--border-inner); box-shadow: none;
 }
-.settings .rbtn:hover { border-color: var(--accent, #4d7fd6); }
+.settings .rbtn:hover {
+  border-color: var(--accent, #4d7fd6); filter: none; box-shadow: none;
+}
+.settings .rbtn:active { transform: translateY(1px); box-shadow: none; }
 
 .mode-toggle { display: flex; gap: 6px; margin-bottom: 4px; }
 .mode-toggle button {
@@ -186,7 +190,7 @@ select:disabled, input:disabled { opacity: .4; cursor: not-allowed; }
   background: rgba(77, 127, 214, .13); border: 1px solid rgba(77, 127, 214, .4);
   font-size: 12px; line-height: 1.5;
 }
-.next-up b { color: #8ab4ff; }
+.next-up b { color: var(--hi, #8ab4ff); }
 
 /* keybind editor */
 .kb-stream {
@@ -201,8 +205,12 @@ select:disabled, input:disabled { opacity: .4; cursor: not-allowed; }
   background: var(--input-bg); border: 1px solid var(--border-inner); border-radius: 5px;
   color: var(--text); cursor: pointer; font-family: ui-monospace, monospace;
 }
-.kb-key.custom { border-color: #4d7fd6; color: #8ab4ff; }
-.kb-key.capturing { border-color: #4d7fd6; background: #1b2740; color: #8ab4ff; }
+.kb-key.custom { border-color: var(--accent, #4d7fd6); color: var(--hi, #8ab4ff); }
+.kb-key.capturing {
+  border-color: var(--accent, #4d7fd6); color: var(--hi, #8ab4ff);
+  background: rgba(77, 127, 214, .22);
+  background: color-mix(in srgb, var(--accent, #4d7fd6) 22%, var(--input-bg));
+}
 .kb-key.clash { border-color: var(--bad); color: var(--bad); }
 
 /* Shortcut rows carry no glyph, so the label column runs full width and the

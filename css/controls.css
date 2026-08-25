@@ -1,12 +1,56 @@
 /* ---------- CONTROLS ---------- */
+/* The dock is the whole bottom cluster: answer keys on top, run controls under
+   them. Previously the deck sat in the scene's flow while the controls were fixed
+   to the viewport, so the two drifted apart by whatever the layout happened to
+   leave between them and read as unrelated furniture. They centre as one block now,
+   and the auto margin that used to be on the deck lives here. */
+.dock {
+  display: flex; flex-direction: column; align-items: center; gap: 11px;
+  width: 100%; margin-bottom: auto;
+}
+
 .controls {
-  position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 8px; z-index: 21;
+  display: flex; align-items: center; gap: 6px; z-index: 21;
+  padding: 6px; border-radius: 999px;
+  background: rgba(20, 24, 32, .6);
+  background: color-mix(in srgb, var(--panel) 74%, transparent);
+  border: 1px solid var(--border-inner);
+  -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
+  box-shadow: 0 14px 32px -22px #000;
 }
 .controls button {
-  padding: 8px 18px; background: var(--panel); border: 1px solid var(--border-outer);
-  color: var(--text); border-radius: 8px; cursor: pointer; font-size: 13px;
+  padding: 9px 20px; border-radius: 999px; cursor: pointer;
+  font-size: 13px; font-weight: 600;
+  background: transparent; border: 1px solid transparent; color: var(--muted);
+  transition: background .14s, color .14s, border-color .14s, filter .14s;
 }
-.controls button.primary { background: #2b4a8a; border-color: #4d7fd6; }
+.controls button:hover { color: var(--text); background: rgba(255, 255, 255, .07); }
 
+.controls button.primary {
+  color: var(--accent-ink, #fff);
+  background: var(--accent, #4d7fd6);
+  background: linear-gradient(180deg, var(--hi, #8ab4ff), var(--accent, #4d7fd6));
+  border-color: var(--accent, #4d7fd6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28),
+              0 5px 18px -7px var(--accent-glow, rgba(77, 127, 214, .55));
+}
+.controls button.primary:hover { filter: brightness(1.09); background-image: linear-gradient(180deg, var(--hi, #8ab4ff), var(--accent, #4d7fd6)); }
+.controls button:active { transform: translateY(1px); }
 
+/* Mid-block, starting again is a restart — a real action, but not the one on offer.
+   It steps back to a quiet ghost button and Stop takes the emphasis, so the pair
+   always shows which one the moment calls for. Both stay clickable: dimming a button
+   that still works is a lie, dropping it to secondary is not. */
+body.running .controls button.primary {
+  background: transparent; color: var(--muted);
+  border-color: transparent; box-shadow: none;
+}
+body.running .controls button.primary:hover {
+  color: var(--text); background: rgba(255, 255, 255, .07); filter: none;
+}
+body.running #stopBtn {
+  color: var(--text);
+  background: rgba(255, 107, 107, .16);
+  border-color: rgba(255, 107, 107, .5);
+}
+body.running #stopBtn:hover { background: rgba(255, 107, 107, .26); }

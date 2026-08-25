@@ -13,7 +13,9 @@
 .modal-box p { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
 .modal-box .cta {
   width: 100%; margin-top: 16px; padding: 11px; font-size: 14px;
-  background: #2b4a8a; border: 1px solid #4d7fd6; color: var(--text);
+  background: rgba(77, 127, 214, .34);
+  background: color-mix(in srgb, var(--accent, #4d7fd6) 34%, transparent);
+  border: 1px solid var(--accent, #4d7fd6); color: var(--text);
   border-radius: 8px; cursor: pointer;
 }
 

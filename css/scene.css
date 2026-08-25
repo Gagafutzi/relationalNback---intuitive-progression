@@ -6,7 +6,7 @@
 .scene {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: flex-start; perspective: 1400px;
-  padding: 54px 0 62px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 54px 0 18px; overflow-y: auto; -webkit-overflow-scrolling: touch;
 }
 
 /* The stage reserves the GIZMO's footprint, not the cube's — the arms reach well
@@ -109,8 +109,9 @@
 }
 .retro-cue.show { display: block; }
 .retro-cue .pair {
-  font-size: 40px; font-weight: 700; color: #8ab4ff; font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 22px rgba(138, 180, 255, .55);
+  font-size: 40px; font-weight: 700; color: var(--hi, #8ab4ff);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 22px var(--accent-glow, rgba(138, 180, 255, .55));
 }
 .retro-cue .cap {
   font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase;
@@ -122,16 +123,16 @@
    cell shows its colour when that stream is on and the highlight fill when it isn't.
    The glow and the text colour are class-only, so they apply either way. */
 .vis-contrast .cell-face, .vis-guides .cell-face {
-  background: rgba(120, 140, 255, .025);
-  border-color: rgba(180, 200, 255, .085);
+  background: var(--cell-fill-dim, rgba(120, 140, 255, .025));
+  border-color: var(--cell-edge-dim, rgba(180, 200, 255, .085));
 }
 .vis-contrast .cell.active .cell-face,
 .vis-guides   .cell.active .cell-face,
 .vis-solo     .cell.active .cell-face {
-  background: #7ad7ff;
-  border-color: #f2fbff;
-  box-shadow: 0 0 16px 2px rgba(122, 215, 255, .85);
-  color: #06202e;
+  background: var(--cell-active-solid, #7ad7ff);
+  border-color: var(--cell-active-edge, #f2fbff);
+  box-shadow: 0 0 16px 2px var(--cell-glow, rgba(122, 215, 255, .85));
+  color: var(--cell-ink, #06202e);
 }
 /* Hidden, not display:none — the cells must keep their layout boxes. */
 .vis-solo .cell { visibility: hidden; }
@@ -144,7 +145,7 @@
 .vis-contrast .cube-frame, .vis-guides .cube-frame, .vis-solo .cube-frame { display: block; }
 .frame-face {
   position: absolute; inset: 0;
-  border: 1px solid rgba(180, 200, 255, .30);
+  border: 1px solid var(--frame-line, rgba(180, 200, 255, .30));
 }
 
 /* Axis rails through the active slot, coloured with the same gradient as the

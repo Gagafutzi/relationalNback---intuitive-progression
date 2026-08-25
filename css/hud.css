@@ -10,7 +10,7 @@
   margin-top: 6px; font-size: 11px; letter-spacing: .1em;
   text-transform: uppercase; color: var(--muted);
 }
-.hud .load b { font-size: 19px; color: #8ab4ff; letter-spacing: 0; }
+.hud .load b { font-size: 19px; color: var(--hi, #8ab4ff); letter-spacing: 0; }
 .speed-wrap { margin-top: 8px; }
 .speed-labels {
   display: flex; justify-content: space-between; font-size: 10px; color: var(--muted);
@@ -20,7 +20,10 @@
   height: 5px; background: rgba(255,255,255,.09);
   border-radius: 3px; overflow: hidden;
 }
-.progress-fill { display: block; height: 100%; width: 0%; background: #8ab4ff; transition: width .35s; }
+.progress-fill {
+  display: block; height: 100%; width: 0%; transition: width .35s;
+  background: linear-gradient(90deg, var(--accent, #4d7fd6), var(--hi, #8ab4ff));
+}
 .hud .next { margin-top: 6px; font-size: 11px; color: var(--muted); max-width: 240px; }
-.hud .next b { color: #8ab4ff; font-weight: 600; }
+.hud .next b { color: var(--hi, #8ab4ff); font-weight: 600; }
 
