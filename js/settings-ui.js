@@ -16,9 +16,12 @@ function renderStreamRows() {
       <select data-stream="${k}">
         <option value="off">Off</option>
         <option value="identity">Identity</option>
-        <option value="relational">Relational</option>
+        ${spec.idOnly ? '' : '<option value="relational">Relational</option>'}
       </select>`;
     const sel = row.querySelector('select');
+    /* A profile saved before this stream existed, or hand-edited, could still name a
+       mode the stream cannot serve. */
+    if (spec.idOnly && freeCfg.streams[k] === 'relational') freeCfg.streams[k] = 'identity';
     sel.value = freeCfg.streams[k] || 'off';
     sel.onchange = () => { freeCfg.streams[k] = sel.value; applyFree(); updateHUD(); saveProgress(); };
     wrap.appendChild(row);
@@ -206,6 +209,23 @@ function syncSettingsUI() {
   $('intervalMs').value = freeCfg.interval;
   $('blockLengthF').value = freeCfg.blockLength;
   $('cubeDimension').value = freeCfg.dim;
+  $('letterVoice').value = cfg.letterVoice;
+  $('letterVoiceHint').textContent = cfg.letterVoice === 'mix'
+    ? 'A new speaker every trial. The letter is still the whole question, so the voice '
+      + 'becomes noise you have to hear past — the setting that stops the sound being '
+      + 'memorised as a sound.'
+    : 'Reads the eight letters for the Spoken letter stream.';
+  $('voiceSet').value = cfg.voiceSet;
+  $('voiceSetHint').textContent = cfg.voiceSet === 'vowels'
+    ? 'Vowel colours — the most separable set. The resonances track the note rather '
+      + 'than sitting at fixed frequencies, so the brightness order holds at every '
+      + 'pitch and the vowels stay out of the pitch channel.'
+    : cfg.voiceSet === 'reeds'
+    ? 'Harmonic profiles rather than raw waveforms — more separable than the plain '
+      + 'oscillators, and each sounds the same at every pitch, so timbre and pitch '
+      + 'stay independent.'
+    : 'The four raw oscillator shapes. Cleanest separation from the pitch stream, '
+      + 'least separation from each other.';
   $('spinPath').value = cfg.spinPath;
   $('spinPathHint').textContent = cfg.spinPath === 'free'
     ? 'Sweeps the tilt as well as the turn, so four times a revolution the view looks '
@@ -223,6 +243,11 @@ function syncSettingsUI() {
   $('gateOn').value = String(freeCfg.gate || 0);
   $('retroOn').value = String(freeCfg.retro || 0);
   $('retroOn').disabled = !!freeCfg.meta;
+  $('varNBack').value = String(freeCfg.varN || 0);
+  /* Shown as unavailable rather than silently ignored: applyFree already forces the
+     spread to zero under a retro-cue, and a control that keeps its setting while
+     doing nothing is worse than one that says so. */
+  $('varNBack').disabled = cfg.retro > 0;
   $('testerLabel').value = progress.tester || '';
   $('lureRateF').value = Math.round(freeCfg.lureRate * 100);
   $('lureVal').textContent = Math.round(freeCfg.lureRate * 100);
@@ -248,6 +273,7 @@ function onConfigChanged(rebuildCube) {
   applyRotation();
   applyGizmoMode();
   buildDeck();
+  primeLetters();
   renderGlyphLegend();
   renderKeybinds();   // live/dormant state changes with the active streams
   renderShortcuts();  // and with them, which shortcut keys the deck is shadowing
@@ -324,6 +350,7 @@ function importJSON(text) {
     cfg.gizmo = progress.display.gizmo || cfg.gizmo;
     cfg.cellVis = progress.display.cellVis || cfg.cellVis;
     cfg.spinPath = progress.display.spinPath || cfg.spinPath;
+    cfg.voiceSet = progress.display.voiceSet || cfg.voiceSet;
   }
   setMode(progress.mode || 'progression');
   renderDataPanel();

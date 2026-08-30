@@ -53,7 +53,7 @@
       <div class="hint" id="rcHint"></div>
     </div>
 
-    <details class="sect" open>
+    <details class="sect">
       <summary>Where you are</summary>
       <div class="sect-body">
       <div class="ladder" id="ladderState"></div>
@@ -164,7 +164,7 @@
 
   <!-- ============ FREE PLAY ============ -->
   <div id="freePane" style="display:none">
-    <details class="sect">
+    <details class="sect" open>
       <summary>Streams</summary>
       <div class="sect-body">
       <div id="streamRows"></div>
@@ -230,6 +230,21 @@
         <div class="hint">Dashed orange cells must be <b>judged but not remembered</b> —
           they never become anyone's N-back item. Trains holding the gate shut, which
           ordinary N-back never asks for.</div>
+      </div>
+      <div class="setting-group">
+        <label>Variable N</label>
+        <select id="varNBack">
+          <option value="0">Off — one fixed N</option>
+          <option value="1">±1 around N</option>
+          <option value="2">±2 around N</option>
+        </select>
+        <div class="hint">The lag is drawn fresh <b>every trial</b> and shown above the
+          answer keys — at N&nbsp;3 ±1 you are asked for 2-back, 3-back or 4-back, in
+          no order. A fixed N can be held as a rehearsal loop; this cannot, so the
+          whole recent window has to stay addressable and you have to re-aim inside
+          the interval. Targets and lures are planted at whatever lag the trial drew,
+          so mis-reading the cue costs you the answer. Can't combine with the
+          retro-cue, which replaces the n-back rule outright.</div>
       </div>
       <div class="setting-group">
         <label>Retro-cue (output gating)</label>
@@ -312,6 +327,26 @@
         <option value="solo">Solo — only the lit cell</option>
       </select>
       <div class="hint" id="cellVisHint"></div>
+    </div>
+    <div class="setting-group">
+      <label>Letter voice</label>
+      <select id="letterVoice">
+        <option value="slt">Female</option>
+        <option value="rms">Male</option>
+        <option value="awb">Male, Scottish</option>
+        <option value="kal">Synthetic</option>
+        <option value="mix">Mixed — a different speaker each trial</option>
+      </select>
+      <div class="hint" id="letterVoiceHint"></div>
+    </div>
+    <div class="setting-group">
+      <label>Timbre voices</label>
+      <select id="voiceSet">
+        <option value="waves">Waveforms — sine, triangle, square, saw</option>
+        <option value="reeds">Instruments — flute, clarinet, horn, bell</option>
+        <option value="vowels">Vowels — oo, ah, eh, ee</option>
+      </select>
+      <div class="hint" id="voiceSetHint"></div>
     </div>
     <div class="setting-group">
       <label>Daily goal (minutes, 0 = off)</label>
@@ -489,6 +524,9 @@
   <!-- The answer keys and the run controls are one cluster, not two things that
        happen to be near the bottom. They live and centre together. -->
   <div class="dock">
+    <!-- Which lag this trial is asking for. Sits between the cube and the keys
+         because that is the path the eye already takes. -->
+    <div class="nback-cue" id="nbackCue"><b id="nbackCueN">2</b><span>-back</span></div>
     <div class="deck" id="deck"></div>
     <div class="controls">
       <button id="startBtn" class="primary">Start block</button>
@@ -517,7 +555,8 @@
      the way the single inline block they came from did, and they must run in this
      order. Loading them from file:// therefore still works, which `type="module"`
      would break. -->
-<script src="js/constants.js"></script>
+<script src="js/letter-audio.js"></script>
+  <script src="js/constants.js"></script>
 <script src="js/ladder.js"></script>
 <script src="js/state.js"></script>
 <script src="js/persistence.js"></script>

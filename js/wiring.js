@@ -213,6 +213,7 @@ freeIn('lureRateF',     v => freeCfg.lureRate = Math.min(LURE_MAX, Math.max(LURE
 $('metaOn').onchange  = e => { freeCfg.meta = e.target.checked; applyFree(); syncSettingsUI(); updateHUD(); saveProgress(); };
 $('gateOn').onchange  = e => { freeCfg.gate = +e.target.value; applyFree(); updateHUD(); saveProgress(); };
 $('retroOn').onchange = e => { freeCfg.retro = +e.target.value; applyFree(); syncSettingsUI(); updateHUD(); saveProgress(); };
+$('varNBack').onchange = e => { freeCfg.varN = +e.target.value; applyFree(); syncSettingsUI(); updateHUD(); saveProgress(); };
 
 $('cubeDimension').onchange = e => { freeCfg.dim = +e.target.value; applyFree(); buildCube(cfg.dim); updateHUD(); saveProgress(); };
 $('rotationOn').onchange    = e => { freeCfg.rotation = e.target.checked; applyFree(); updateHUD(); saveProgress(); };
@@ -223,6 +224,21 @@ $('feedbackModeF').onchange = e => { freeCfg.feedback = e.target.value; cfg.feed
    a smaller footprint, so the lattice grows to fill it and the arm lengths — which
    are computed in px at build time — no longer match. */
 $('gizmoMode').onchange = e => { cfg.gizmo = e.target.value; onConfigChanged(true); saveProgress(); };
+$('letterVoice').onchange = e => {
+  cfg.letterVoice = e.target.value;
+  primeLetters(); syncSettingsUI(); saveProgress();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  /* Decoding is async, so the sample is a beat behind the click on first use. */
+  setTimeout(() => playLetter({ letter: 0 }), 260);
+};
+$('voiceSet').onchange = e => {
+  cfg.voiceSet = e.target.value;
+  syncSettingsUI(); saveProgress();
+  /* Play the set bottom to top so the ordering the deck labels claim is audible. */
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  voiceSet().voices.forEach((_, i) =>
+    setTimeout(() => playTone({ timbre: i, pitch: 1 }), i * 260));
+};
 /* Rebuilds: the two paths want different stage footprints, and the spaced layout
    sizes its cells from whichever view is actually going to be held. */
 $('spinPath').onchange  = e => {
@@ -356,6 +372,7 @@ function pauseBlock(why) {
   state.judgments = [];
   state.presses.clear();
   clearCells();
+  hideLagCue();
   $('retroCue').classList.remove('show');
   $('pauseText').textContent = why;
   $('pauseVeil').classList.add('show');

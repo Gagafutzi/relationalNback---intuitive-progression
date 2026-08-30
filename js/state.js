@@ -11,6 +11,8 @@ const cfg = {
   dim: 3,
   rotation: false,
   spinPath: 'solved',     // 'solved' = non-degenerate turntable + roll, 'free' = original tumble
+  voiceSet: 'waves',      // which four timbres the timbre stream draws from
+  letterVoice: 'slt',     // who reads the letters, or 'mix' for a new speaker each trial
   spin: 60,
   frame: 'cube',                       // 'cube' | 'screen' | 'both'
   interval: 5000,
@@ -26,6 +28,7 @@ const cfg = {
   meta: false,        // second-order relational judgements
   gate: 0,            // fraction of compare-only (gate-closed) trials
   retro: 0,           // 0 = off, else how many lags the post-cue can name
+  varN: 0,            // 0 = fixed N, else the ± spread the per-trial lag is drawn in
   varPriority: true,  // cue one stream to prioritise per block
 };
 
@@ -33,7 +36,7 @@ const cfg = {
 const freeCfg = {
   n: 2, streams: { position: 'relational' }, dim: 3, rotation: false,
   spin: 60, frame: 'cube', interval: 2500, blockLength: 20, feedback: 'reveal',
-  lureRate: 0.20, meta: false, gate: 0, retro: 0,
+  lureRate: 0.20, meta: false, gate: 0, retro: 0, varN: 0,
   /* varPriority was missing here while cfg defaulted it on, so Free Play silently
      ran without the cue that progression uses. */
   varPriority: true, fixedGlyphMap: false,

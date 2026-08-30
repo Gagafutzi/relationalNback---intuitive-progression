@@ -52,7 +52,10 @@ function tick() {
       pair = [S[S.length - t.retroK - 2], S[S.length - t.retroK - 1]];
     }
   } else {
-    const partner = C[C.length - cfg.n];
+    /* t.n, not cfg.n: sampleTrial already committed to a lag and built the stimulus
+       around it. Reading cfg.n back here would score the answer against a different
+       item than the one the target was planted at. */
+    const partner = C[C.length - t.n];
     if (partner) pair = [partner, t];
   }
 
@@ -136,6 +139,7 @@ function stopBlock(silent) {
   $('pauseVeil').classList.remove('show');
   state.paused = false;
   clearCells();
+  hideLagCue();
   if (state.sessionStart) {
     addMinutes(Date.now() - state.sessionStart);
     state.sessionStart = null;
@@ -266,7 +270,8 @@ function endBlock() {
       streams: { ...cfg.streams }, dim: cfg.dim, frame: cfg.frame,
       interval: cfg.interval, blockLength: cfg.blockLength, rotation: cfg.rotation,
       spin: cfg.spin, feedback: cfg.feedback, lureRate: cfg.lureRate,
-      meta: cfg.meta, gate: cfg.gate, retro: cfg.retro, cellVis: cfg.cellVis,
+      meta: cfg.meta, gate: cfg.gate, retro: cfg.retro, varN: cfg.varN,
+      cellVis: cfg.cellVis,
       gizmo: cfg.gizmo,
       /* Layout belongs here, not with the cosmetics: flat panels remove the depth
          ambiguity entirely, so the same score means something different. */
@@ -294,6 +299,12 @@ function endBlock() {
 
 function computeLoad() {
   let load = 10 * cfg.n;
+  /* A varying lag costs more than its mean depth: the pairing cannot be maintained
+     as a rehearsal loop, so the whole recent window has to stay addressable and the
+     cue has to be read and applied inside the interval. Scaled with N because the
+     span is what has to stay open, and a ±1 around 4 is a wider window than ±1
+     around 2. */
+  if (cfg.varN) load += 6 * cfg.varN + 2 * cfg.varN * cfg.n;
   STREAM_KEYS.forEach(k => {
     if (cfg.streams[k] === 'identity') load += 4;
     else if (cfg.streams[k] === 'relational') load += 9;
@@ -332,7 +343,7 @@ function applyProgression() {
   cfg.interval = prog.interval;
   cfg.lureRate = prog.lureRate;
   cfg.meta = rcTier >= 4;          // the tier IS the relational-complexity level
-  cfg.gate = 0; cfg.retro = 0;     // Free Play only, for now
+  cfg.gate = 0; cfg.retro = 0; cfg.varN = 0;   // Free Play only, for now
   cfg.varPriority = true;
   cfg.dim = 3;
   cfg.frame = 'cube';
@@ -361,6 +372,9 @@ function applyFree() {
   /* Meta and retro-cue ask incompatible questions of the same trial — meta needs a
      fixed n-back pairing to have a "previous move" at all. */
   cfg.retro = cfg.meta ? 0 : freeCfg.retro;
+  /* A retro trial is told which pair to report, so it has already replaced the
+     n-back rule — there is no lag left for a variable one to vary. */
+  cfg.varN = cfg.retro > 0 ? 0 : freeCfg.varN;
   /* A retro trial spends its first stretch showing the stimulus and locks responses
      until the cue, so it needs a floor the plain task doesn't. */
   if (cfg.retro > 0) cfg.interval = Math.max(RETRO_MIN_INTERVAL, cfg.interval);

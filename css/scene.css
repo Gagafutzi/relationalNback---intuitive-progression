@@ -69,6 +69,10 @@
 .cell-face {
   position: absolute; width: 100%; height: 100%;
   background: var(--cell-fill); border: 1px solid var(--border-inner);
+  /* Depth cue for the spaced layout, as a custom property rather than an inline
+     style: inline would outrank the lit cell's own edge colour below, and the
+     highlight would keep the depth tint instead of the slot's colour. */
+  border-color: var(--depth-edge, var(--border-inner));
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 1px; line-height: 1; color: var(--text); user-select: none;
 }
@@ -161,3 +165,32 @@
   filter: drop-shadow(0 0 4px rgba(255, 255, 255, .35));
 }
 
+
+/* ---------- VARIABLE-N CUE ----------
+   The lag this trial is asking for. It is an instruction rather than a status
+   readout, so it sits in the line of sight between the cube and the answer keys and
+   is loud enough to be taken in without a deliberate look. The flash replays on
+   every trial, including one that drew the same lag again — otherwise a repeat is
+   indistinguishable from last trial's cue simply still being there. */
+.nback-cue {
+  display: none; align-items: baseline; gap: 3px;
+  padding: 5px 14px 6px; border-radius: 999px;
+  background: rgba(77, 127, 214, .16);
+  background: color-mix(in srgb, var(--accent, #4d7fd6) 16%, transparent);
+  border: 1px solid var(--accent, #4d7fd6);
+  border-color: color-mix(in srgb, var(--accent, #4d7fd6) 55%, transparent);
+  -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
+}
+.nback-cue.show { display: flex; animation: lag-cue .34s ease-out; }
+.nback-cue b {
+  font-size: 20px; font-weight: 700; line-height: 1;
+  color: var(--hi, #8ab4ff); font-variant-numeric: tabular-nums;
+}
+.nback-cue span {
+  font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted);
+}
+@keyframes lag-cue {
+  from { transform: scale(.9); opacity: .35; }
+  to   { transform: scale(1);  opacity: 1; }
+}

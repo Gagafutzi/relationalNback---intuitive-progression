@@ -71,7 +71,8 @@ function resetInMemoryState() {
   Object.assign(freeCfg, {
     n:2, streams:{ position:'relational' }, dim:3, rotation:false, spin:60,
     frame:'cube', interval:2500, blockLength:20, feedback:'reveal',
-    lureRate:0.20, meta:false, gate:0, retro:0, varPriority:true, fixedGlyphMap:false,
+    lureRate:0.20, meta:false, gate:0, retro:0, varN:0,
+    varPriority:true, fixedGlyphMap:false,
   });
 }
 
@@ -119,6 +120,8 @@ function loadProgress() {
                      cfg.cellVis = p.display.cellVis || cfg.cellVis;
                      cfg.layout = p.display.layout || cfg.layout;
                      cfg.spinPath = p.display.spinPath || cfg.spinPath;
+                     cfg.voiceSet = p.display.voiceSet || cfg.voiceSet;
+                     cfg.letterVoice = p.display.letterVoice || cfg.letterVoice;
                      cfg.cubeScale = p.display.cubeScale || cfg.cubeScale;
                      if (p.display.dailyGoal != null) cfg.dailyGoal = p.display.dailyGoal;
                      cfg.buzzer = !!p.display.buzzer; }
@@ -135,7 +138,9 @@ function saveProgress() {
   progress.keyBinds = keyBinds;
   progress.actionBinds = actionBinds;
   progress.display = { gizmo: cfg.gizmo, cellVis: cfg.cellVis, layout: cfg.layout,
-                       spinPath: cfg.spinPath, cubeScale: cfg.cubeScale,
+                       spinPath: cfg.spinPath, voiceSet: cfg.voiceSet,
+                       letterVoice: cfg.letterVoice,
+                       cubeScale: cfg.cubeScale,
                        dailyGoal: cfg.dailyGoal, buzzer: cfg.buzzer };
   progress.stair = stairLog ? stairLog.map(v => +v.toFixed(4)) : null;
   progress.rcTier = rcTier;

@@ -67,6 +67,10 @@ function buildJudgments(a, b, extra) {
   scalar('color',    'color',  'color-cool', 'color-warm');  // pool runs warm → cool
   scalar('size',     'size',   'size-up',    'size-down');
   scalar('quantity', 'qty',    'qty-up',     'qty-down');
+  /* No up/down pair: `letter` is registered identity-only and its settings row offers
+     no relational option, so the scalar helper's ordered branch is unreachable here. */
+  if (mode('letter') === 'identity' && a.letter != null && b.letter != null)
+    push('letter', ['letter'], a.letter === b.letter ? ['letter'] : []);
 
   /* --- glyph: identity, or movement across the 2×2 set map + rank --- */
   const gm = mode('glyph');

@@ -22,7 +22,9 @@ function updateHUD() {
   const rc = relationalComplexity();
   $('hudRC').textContent = 'RC ' + rc;
   $('hudRCName').textContent = RC_NAMES[rc] + (rc >= 4 ? ' · adult ceiling' : '');
-  $('hudN').textContent = cfg.n;
+  /* In variable mode the single number is a lie — what is fixed is the span the
+     lag is drawn from, so that is what the HUD shows. */
+  $('hudN').textContent = cfg.varN ? `${cfg.n}±${cfg.varN}` : cfg.n;
   $('hudSpinLabel').textContent = spinLabel();
   renderPriorityCue();
   $('hudTrial').textContent = `${state.scored}/${cfg.blockLength}`;

@@ -243,7 +243,7 @@ function buildCube(dim) {
              hue channel, and a magenta far-layer reads as the violet A axis. */
           const t = dim > 1 ? z / (dim - 1) : 0;
           const col = `hsla(215, 30%, ${52 + t * 34}%, ${0.20 + t * 0.45})`;
-          faces.forEach(f => { f.style.borderColor = col; });
+          faces.forEach(f => { f.style.setProperty('--depth-edge', col); });
         }
         gridCube.appendChild(cell);
         state.cells.push({ el: cell, x, y, z });

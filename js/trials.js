@@ -37,6 +37,30 @@ function backAt(k) {
   return k >= 1 && c.length >= k ? c[c.length - k] : null;
 }
 
+/* ---- Variable N ----
+   The deepest lag the current settings can ask for. Anything sized against "how far
+   back might this block reach" has to use this rather than cfg.n, or it reserves
+   room for the centre of the range and the top of it goes unprotected. */
+const maxLag = () => cfg.n + (cfg.varN || 0);
+
+/* The lag THIS trial is judged at, drawn fresh per trial and then carried on the
+   trial itself. Fixed N is just the zero-spread case.
+
+   The draw is clamped to the chain that actually exists, which matters at the start
+   of a block: an uncued 4-back over two items has no answer, and cueing one would be
+   asking a question the player cannot be wrong about. Early trials therefore run
+   shallow and deepen as the chain fills, the same warm-up fixed N already has.
+
+   Sampling here rather than in tick() is deliberate — the whole point of knowing the
+   lag before the stimulus is chosen is that targets and lures can be planted AT that
+   lag. Deciding it afterwards would leave a variable-N block with no targets. */
+function trialLag() {
+  if (!cfg.varN) return cfg.n;
+  const hi = Math.min(cfg.n + cfg.varN, Math.max(1, state.chain.length));
+  const lo = Math.min(Math.max(1, cfg.n - cfg.varN), hi);
+  return lo + randInt(hi - lo + 1);
+}
+
 /* Cells reachable from `from` by a single-axis move — meta-relations needs every
    delta to be cardinal, or "same/opposite/different" has no defined answer for a
    diagonal move and the task stops being about memory. */
@@ -74,7 +98,7 @@ function pickMetaTarget(fromIdx, A) {
 }
 
 function sampleTrial() {
-  const n = cfg.n;
+  const n = trialLag();
   const nb = backAt(n);
   const lureA = backAt(n - 1), lureB = backAt(n + 1);
   const rel = k => cfg.streams[k] === 'relational';
@@ -120,11 +144,12 @@ function sampleTrial() {
   };
 
   t.pitch    = feature('pitch',    PITCHES);
-  t.timbre   = feature('timbre',   TIMBRES);
+  t.timbre   = feature('timbre',   voiceSet().voices);
   t.pan      = feature('pan',      PANS);
   t.color    = feature('color',    COLORS);
   t.size     = feature('size',     SIZES);
   t.quantity = feature('quantity', COUNTS);
+  t.letter   = feature('letter',   LETTER_KEYS);
 
   if (on('glyph')) {
     if (rel('glyph')) {
@@ -149,15 +174,22 @@ function sampleTrial() {
   } else { t.glyphSet = null; t.glyphIdx = null; }
 
   t.isLure = usedLure;
+  /* The lag this trial was built around. tick() reads it back to pick the partner,
+     so the judgement is scored against the same item the stimulus was sampled
+     against — and the cue shows the player the same number. */
+  t.n = n;
   /* Gate: a compare-only trial must still be judged, but never joins the chain.
-     Never close the gate before there is a chain to protect. */
-  t.gate = (cfg.gate > 0 && state.chain.length > cfg.n && Math.random() < cfg.gate)
+     Never close the gate before there is a chain to protect — measured at the
+     DEEPEST lag in play, since eating an item the top of the range still needs would
+     strand those trials. */
+  t.gate = (cfg.gate > 0 && state.chain.length > maxLag() && Math.random() < cfg.gate)
     ? 'compare' : 'update';
   return t;
 }
 
 function renderTrial(t) {
   clearCells();
+  showLagCue(t);
   state.stimShown = true;
   const cell = state.cells[t.cellIdx];
   cell.el.classList.add('active');
@@ -190,13 +222,65 @@ function renderTrial(t) {
     html = `<span class="g" style="font-size:${fontSize}px">●</span>`;
 
   faces.forEach(f => {
-    if (t.color != null) f.style.background = COLORS[t.color];
+    if (t.color != null) litColour(f, COLORS[t.color]);
     f.innerHTML = html;
   });
 
-  if (t.pitch != null || t.timbre != null || t.pan != null) playTone(t);
+  /* A letter carries the trial's audio on its own; the tone is only for the streams
+     that have no voice. Pan applies to whichever is sounding. */
+  if (t.pitch != null || t.timbre != null || (t.pan != null && t.letter == null))
+    playTone(t);
+  if (t.letter != null) playLetter(t);
   t.matrix = currentMatrix();
 }
+
+/* Repaint the lit slot from the colour stream by overriding the same variables the
+   theme sets on :root, so fill, edge, halo and ink move together. Without this the
+   halo keeps the accent's hue whatever colour the slot is, and a red face inside a
+   cyan glow reads as neither.
+
+   The ink is chosen by comparing actual contrast against both candidates rather than
+   by a luma threshold. appearance.js's `luma` is the right tool for the accent, but it
+   is unlinearised, and the palette's red lands just the wrong side of 0.5 — which gave
+   white glyphs on red at a ratio of 2:1. */
+const LIT_VARS = ['--cell-active', '--cell-active-solid', '--cell-active-edge',
+                  '--cell-glow', '--cell-ink'];
+const srgbLum = c => {
+  const [r, g, b] = rgbOf(c).map(v => {
+    v /= 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const INK_DARK = '#08131a', INK_LIGHT = '#ffffff';
+
+function litColour(face, hex) {
+  const L = srgbLum(hex);
+  const ratio = o => (Math.max(L, o) + 0.05) / (Math.min(L, o) + 0.05);
+  face.style.setProperty('--cell-active', hex);
+  face.style.setProperty('--cell-active-solid', hex);
+  face.style.setProperty('--cell-active-edge', lighten(hex, 0.45));
+  /* Weaker than the accent's 0.8: a saturated hue under a bright halo of its own
+     colour washes out, and the hue is the thing being reported. */
+  face.style.setProperty('--cell-glow', rgba(hex, 0.55));
+  face.style.setProperty('--cell-ink',
+    ratio(srgbLum(INK_DARK)) >= ratio(srgbLum(INK_LIGHT)) ? INK_DARK : INK_LIGHT);
+}
+
+/* The cue is the trial's instruction, not part of the stimulus, so it stays up for
+   the whole interval — including the stretch after a retro trial blanks the cube.
+   The restart of the flash animation is what makes a repeated lag read as a fresh
+   instruction rather than as last trial's cue still sitting there. */
+function showLagCue(t) {
+  const el = $('nbackCue');
+  if (!cfg.varN || t.n == null) { el.classList.remove('show'); return; }
+  $('nbackCueN').textContent = t.n;
+  el.classList.remove('show');
+  void el.offsetWidth;                 // reflow, or the animation never replays
+  el.classList.add('show');
+}
+
+const hideLagCue = () => $('nbackCue').classList.remove('show');
 
 function clearCells() {
   state.stimShown = false;
@@ -205,6 +289,7 @@ function clearCells() {
     c.el.classList.remove('active', 'gate-closed');
     c.el.querySelectorAll('.cell-face').forEach(f => {
       f.style.background = ''; f.innerHTML = '';
+      LIT_VARS.forEach(k => f.style.removeProperty(k));
     });
   });
 }
@@ -242,15 +327,98 @@ function playBuzz(kind) {
   }
 }
 
+/* PeriodicWave objects are immutable and shared, so building one per trial allocates
+   for nothing. */
+const waveCache = new Map();
+function voiceWave(ctx, partials) {
+  const key = partials.join(',');
+  let w = waveCache.get(key);
+  if (!w) {
+    const real = new Float32Array(partials.length + 1);
+    const imag = new Float32Array(partials.length + 1);
+    partials.forEach((a, i) => { imag[i + 1] = a; });
+    w = ctx.createPeriodicWave(real, imag);
+    waveCache.set(key, w);
+  }
+  return w;
+}
+
+/* Split out of playTone so a voice can be rendered into an OfflineAudioContext and
+   measured — which is how the brightness ordering above was established. */
+function buildVoice(ctx, v, freq, out, t0) {
+  const osc = ctx.createOscillator();
+  osc.frequency.value = freq;
+  if (v.partials) osc.setPeriodicWave(voiceWave(ctx, v.partials));
+  else osc.type = v.osc || 'sine';
+
+  if (v.formants) {
+    /* Parallel resonances on a buzzy source, summed: that is what makes a vowel. */
+    v.formants.forEach(([ratio, q, g]) => {
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = ratio * freq; bp.Q.value = q;
+      const fg = ctx.createGain(); fg.gain.value = g;
+      osc.connect(bp); bp.connect(fg); fg.connect(out);
+    });
+  } else {
+    osc.connect(out);
+  }
+  osc.start(t0);
+  return osc;
+}
+
+/* Decoded clips, keyed voice/letter. Decoding is async, so it is kicked off when the
+   stream is switched on rather than on the trial that needs it — a letter arriving
+   after its own trial has ended is worse than no letter. */
+const letterBuffers = new Map();
+function primeLetters() {
+  if (!cfg.streams.letter || cfg.streams.letter === 'off') return;
+  const vs = cfg.letterVoice === 'mix' ? Object.keys(LETTER_VOICES) : [cfg.letterVoice];
+  vs.forEach(v => LETTER_KEYS.forEach(L => {
+    const k = v + '/' + L;
+    if (letterBuffers.has(k) || !LETTER_AUDIO[v]) return;
+    letterBuffers.set(k, 'pending');
+    const bin = atob(LETTER_AUDIO[v][L]);
+    const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    audioCtx.decodeAudioData(u.buffer)
+      .then(b => letterBuffers.set(k, b))
+      .catch(() => letterBuffers.delete(k));
+  }));
+}
+
+function playLetter(t) {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  /* "Mixed" redraws the speaker every trial, so the letter has to be heard through a
+     voice rather than remembered as a sound. It never changes the answer: identity is
+     compared on the letter index. */
+  const v = cfg.letterVoice === 'mix' ? pick(Object.keys(LETTER_VOICES)) : cfg.letterVoice;
+  const buf = letterBuffers.get(v + '/' + LETTER_KEYS[t.letter]);
+  if (!buf || buf === 'pending') return;
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const g = audioCtx.createGain();
+  g.gain.value = 0.9;
+  let tail = g;
+  if (t.pan != null && audioCtx.createStereoPanner) {
+    const pn = audioCtx.createStereoPanner();
+    pn.pan.value = PANS[t.pan];
+    g.connect(pn); tail = pn;
+  }
+  src.connect(g); tail.connect(audioCtx.destination);
+  src.start();
+}
+
 function playTone(t) {
   if (audioCtx.state === 'suspended') audioCtx.resume();
-  const osc = audioCtx.createOscillator();
+  const now = audioCtx.currentTime;
+  const set = voiceSet().voices;
+  const v = set[t.timbre != null ? t.timbre : 0] || set[0];
+
   const gain = audioCtx.createGain();
-  osc.type = t.timbre != null ? TIMBRES[t.timbre] : 'sine';
-  osc.frequency.value = t.pitch != null ? PITCHES[t.pitch] : 330;
-  gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.09, audioCtx.currentTime + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.30);
+  const peak = 0.09 * (v.level || 1);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(peak, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.30);
 
   let tail = gain;
   if (t.pan != null && audioCtx.createStereoPanner) {
@@ -258,7 +426,9 @@ function playTone(t) {
     p.pan.value = PANS[t.pan];
     gain.connect(p); tail = p;
   }
-  osc.connect(gain); tail.connect(audioCtx.destination);
-  osc.start(); osc.stop(audioCtx.currentTime + 0.32);
+  tail.connect(audioCtx.destination);
+
+  const osc = buildVoice(audioCtx, v, t.pitch != null ? PITCHES[t.pitch] : 330, gain, now);
+  osc.stop(now + 0.32);
 }
 

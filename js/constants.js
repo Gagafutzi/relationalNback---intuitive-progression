@@ -27,7 +27,56 @@ const AXIS_ORIENT = {
 
 /* Stimulus pools. Every pool is ORDERED so a relational judgement is well defined. */
 const PITCHES = [220, 293.66, 392, 523.25];                 // A3 D4 G4 C5, low → high
-const TIMBRES = ['sine', 'triangle', 'square', 'sawtooth']; // dull → bright
+/* Timbre voices. Every set is FOUR voices ordered dull → bright, because the deck
+   labels them "Brighter"/"Duller" and a relational answer is only defined on an
+   ordered scale. The ordering is by spectral centroid, measured by rendering each
+   voice offline at all four pitches rather than assumed — the first attempt at the
+   vowel set was monotone on average and scrambled at individual pitches, which is the
+   worst thing such a scale can be.
+
+   `level` equalises loudness, also measured: a square is nearly twice the RMS of a
+   sawtooth, so without it the stream would be partly answerable by volume.
+
+   `partials` are harmonic amplitudes (fundamental first) turned into a PeriodicWave,
+   which is defined in ratios and so sounds the same at every pitch. `formants` are
+   resonances given as MULTIPLES OF THE FUNDAMENTAL for the same reason: real vowels
+   use absolute frequencies, and a fixed resonance sits on a different harmonic for
+   every note, which is exactly what broke the ordering. The cost is that these read as
+   vowel colours rather than speech; the spoken-letter stream is where real voices
+   live. */
+const VOICE_SETS = {
+  waves: {
+    label: 'Waveforms',
+    voices: [
+      { osc:'sine',     level: 0.78 },
+      { osc:'triangle', level: 0.95 },
+      { osc:'square',   level: 0.65 },
+      { osc:'sawtooth', level: 1.13 },
+    ],
+  },
+  reeds: {
+    label: 'Instruments',
+    voices: [
+      { level: 0.77, partials: [1, .04, .01] },                          // flute
+      { level: 0.63, partials: [1, 0, .32, 0, .12, 0, .05] },            // clarinet
+      { level: 1.15, partials: [1, .55, .42, .34, .26, .19, .13, .09] }, // horn
+      { level: 1.77, partials: [.5, .25, .7, .4, 1, .5, .85, .6, .7] },  // bell
+    ],
+  },
+  vowels: {
+    label: 'Vowels',
+    voices: [
+      { osc:'sawtooth', level: 1.10, formants: [[0.9, 11, 3.4], [2.2, 9, 0.8]] }, // oo
+      { osc:'sawtooth', level: 1.07, formants: [[2.0, 11, 2.6], [3.4, 9, 1.4]] }, // ah
+      { osc:'sawtooth', level: 3.27, formants: [[1.6, 11, 1.8], [5.2, 9, 2.0]] }, // eh
+      { osc:'sawtooth', level: 2.49, formants: [[0.9, 11, 1.2], [7.5, 9, 2.8]] }, // ee
+    ],
+  },
+};
+/* Read live rather than snapshotted: `cfg` does not exist yet in this file, and the
+   set can change between blocks. All sets are the same length, so switching never
+   changes how many timbre levels the ladder is working with. */
+const voiceSet = () => VOICE_SETS[cfg.voiceSet] || VOICE_SETS.waves;
 const PANS    = [-0.9, -0.3, 0.3, 0.9];                     // left → right
 const COLORS  = ['#ff4d4d','#ff9f1a','#ffe14d','#4ddb6f','#4d9fff']; // warm → cool
 const SIZES   = [15, 22, 30, 40];                           // small → large
@@ -44,7 +93,7 @@ const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
 /* Stamped into every block and into the export. Testers who pick the file up at
    different times will be on different snapshots, and without this you cannot tell
    which build produced which numbers. */
-const BUILD = '2026-08-25.5';
+const BUILD = '2026-08-25.6';
 
 /* ---- Relational complexity (Halford) ----
    Difficulty defined by how many variables are bound in one representation.
@@ -150,8 +199,22 @@ const STREAMS = {
     relational: [{ id:'qty-up', glyph:'#↑', label:'More', key:'m' },
                  { id:'qty-down', glyph:'#↓', label:'Fewer', key:'v' }],
   },
+  /* The classic n-back audio channel, and the only stream here with no relational
+     form: every other stimulus is a scale with an up and a down, but letters are
+     names. "Was it the same letter" is the whole question. */
+  letter: {
+    label: 'Spoken letter', color: '#9ccc65', idOnly: true,
+    identity: [{ id:'letter', glyph:'\u{1F5E3}', label:'Same', key:'j' }],
+    relational: [],
+  },
 };
 const STREAM_KEYS = Object.keys(STREAMS);
+
+/* Eight letters, not twenty-six, and chosen to spread across both the onset and the
+   vowel: the alphabet's own rhyme groups (B/C/D/E/G/P/T/V/Z, and A/H/J/K) would turn
+   an identity judgement into a listening test. */
+const LETTER_KEYS = ['A', 'F', 'L', 'O', 'Q', 'R', 'X', 'Y'];
+const LETTER_VOICES = { slt: 'Female', rms: 'Male', awb: 'Male, Scottish', kal: 'Synthetic' };
 
 /* Extra scoring buckets that aren't user-configurable streams. */
 const EXTRA_LABELS = { position2: 'Position (screen)' };
