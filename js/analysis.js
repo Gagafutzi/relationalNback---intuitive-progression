@@ -340,7 +340,9 @@ function progressHTML() {
       <div><span class="k">Blocks</span><b>${s.blocks}</b>${
         s.rolled ? `<span class="ch-sub">+${s.rolled} rolled up</span>` : ''}</div>
       <div><span class="k">Time</span><b>${s.hours.toFixed(1)}h</b><span class="ch-sub">over ${s.days} days</span></div>
-      <div><span class="k">Load held</span><b>${s.loadHeld}</b><span class="ch-sub">at ≥${Math.round(s.crit*100)}% · best set ${s.bestLoad}</span></div>
+      <div><span class="k">Load held</span><b>${s.loadHeld || '—'}</b><span class="ch-sub">${
+        s.loadHeld ? `at ≥${Math.round(s.crit*100)}%` : `no block at ≥${Math.round(s.crit*100)}% yet`
+        }${s.bestLoad ? ` · best set ${s.bestLoad}` : ''}</span></div>
       <div><span class="k">Threshold</span><b>${thr}</b><span class="ch-sub">RC ${rcTier}, now</span></div>
     </div>
     ${speed}${sens}${bias}${vol}
