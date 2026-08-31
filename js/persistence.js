@@ -189,6 +189,14 @@ function compactPresses(keep = FULL_PRESS_BLOCKS) {
   for (let i = 0; i < cut; i++) if (b[i].presses) summarisePresses(b[i]);
 }
 
+/* Summaries are shed oldest-first too. The first version dropped them from every
+   block at once, including the block just played, which threw away far more than the
+   quota was actually asking for. */
+function dropSummaries(keep) {
+  const b = progress.blocks, cut = b.length - keep;
+  for (let i = 0; i < cut; i++) delete b[i].pressSummary;
+}
+
 /* Last resort, and the reason the old `slice(-500)` was the worst line in this file:
    it ran unconditionally on every save, with no quota problem at all, and a block
    past the cap simply ceased to exist. Blocks that genuinely have to go now leave a
@@ -247,22 +255,38 @@ function saveProgress() {
 
   if (write()) { done(null); return; }
 
-  /* Out of quota. Each step gives up strictly less than the one below it, and none
-     of them discards a block without leaving the day behind. */
-  compactPresses(10);
-  if (write()) { done('storage tight — older press logs summarised to make room'); return; }
+  /* Out of quota. Every step is retried immediately, so we stop at the first one that
+     fits instead of over-shedding, and each gives up strictly less than the next.
+     Raw logs go before summaries because they are four times the size, and both go
+     oldest-first. */
+  const shed = [
+    () => compactPresses(20),
+    () => compactPresses(0),
+    () => dropSummaries(120),
+    () => dropSummaries(20),
+    () => dropSummaries(0),
+  ];
+  for (const step of shed) {
+    step();
+    if (write()) { done('storage tight — per-press detail trimmed from older blocks'); return; }
+  }
 
-  progress.blocks.forEach(b => { delete b.pressSummary; });
-  if (write()) { done('storage tight — per-press detail dropped from older blocks'); return; }
-
-  while (progress.blocks.length > 50) {
-    rollUpBlocks(Math.max(25, progress.blocks.length >> 2));
+  /* Blocks themselves now, halving what is left each time. Nibbling 25 at a time made
+     a genuinely full quota cost dozens of serialisations to converge, and it stopped
+     at an arbitrary floor of 50 — which meant refusing to save at all rather than
+     shedding the 51st, losing the block just played into the bargain. */
+  while (progress.blocks.length > 4) {
+    rollUpBlocks(Math.max(4, progress.blocks.length >> 1));
     if (write()) {
       done(`storage full — oldest blocks folded into daily totals, ` +
            `${progress.blocks.length} kept in full. Export your JSON to keep the rest.`);
       return;
     }
   }
+  /* Daily totals and the ladder, nothing else. Still far better than a failed write,
+     which loses the block you just played as well as everything before it. */
+  rollUpBlocks(progress.blocks.length);
+  if (write()) { done('storage full — only daily totals kept. Export your JSON.'); return; }
   done('could not save — export your JSON now, before closing this tab');
 }
 
