@@ -394,33 +394,66 @@ document.addEventListener('visibilitychange', () => {
 });
 $('pauseResume').onclick = resumeFromPause;
 
-/* Debounced: cube size is vmin-based so a resize must rebuild, but mobile browsers
-   fire this continuously as the address bar hides, and each rebuild drops the
-   on-screen stimulus. */
-let resizeTimer = null;
-window.addEventListener('resize', () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    /* Only the cube box matters here. A phone fires resize for every address-bar
-       slide and for the keyboard opening, and rebuilding on each one threw away the
-       stimulus mid-trial. */
-    const box = parseFloat(getComputedStyle(cubeWrapper).width);
-    if (Math.abs(box - state.builtSize) < 0.5) return;
+/**
+ * Rebuild the lattice if the cube box is no longer the size it was built for.
+ *
+ * **The cells are absolute pixels; the frame is not.** A cell's position and size
+ * are written in px from the width read at build time, while `.cube-frame` and
+ * `.frame-face` are `inset: 0` and take whatever the box currently is. So a cube
+ * built against the wrong width does not come out uniformly small — it comes out
+ * as a correct wireframe with a shrunken lattice huddled in the middle of it,
+ * which is what a player sees and reports as "the cube isn't loading in
+ * correctly".
+ *
+ * That is the state the page booted into. `boot.js` builds the cube as soon as
+ * the scripts run, when `gridCube.clientWidth` is still 0 and the `|| 240`
+ * fallback stands in for it — and 240 is only right when `--cube-scale` is
+ * exactly 1. Nothing rebuilt afterwards, because the only trigger was a window
+ * resize and laying out a page is not one.
+ */
+function rebuildForBox() {
+  const box = parseFloat(getComputedStyle(cubeWrapper).width);
+  if (!box || Math.abs(box - state.builtSize) < 0.5) return;
 
-    buildCube(cfg.dim);
-    /* Re-render rather than just re-flagging the cell: the lattice is new DOM, so
-       colour, glyph, size and quantity are all gone and the slot would come back
-       blank. Skipped while a retro cue is up — the stimulus is meant to be hidden
-       then, and painting it back would hand over the answer. */
-    const cur = state.currentTrial;
-    if (state.running && cur && state.stimShown) {
-      /* The recorded matrix is the one the screen frame is judged against, sampled
-         at onset. Re-rendering must not re-sample it at the angle we happen to be
-         at now. */
-      const m = cur.matrix;
-      renderTrial(cur);
-      cur.matrix = m;
-    }
-  }, 160);
-});
+  buildCube(cfg.dim);
+  /* Re-render rather than just re-flagging the cell: the lattice is new DOM, so
+     colour, glyph, size and quantity are all gone and the slot would come back
+     blank. Skipped while a retro cue is up — the stimulus is meant to be hidden
+     then, and painting it back would hand over the answer. */
+  const cur = state.currentTrial;
+  if (state.running && cur && state.stimShown) {
+    /* The recorded matrix is the one the screen frame is judged against, sampled
+       at onset. Re-rendering must not re-sample it at the angle we happen to be
+       at now. */
+    const m = cur.matrix;
+    renderTrial(cur);
+    cur.matrix = m;
+  }
+}
+
+/* Debounced: mobile browsers fire resize continuously as the address bar hides,
+   and each rebuild drops the on-screen stimulus. */
+let resizeTimer = null;
+const rebuildSoon = () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(rebuildForBox, 160);
+};
+
+window.addEventListener('resize', rebuildSoon);
+
+/**
+ * The box itself, watched.
+ *
+ * A window resize is not the only way the cube changes width, and it is not even
+ * the common one: the box is `--cube-size`, which moves when the scale slider
+ * moves, when the layout switches, when a phone rotates — and, the case that
+ * matters here, when the page finishes its first layout after `boot.js` has
+ * already built a cube against a width of zero.
+ *
+ * Observing the element catches all of those, including the first, because a
+ * ResizeObserver reports the initial size as soon as it has one.
+ */
+if (typeof ResizeObserver === 'function') {
+  new ResizeObserver(rebuildSoon).observe(cubeWrapper);
+}
 
