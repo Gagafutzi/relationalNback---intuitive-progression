@@ -367,7 +367,10 @@ function showMoveArrow(axisId) {
   ma.wrap.style.transform = `${AXIS_ORIENT[axisId]} translateX(${-ma.L / 2}px)`;
   ma.wrap.style.color = ax.color;
   ma.badge.innerHTML = '';
-  const faces = addFaces(ma.badge, 24, 'ma-badge-face', ax.letter);
+  /* The badge sizes itself from the element buildMoveArrow already sized, so the
+     faces cannot drift out of the box they sit in when the cube changes size. */
+  const bs = parseFloat(ma.badge.style.width) || 21;
+  const faces = addFaces(ma.badge, bs, 'ma-badge-face', ax.letter);
   faces.forEach(f => { f.style.color = ax.color; f.style.borderColor = ax.color; });
   /* Undo the arm's rotation on the badge only, so the letter stays the right way up
      however the arrow is pointing. */

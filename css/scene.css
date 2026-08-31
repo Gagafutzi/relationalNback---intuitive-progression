@@ -230,12 +230,16 @@
   filter: drop-shadow(0 0 9px currentColor);
 }
 .move-arrow .ma-badge { position: absolute; transform-style: preserve-3d; }
+/* Filled in the axis colour rather than outlined on the background. A dark box with
+   a hairline border is unreadable at this size against a lattice, and the fill also
+   ties the letter to the shaft it sits on. */
 .move-arrow .ma-badge-face {
   position: absolute; width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 12.5px; font-weight: 700; border-radius: 5px;
+  font-size: 13px; font-weight: 700; border-radius: 5px;
   border: 1px solid currentColor;
-  background: var(--bg); user-select: none;
+  background: currentColor; color: var(--bg) !important;
+  user-select: none;
   /* Opaque with no backface, exactly as the gizmo badges: otherwise the letter on
      the far side shows through mirrored, which is the one thing that must not
      happen to a direction label. */
