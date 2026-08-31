@@ -12,6 +12,29 @@ function cardinalOf(a, b) {
   return nz.length === 1 ? [nz[0][1], Math.sign(nz[0][0])] : null;
 }
 
+/* [axis, sign] → the axis id everything else in the app speaks. Mirrors the axisJ()
+   calls below exactly: +x east, +y south (CSS +Y points DOWN), +z above. If those
+   ever disagree the deck would light one arrow and the trace name another. */
+const CARDINAL_IDS = [['west', 'east'], ['north', 'south'], ['below', 'above']];
+const cardinalId = c => c ? CARDINAL_IDS[c[0]][c[1] > 0 ? 1 : 0] : null;
+
+/* The two moves a meta-relation trial compares, plus the relation between them.
+   Null when there is no meta judgement to explain: the first comparison of a block
+   has no previous move, and a diagonal has no cardinal direction. Recomputed from
+   the trial rather than read off the judgement so it stays correct for a late press,
+   where the judgement being scored belongs to the interval that already closed. */
+function metaMoves(trial) {
+  const pair = trial && trial.pair;
+  if (!pair || !pair[0] || !pair[0].pair) return null;
+  const A = cardinalOf(pair[0].pair[0], pair[0].pair[1]);
+  const B = cardinalOf(pair[0], pair[1]);
+  if (!A || !B) return null;
+  return {
+    from: cardinalId(A), to: cardinalId(B),
+    rel: A[0] !== B[0] ? 'meta-diff' : A[1] === B[1] ? 'meta-same' : 'meta-opp',
+  };
+}
+
 function buildJudgments(a, b, extra) {
   const js = [];
   const mode = k => cfg.streams[k] || 'off';
@@ -155,6 +178,10 @@ function scoreInterval() {
     trial: state.trial,
     stimAt: state.stimAt,
     isLure: !!(state.currentTrial && state.currentTrial.isLure),
+    /* The trial these judgements belong to. A press inside the grace window is
+       scored against this interval, so the trace it triggers has to explain this
+       trial's moves and not the one already on screen. */
+    trial_: state.currentTrial,
   };
   applyInterval(snap, 1);
   state.lastSnap = snap;

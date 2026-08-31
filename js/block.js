@@ -26,7 +26,15 @@ function tick() {
        it is about to fix. */
     const snap = state.lastSnap;
     state.buzzTimer = setTimeout(() => {
-      if (snapMissed(snap)) playBuzz('miss');
+      if (!snapMissed(snap)) return;
+      playBuzz('miss');
+      /* A meta target nobody answered leaves you exactly as lost as a wrong press
+         does, so it earns the same trace. Held until the grace window shuts along
+         with the buzz — a press landing a few tens of ms late is about to turn this
+         into a non-miss. */
+      if (cfg.moveTrace && cfg.feedback !== 'off' &&
+          snap.judgments.some(j => j.correct.some(o => META_CHANNEL_IDS.has(o))))
+        showMoveTrace(snap.trial_);
     }, graceMs());
     revealAnswers();
   }
@@ -37,6 +45,9 @@ function tick() {
   state.history.push(t);
   state.currentTrial = t;
   state.trial++;
+  /* Counted in trials rather than milliseconds so the trace lasts the same amount of
+     TASK however fast the interval is set. */
+  if (state.traceUntil != null && state.trial > state.traceUntil) hideMoveTrace();
 
   const C = state.chain;
   let pair = null;
@@ -101,6 +112,7 @@ function startBlock() {
   state.presses_log = []; state.stimAt = 0;
   state.tickAt = 0; state.lastSnap = null; clearTimeout(state.buzzTimer);
   state.paused = false; state.interrupted = false;
+  hideMoveTrace();
   $('pauseVeil').classList.remove('show');
 
   /* Rotate the cued stream rather than picking at random, so every stream actually
@@ -140,6 +152,7 @@ function stopBlock(silent) {
   state.paused = false;
   clearCells();
   hideLagCue();
+  hideMoveTrace();
   if (state.sessionStart) {
     addMinutes(Date.now() - state.sessionStart);
     state.sessionStart = null;
@@ -271,6 +284,8 @@ function endBlock() {
       interval: cfg.interval, blockLength: cfg.blockLength, rotation: cfg.rotation,
       spin: cfg.spin, feedback: cfg.feedback, lureRate: cfg.lureRate,
       meta: cfg.meta, gate: cfg.gate, retro: cfg.retro, varN: cfg.varN,
+      /* An assist, so a score earned with it on is not the same score. */
+      moveTrace: !!cfg.moveTrace,
       cellVis: cfg.cellVis,
       gizmo: cfg.gizmo,
       /* Layout belongs here, not with the cosmetics: flat panels remove the depth

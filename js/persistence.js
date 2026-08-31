@@ -124,7 +124,9 @@ function loadProgress() {
                      cfg.letterVoice = p.display.letterVoice || cfg.letterVoice;
                      cfg.cubeScale = p.display.cubeScale || cfg.cubeScale;
                      if (p.display.dailyGoal != null) cfg.dailyGoal = p.display.dailyGoal;
-                     cfg.buzzer = !!p.display.buzzer; }
+                     cfg.buzzer = !!p.display.buzzer;
+                     if (p.display.moveTrace != null)
+                       cfg.moveTrace = !!p.display.moveTrace; }
     if (p.mode) cfg.mode = p.mode;
     return p;
   } catch (e) { return blank; }
@@ -141,7 +143,8 @@ function saveProgress() {
                        spinPath: cfg.spinPath, voiceSet: cfg.voiceSet,
                        letterVoice: cfg.letterVoice,
                        cubeScale: cfg.cubeScale,
-                       dailyGoal: cfg.dailyGoal, buzzer: cfg.buzzer };
+                       dailyGoal: cfg.dailyGoal, buzzer: cfg.buzzer,
+                       moveTrace: cfg.moveTrace };
   progress.stair = stairLog ? stairLog.map(v => +v.toFixed(4)) : null;
   progress.rcTier = rcTier;
   progress.profileName = activeProfile().name;

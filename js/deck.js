@@ -135,7 +135,51 @@ function renderPriorityCue() {
 const LATE_PRESS_GRACE = 260;
 const graceMs = () => Math.min(LATE_PRESS_GRACE, cfg.interval * 0.25);
 
-function pressFeedback(channelId, ok) {
+/* ---- Move trace ----
+   Only the meta-relation channels get one. Every other stream asks an independent
+   question — miss a colour and the next colour question is unaffected — but meta
+   compares this move against the move you reported last time, so an error there
+   takes the anchor with it and the rest of the block is guesswork. This hands the
+   anchor back. */
+const META_CHANNEL_IDS = new Set((STREAMS.position.meta || []).map(c => c.id));
+
+const MOVE_REL_LABEL = {
+  'meta-same': 'same direction', 'meta-opp': 'opposite', 'meta-diff': 'different axis',
+};
+
+function hideMoveTrace() {
+  $('moveTrace').classList.remove('show');
+  state.traceUntil = null;
+}
+
+/* Deliberately left up through the FOLLOWING trial, not flashed and cleared. The
+   move it names is the one the next trial has to be judged against, so the moment it
+   is most useful is after the next stimulus has already appeared. */
+function showMoveTrace(trial) {
+  const m = metaMoves(trial);
+  if (!m) return;
+  const A = AXIS[m.from], B = AXIS[m.to];
+  const rel = (STREAMS.position.meta || []).find(c => c.id === m.rel);
+  if (!A || !B || !rel) return;
+
+  const leg = ax => `<span class="mt-move" style="color:${ax.color}">` +
+                    `<b>${ax.letter}</b>${ax.name}</span>`;
+  $('moveTrace').innerHTML =
+    `<span class="mt-cap">was</span>${leg(A)}` +
+    `<span class="mt-then">then</span>${leg(B)}` +
+    `<span class="mt-rel" style="color:${rel.color}">` +
+    `<b>${rel.glyph}</b>${MOVE_REL_LABEL[m.rel]}</span>`;
+  $('moveTrace').classList.add('show');
+  state.traceUntil = state.trial + 1;
+
+  /* The arms carry the same two directions in 3D, in order, which is the part a
+     letter cannot do. Second one is delayed so it reads as a sequence rather than
+     as both axes lighting at once. */
+  flashArm(m.from);
+  setTimeout(() => flashArm(m.to), 240);
+}
+
+function pressFeedback(channelId, ok, trial) {
   const btn = deckEl.querySelector(`[data-channel="${channelId}"]`);
   if (AXIS[channelId]) flashArm(channelId);
   if (!ok) playBuzz('fa');
@@ -143,6 +187,10 @@ function pressFeedback(channelId, ok) {
     btn.classList.add(ok ? 'hit' : 'miss');
     setTimeout(() => btn.classList.remove('hit', 'miss'), 260);
   }
+  /* Suppressed under test conditions whatever the switch says — the trace is the
+     loudest feedback in the app and "None" has to mean none. */
+  if (!ok && cfg.moveTrace && cfg.feedback !== 'off' && META_CHANNEL_IDS.has(channelId))
+    showMoveTrace(trial);
 }
 
 function press(channelId) {
@@ -164,7 +212,7 @@ function press(channelId) {
       t: snap.trial, ch: channelId, ok, late: true,
       rt: snap.stimAt ? Math.round(performance.now() - snap.stimAt) : null,
     });
-    pressFeedback(channelId, ok);
+    pressFeedback(channelId, ok, snap.trial_);
     return;
   }
 
@@ -181,7 +229,7 @@ function press(channelId) {
     rt: state.stimAt ? Math.round(performance.now() - state.stimAt) : null,
   });
 
-  pressFeedback(channelId, ok);
+  pressFeedback(channelId, ok, state.currentTrial);
 }
 
 function revealAnswers() {

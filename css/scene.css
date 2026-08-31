@@ -194,3 +194,40 @@
   from { transform: scale(.9); opacity: .35; }
   to   { transform: scale(1);  opacity: 1; }
 }
+
+/* ---------- MOVE TRACE ----------
+   The two moves behind a missed meta-relation. Sits with the lag cue, between the
+   cube and the answer keys, because it is read in the same glance. Wide and quiet
+   rather than loud: it is a reference to consult during the next trial, not an
+   alarm — the buzz and the red key have already done the alarming. */
+.move-trace {
+  display: none; align-items: center; flex-wrap: wrap;
+  justify-content: center; gap: 4px 10px;
+  max-width: min(560px, 94vw);
+  padding: 6px 14px 7px; border-radius: 12px;
+  background: rgba(20, 24, 32, .6);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  border: 1px solid var(--border-inner);
+  -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
+  font-size: 12px;
+}
+.move-trace.show { display: flex; animation: move-trace-in .28s ease-out; }
+.move-trace .mt-cap, .move-trace .mt-then {
+  font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--muted);
+}
+/* The letter is the same badge the gizmo arm carries, so the eye can go from the
+   trace straight to the direction on the cube. */
+.move-trace .mt-move b, .move-trace .mt-rel b {
+  display: inline-block; margin-right: 5px;
+  font-size: 14px; font-weight: 700; line-height: 1;
+}
+.move-trace .mt-move { font-weight: 600; }
+.move-trace .mt-rel {
+  padding-left: 10px; margin-left: 2px; font-weight: 600;
+  border-left: 1px solid var(--border-inner);
+}
+@keyframes move-trace-in {
+  from { transform: translateY(4px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}

@@ -23,6 +23,10 @@ const cfg = {
   cubeScale: 1,
   dailyGoal: 20,
   buzzer: false,
+  /* Meta-relations chains: this trial's answer depends on the move you made last
+     trial, so one wrong answer costs you the anchor and every trial after it is a
+     guess. On an error the two moves are spelled out so you can rejoin. */
+  moveTrace: true,
   feedback: 'reveal',
   lureRate: 0.20,
   meta: false,        // second-order relational judgements
@@ -108,7 +112,7 @@ const state = {
   lastSnap: null,         // the interval just closed, still open to a late press
   buzzTimer: null,
   glyphMap: null, cells: [],
-  sessionStart: null, keyIndex: {},
+  sessionStart: null, keyIndex: {}, traceUntil: null,
 };
 
 /* Declared here, but only populated once the profile registry below has resolved

@@ -250,6 +250,7 @@ $('dailyGoal').oninput = e => {
   cfg.dailyGoal = Math.max(0, +e.target.value || 0);
   renderDailyTimer(); saveProgress();
 };
+$('moveTraceOn').onchange = e => { cfg.moveTrace = e.target.checked; saveProgress(); };
 $('buzzer').onchange = e => {
   cfg.buzzer = e.target.checked;
   /* Audition both, so the two error sounds are distinguishable before you meet
@@ -373,6 +374,7 @@ function pauseBlock(why) {
   state.presses.clear();
   clearCells();
   hideLagCue();
+  hideMoveTrace();
   $('retroCue').classList.remove('show');
   $('pauseText').textContent = why;
   $('pauseVeil').classList.add('show');
