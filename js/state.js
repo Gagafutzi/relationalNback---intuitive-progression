@@ -105,6 +105,9 @@ const state = {
   presses_log: [],        // {trial, ch, rt, ok} for every press in the block
   priorityStream: null,   // stream cued for extra weight this block
   paused: false, interrupted: false,
+  /* Set while `endBlock` is scoring, so the `stopBlock` it calls to tear the
+     block down does not also record it as abandoned. */
+  ending: false,
   builtSize: 0,           // cube box the lattice was last laid out for, in px
   spinKey: '',            // identity of the running spin, so a rebuild need not restart it
   stimShown: false,       // is a stimulus on screen right now (vs cleared for a retro cue)

@@ -111,7 +111,7 @@ function startBlock() {
   state.lureTally = null; state.currentTrial = null; state.cued = true;
   state.presses_log = []; state.stimAt = 0;
   state.tickAt = 0; state.lastSnap = null; clearTimeout(state.buzzTimer);
-  state.paused = false; state.interrupted = false;
+  state.paused = false; state.interrupted = false; state.ending = false;
   hideMoveArrow();
   $('pauseVeil').classList.remove('show');
 
@@ -139,6 +139,12 @@ function startBlock() {
 }
 
 function stopBlock(silent) {
+  /* Whatever was on the board goes into the record before it is torn down.
+     `state.ending` is how a finished block gets past here without being written
+     twice: `endBlock` sets it, scores the block, calls this to clean up, and
+     writes its own record afterwards. */
+  if (state.running && !state.ending) recordAbandoned();
+
   clearInterval(state.timer);
   clearTimeout(state.cueTimer);
   clearTimeout(state.buzzTimer);
@@ -160,7 +166,85 @@ function stopBlock(silent) {
   if (!silent) { state.judgments = []; updateHUD(); }
 }
 
+/**
+ * One block as it goes into the record, finished or not.
+ *
+ * Extracted so an abandoned block is recorded by the same code as a completed
+ * one. A second copy of this object literal would be a second thing to keep in
+ * step with `cfg`, and the half that got forgotten would be the half nobody
+ * looks at until they need it.
+ *
+ * `completed` is the field that keeps them apart. Everything written before it
+ * existed was a finished block by definition — nothing else was ever recorded —
+ * so a record without the field reads as completed.
+ */
+function blockRecord(completed, scored) {
+  const rts = state.presses_log.map(p => p.rt).filter(r => r != null).sort((a, b) => a - b);
+  const median = rts.length ? rts[rts.length >> 1] : null;
+
+  return {
+    ts: Date.now(), build: BUILD, mode: cfg.mode, n: cfg.n,
+    load: scored.load, score: scored.score,
+    completed: !!completed,
+    /* How far it got, against how far it was meant to. Meaningless on a
+       finished block and the whole of the story on an abandoned one. */
+    trials: state.trial || 0,
+    plannedTrials: cfg.blockLength,
+    rc: relationalComplexity(), rcTier,
+    interrupted: !!state.interrupted,
+    priority: state.priorityStream,
+    lureScore: scored.lureScore,
+    lureTrials: state.lureTally ? state.lureTally.total : 0,
+    ladder: cfg.mode === 'progression' ? { ...prog } : null,
+    /* Full config snapshot: a score is meaningless without knowing what produced it,
+       and settings drift between blocks. */
+    cfg: {
+      streams: { ...cfg.streams }, dim: cfg.dim, frame: cfg.frame,
+      interval: cfg.interval, blockLength: cfg.blockLength, rotation: cfg.rotation,
+      spin: cfg.spin, feedback: cfg.feedback, lureRate: cfg.lureRate,
+      meta: cfg.meta, gate: cfg.gate, retro: cfg.retro, varN: cfg.varN,
+      /* An assist, so a score earned with it on is not the same score. */
+      moveTrace: !!cfg.moveTrace,
+      cellVis: cfg.cellVis,
+      gizmo: cfg.gizmo,
+      /* Layout belongs here, not with the cosmetics: flat panels remove the depth
+         ambiguity entirely, so the same score means something different. */
+      layout: cfg.layout, cubeScale: cfg.cubeScale,
+    },
+    streams: Object.fromEntries(Object.entries(state.tally)
+      .map(([k, t]) => [k, { score: streamScore(t), raw: rawAcc(t), chance: chanceOf(t),
+                             hit:t.hit, miss:t.miss, fa:t.fa, cr:t.cr }])),
+    rt: { n: rts.length, median, mean: rts.length
+            ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length) : null },
+    presses: state.presses_log,
+  };
+}
+
+/**
+ * A block that was stopped rather than finished.
+ *
+ * Until now, stopping mid-block left nothing behind but the minutes: the trials
+ * you answered, the presses, the streams, all discarded because the block never
+ * reached `endBlock`. Two hundred trials of an evening spent on hard blocks you
+ * abandoned looked identical to an evening you did not train.
+ *
+ * **It is recorded and never scored.** `endBlock` is what moves the ladder, and
+ * a partial block must not: its score is over however many trials you happened
+ * to do, which is not the quantity the staircase targets, and letting a
+ * two-trial block push the interval around would make quitting a way to steer
+ * the progression. So this writes the record and touches nothing else — no
+ * `applyProgression`, no `bestLoad`, no promotion.
+ */
+function recordAbandoned() {
+  if (!state.trial) return;                 // nothing happened; nothing to keep
+  progress.blocks.push(blockRecord(false, {
+    load: computeLoad(), score: blockScore(), lureScore: lureScore(),
+  }));
+  saveProgress();
+}
+
 function endBlock() {
+  state.ending = true;
   const score = blockScore();
   const load = computeLoad();
   stopBlock(true);
@@ -270,35 +354,8 @@ function endBlock() {
   const rts = state.presses_log.map(p => p.rt).filter(r => r != null).sort((a, b) => a - b);
   const median = rts.length ? rts[rts.length >> 1] : null;
 
-  progress.blocks.push({
-    ts: Date.now(), build: BUILD, mode: cfg.mode, n: cfg.n, load, score,
-    rc: relationalComplexity(), rcTier,
-    interrupted: !!state.interrupted,
-    priority: state.priorityStream,
-    lureScore: ls, lureTrials: state.lureTally ? state.lureTally.total : 0,
-    ladder: cfg.mode === 'progression' ? { ...prog } : null,
-    /* Full config snapshot: a score is meaningless without knowing what produced it,
-       and settings drift between blocks. */
-    cfg: {
-      streams: { ...cfg.streams }, dim: cfg.dim, frame: cfg.frame,
-      interval: cfg.interval, blockLength: cfg.blockLength, rotation: cfg.rotation,
-      spin: cfg.spin, feedback: cfg.feedback, lureRate: cfg.lureRate,
-      meta: cfg.meta, gate: cfg.gate, retro: cfg.retro, varN: cfg.varN,
-      /* An assist, so a score earned with it on is not the same score. */
-      moveTrace: !!cfg.moveTrace,
-      cellVis: cfg.cellVis,
-      gizmo: cfg.gizmo,
-      /* Layout belongs here, not with the cosmetics: flat panels remove the depth
-         ambiguity entirely, so the same score means something different. */
-      layout: cfg.layout, cubeScale: cfg.cubeScale,
-    },
-    streams: Object.fromEntries(Object.entries(state.tally)
-      .map(([k, t]) => [k, { score: streamScore(t), raw: rawAcc(t), chance: chanceOf(t),
-                             hit:t.hit, miss:t.miss, fa:t.fa, cr:t.cr }])),
-    rt: { n: rts.length, median, mean: rts.length
-            ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length) : null },
-    presses: state.presses_log,
-  });
+  progress.blocks.push(blockRecord(true, { load, score, lureScore: ls }));
+  state.ending = false;
   saveProgress();
 
   if (lureNote) detail += (detail ? '<br>' : '') +
