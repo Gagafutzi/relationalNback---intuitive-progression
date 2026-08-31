@@ -16,6 +16,7 @@ const toggleSettings = () =>
 
 $('settingsBtn').onclick = toggleSettings;
 $('settingsClose').onclick = () => setSettingsOpen(false);
+$('openProgress').onclick = () => { setSettingsOpen(false); showProgress(); };
 $('modeProgression').onclick = () => setMode('progression');
 $('modeFree').onclick = () => setMode('free');
 

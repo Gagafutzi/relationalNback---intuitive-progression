@@ -53,3 +53,63 @@
 .glyph-legend.show { display: block; }
 .glyph-legend b { color: var(--text); }
 
+
+/* ---------- PROGRESS VIEW ----------
+   Charts want width the 480px report box cannot give, so the progress view opts into
+   a wider one rather than every modal growing to fit its largest tenant. */
+.modal-box.wide { max-width: 900px; }
+.modal-box.wide h3 {
+  margin: 22px 0 8px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text); border-bottom: 1px solid var(--border-inner); padding-bottom: 6px;
+}
+.modal-box.wide h3:first-of-type { margin-top: 14px; }
+.ch-sub {
+  font-size: 10.5px; letter-spacing: .02em; text-transform: none;
+  color: var(--muted); font-weight: 400; margin-left: 8px;
+}
+
+.prog-summary {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px;
+  margin: 10px 0 4px;
+}
+.prog-summary > div {
+  padding: 10px 12px; border-radius: 10px;
+  background: var(--panel-2); border: 1px solid var(--border-inner);
+}
+.prog-summary .k {
+  display: block; font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 3px;
+}
+.prog-summary b { font-size: 19px; font-variant-numeric: tabular-nums; }
+.prog-summary .ch-sub { display: block; margin: 2px 0 0; }
+
+/* preserveAspectRatio is none, so the viewBox stretches to whatever width is
+   available and the height stays put — which is what keeps the axis labels legible
+   on a phone instead of shrinking with the box. */
+.chart { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .grid  { stroke: var(--border-inner); stroke-width: 1; }
+.chart .axis  { stroke: var(--border-outer); stroke-width: 1; }
+.chart .rule  { stroke-width: 1; stroke-dasharray: 4 3; opacity: .8; }
+.chart .ln    { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
+                vector-effect: non-scaling-stroke; }
+.chart .ln.dash { stroke-dasharray: 5 4; }
+.chart .dot   { opacity: .28; }
+.chart .band  { opacity: .9; }
+.chart .ax    { fill: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.chart .rule-lab { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.chart-empty {
+  padding: 22px; text-align: center; font-size: 12.5px; color: var(--muted);
+  border: 1px dashed var(--border-inner); border-radius: 10px;
+}
+
+.ch-legend {
+  display: flex; flex-wrap: wrap; gap: 5px 14px; margin: 7px 0 0;
+  font-size: 11.5px; color: var(--muted);
+}
+.ch-legend i {
+  display: inline-block; width: 10px; height: 3px; border-radius: 2px;
+  margin-right: 6px; vertical-align: middle;
+}
+.ch-legend i.band-key { background: rgba(138, 180, 255, .5); height: 9px; border-radius: 2px; }
+.ch-note { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: 8px 0 0; }
+.modal-box.wide .ch-note b { color: var(--text); }

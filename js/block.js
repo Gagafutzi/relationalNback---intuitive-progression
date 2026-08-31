@@ -216,6 +216,17 @@ function blockRecord(completed, scored) {
                              hit:t.hit, miss:t.miss, fa:t.fa, cr:t.cr }])),
     rt: { n: rts.length, median, mean: rts.length
             ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length) : null },
+    /* The posterior AFTER this block's observation — endBlock updates the staircase
+       before it builds the record. Stored because the posterior is a single evolving
+       distribution, not a series: without a stamp per block there is no way to
+       recover what it believed at the time, short of replaying the entire ladder and
+       hoping the replay does not diverge. The interval each block was played at is a
+       good proxy and always available, but only this carries the uncertainty. */
+    ...(cfg.mode === 'progression' && tune.adapt === 'bayes' && stairLog
+        ? (() => { const ci = stairCI(0.9);
+                   return { thr: Math.round(stairThresholdMs()),
+                            thrLo: Math.round(ci[0]), thrHi: Math.round(ci[1]) }; })()
+        : {}),
     presses: state.presses_log,
   };
 }
