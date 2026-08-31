@@ -112,7 +112,7 @@ const state = {
   lastSnap: null,         // the interval just closed, still open to a late press
   buzzTimer: null,
   glyphMap: null, cells: [],
-  sessionStart: null, keyIndex: {}, traceUntil: null,
+  sessionStart: null, keyIndex: {}, traceUntil: null, moveArrowAxis: null,
 };
 
 /* Declared here, but only populated once the profile registry below has resolved

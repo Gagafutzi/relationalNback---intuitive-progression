@@ -374,7 +374,7 @@ function pauseBlock(why) {
   state.presses.clear();
   clearCells();
   hideLagCue();
-  hideMoveTrace();
+  hideMoveArrow();
   $('retroCue').classList.remove('show');
   $('pauseText').textContent = why;
   $('pauseVeil').classList.add('show');

@@ -143,40 +143,17 @@ const graceMs = () => Math.min(LATE_PRESS_GRACE, cfg.interval * 0.25);
    anchor back. */
 const META_CHANNEL_IDS = new Set((STREAMS.position.meta || []).map(c => c.id));
 
-const MOVE_REL_LABEL = {
-  'meta-same': 'same direction', 'meta-opp': 'opposite', 'meta-diff': 'different axis',
-};
-
-function hideMoveTrace() {
-  $('moveTrace').classList.remove('show');
-  state.traceUntil = null;
-}
-
 /* Deliberately left up through the FOLLOWING trial, not flashed and cleared. The
-   move it names is the one the next trial has to be judged against, so the moment it
-   is most useful is after the next stimulus has already appeared. */
-function showMoveTrace(trial) {
-  const m = metaMoves(trial);
-  if (!m) return;
-  const A = AXIS[m.from], B = AXIS[m.to];
-  const rel = (STREAMS.position.meta || []).find(c => c.id === m.rel);
-  if (!A || !B || !rel) return;
-
-  const leg = ax => `<span class="mt-move" style="color:${ax.color}">` +
-                    `<b>${ax.letter}</b>${ax.name}</span>`;
-  $('moveTrace').innerHTML =
-    `<span class="mt-cap">was</span>${leg(A)}` +
-    `<span class="mt-then">then</span>${leg(B)}` +
-    `<span class="mt-rel" style="color:${rel.color}">` +
-    `<b>${rel.glyph}</b>${MOVE_REL_LABEL[m.rel]}</span>`;
-  $('moveTrace').classList.add('show');
+   direction it draws is the one the next trial has to be judged against, so the
+   moment it is most useful is after the next stimulus has already appeared. */
+function traceMove(trial) {
+  const axisId = moveIntoTrial(trial);
+  if (!axisId) return;
+  showMoveArrow(axisId);
   state.traceUntil = state.trial + 1;
-
-  /* The arms carry the same two directions in 3D, in order, which is the part a
-     letter cannot do. Second one is delayed so it reads as a sequence rather than
-     as both axes lighting at once. */
-  flashArm(m.from);
-  setTimeout(() => flashArm(m.to), 240);
+  /* The gizmo arm for the same axis, once, so the eye is handed from the arrow
+     inside the lattice out to the label that names it. */
+  flashArm(axisId);
 }
 
 function pressFeedback(channelId, ok, trial) {
@@ -190,7 +167,7 @@ function pressFeedback(channelId, ok, trial) {
   /* Suppressed under test conditions whatever the switch says — the trace is the
      loudest feedback in the app and "None" has to mean none. */
   if (!ok && cfg.moveTrace && cfg.feedback !== 'off' && META_CHANNEL_IDS.has(channelId))
-    showMoveTrace(trial);
+    traceMove(trial);
 }
 
 function press(channelId) {

@@ -252,6 +252,7 @@ function buildCube(dim) {
   state.builtSize = size;
   buildCubeFrame(size);
   buildGuides(size);
+  buildMoveArrow(size);
   buildGizmo();
   applyCellVis();
   applyRotation();
@@ -299,6 +300,79 @@ function buildGuides(size) {
     state.rails.push(pair);
   });
   gridCube.appendChild(g);
+}
+
+/* ---- Move arrow ----
+   The direction the sequence is currently travelling, drawn through the middle of
+   the lattice after a wrong meta-relation. Built like a gizmo arm — crossed planes
+   so it never vanishes edge-on, a letter badge kept upright — but it lives inside
+   gridCube rather than in the gizmo, so it turns with the lattice and reads as a
+   vector THROUGH the cube instead of another label around the outside.
+
+   Anchored to the cube's centre, deliberately, not to the cell that was lit. It has
+   to stay up for the trial after the mistake, and by then a different cell is lit;
+   an arrow still pinned to the old slot would be pointing out of nowhere. Centred,
+   it is unmistakably a direction rather than a path between two cells. */
+function buildMoveArrow(size) {
+  const L = size * 0.78, HEAD = size * 0.11, BADGE = 24;
+  const wrap = document.createElement('div');
+  wrap.className = 'move-arrow';
+
+  [0, 90].forEach(roll => {
+    const s = document.createElement('div');
+    s.className = 'ma-shaft';
+    s.style.width = L + 'px';
+    s.style.transform = `rotateX(${roll}deg)`;
+    wrap.appendChild(s);
+
+    const h = document.createElement('div');
+    h.className = 'ma-head';
+    h.style.width = HEAD + 'px';
+    h.style.height = HEAD * 0.92 + 'px';
+    h.style.top = `${-HEAD * 0.46}px`;
+    h.style.left = L + 'px';
+    h.style.transform = `rotateX(${roll}deg)`;
+    wrap.appendChild(h);
+  });
+
+  const badge = document.createElement('div');
+  badge.className = 'ma-badge';
+  badge.style.width = badge.style.height = BADGE + 'px';
+  badge.style.left = `${L + HEAD * 0.7}px`;
+  badge.style.top = `${-BADGE / 2}px`;
+  wrap.appendChild(badge);
+
+  gridCube.appendChild(wrap);
+  state.moveArrow = { wrap, badge, L, size };
+  /* A resize rebuilds the lattice mid-trial. Put the arrow back rather than letting
+     the rebuild silently swallow the one piece of feedback the player is relying on
+     to answer the trial in front of them. */
+  if (state.moveArrowAxis && state.traceUntil != null)
+    showMoveArrow(state.moveArrowAxis);
+}
+
+function showMoveArrow(axisId) {
+  const ma = state.moveArrow, ax = AXIS[axisId];
+  if (!ma || !ax) return;
+  state.moveArrowAxis = axisId;
+  /* translateX runs along the LOCAL x, which AXIS_ORIENT has already aimed down the
+     axis — so this backs the tail up half a length and leaves the arrow centred on
+     the cube while still pointing the right way. */
+  ma.wrap.style.transform = `${AXIS_ORIENT[axisId]} translateX(${-ma.L / 2}px)`;
+  ma.wrap.style.color = ax.color;
+  ma.badge.innerHTML = '';
+  const faces = addFaces(ma.badge, 24, 'ma-badge-face', ax.letter);
+  faces.forEach(f => { f.style.color = ax.color; f.style.borderColor = ax.color; });
+  /* Undo the arm's rotation on the badge only, so the letter stays the right way up
+     however the arrow is pointing. */
+  ma.badge.style.transform = invertOrient(axisId);
+  ma.wrap.classList.add('show');
+}
+
+function hideMoveArrow() {
+  if (state.moveArrow) state.moveArrow.wrap.classList.remove('show');
+  state.moveArrowAxis = null;
+  state.traceUntil = null;
 }
 
 /* Slide the rails onto the lit cell. Translate first, then orient, so each rail

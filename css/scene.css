@@ -195,39 +195,42 @@
   to   { transform: scale(1);  opacity: 1; }
 }
 
-/* ---------- MOVE TRACE ----------
-   The two moves behind a missed meta-relation. Sits with the lag cue, between the
-   cube and the answer keys, because it is read in the same glance. Wide and quiet
-   rather than loud: it is a reference to consult during the next trial, not an
-   alarm — the buzz and the red key have already done the alarming. */
-.move-trace {
-  display: none; align-items: center; flex-wrap: wrap;
-  justify-content: center; gap: 4px 10px;
-  max-width: min(560px, 94vw);
-  padding: 6px 14px 7px; border-radius: 12px;
-  background: rgba(20, 24, 32, .6);
-  background: color-mix(in srgb, var(--panel) 78%, transparent);
-  border: 1px solid var(--border-inner);
-  -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
-  font-size: 12px;
+/* ---------- MOVE ARROW ----------
+   The direction the sequence is currently travelling, drawn through the lattice
+   after a wrong meta-relation. Heavier than the 2px gizmo shafts on purpose: those
+   are permanent scenery and this is a one-off answer to "which way am I going", so
+   it has to win the glance against a lit cell and six arms already on screen. */
+.move-arrow {
+  position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+  transform-style: preserve-3d; pointer-events: none;
+  display: none; color: #8ab4ff;
 }
-.move-trace.show { display: flex; animation: move-trace-in .28s ease-out; }
-.move-trace .mt-cap, .move-trace .mt-then {
-  font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
-  color: var(--muted);
+.move-arrow.show { display: block; animation: move-arrow-in .26s ease-out; }
+.move-arrow .ma-shaft {
+  position: absolute; height: 5px; top: -2.5px; left: 0;
+  transform-origin: 0 50%; border-radius: 3px;
+  background: currentColor;
+  filter: drop-shadow(0 0 6px currentColor);
 }
-/* The letter is the same badge the gizmo arm carries, so the eye can go from the
-   trace straight to the direction on the cube. */
-.move-trace .mt-move b, .move-trace .mt-rel b {
-  display: inline-block; margin-right: 5px;
-  font-size: 14px; font-weight: 700; line-height: 1;
+.move-arrow .ma-head {
+  position: absolute; transform-origin: 0 50%;
+  background: currentColor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+  filter: drop-shadow(0 0 6px currentColor);
 }
-.move-trace .mt-move { font-weight: 600; }
-.move-trace .mt-rel {
-  padding-left: 10px; margin-left: 2px; font-weight: 600;
-  border-left: 1px solid var(--border-inner);
+.move-arrow .ma-badge { position: absolute; transform-style: preserve-3d; }
+.move-arrow .ma-badge-face {
+  position: absolute; width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; border-radius: 5px;
+  border: 1px solid currentColor;
+  background: var(--bg); user-select: none;
+  /* Opaque with no backface, exactly as the gizmo badges: otherwise the letter on
+     the far side shows through mirrored, which is the one thing that must not
+     happen to a direction label. */
+  backface-visibility: hidden;
 }
-@keyframes move-trace-in {
-  from { transform: translateY(4px); opacity: 0; }
-  to   { transform: translateY(0);   opacity: 1; }
+@keyframes move-arrow-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }

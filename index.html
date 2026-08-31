@@ -355,14 +355,14 @@
         Turns green once you hit it.</div>
     </div>
     <div class="setting-group">
-      <label><input type="checkbox" id="moveTraceOn" style="width:auto"> Show the moves
-        after a wrong meta-relation</label>
+      <label><input type="checkbox" id="moveTraceOn" style="width:auto"> Draw the
+        current direction after a wrong meta-relation</label>
       <div class="hint">Quaternary asks how this move relates to the move you reported
         last time, so a single wrong answer takes your anchor with it and everything
-        after it is a guess. On an error the two actual moves are named above the
-        answer keys and flashed on the gizmo in order, and they stay up through the
-        next trial — which is the trial that needs them. Off restores the old
-        behaviour: you are told you were wrong and nothing else. Never shown under
+        after it is a guess. On an error an arrow is drawn through the cube along the
+        direction the sequence just travelled — the one the next trial is measured
+        against — and stays up through that trial. Off restores the old behaviour:
+        you are told you were wrong and nothing else. Never shown under
         <b>None (test conditions)</b>.</div>
     </div>
     <div class="setting-group">
@@ -538,9 +538,6 @@
     <!-- Which lag this trial is asking for. Sits between the cube and the keys
          because that is the path the eye already takes. -->
     <div class="nback-cue" id="nbackCue"><b id="nbackCueN">2</b><span>-back</span></div>
-    <!-- After a wrong meta-relation: the two moves that were actually made, so the
-         chain can be rejoined instead of guessed at for the rest of the block. -->
-    <div class="move-trace" id="moveTrace"></div>
     <div class="deck" id="deck"></div>
     <div class="controls">
       <button id="startBtn" class="primary">Start block</button>

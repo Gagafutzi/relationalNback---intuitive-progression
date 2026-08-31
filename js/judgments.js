@@ -18,21 +18,18 @@ function cardinalOf(a, b) {
 const CARDINAL_IDS = [['west', 'east'], ['north', 'south'], ['below', 'above']];
 const cardinalId = c => c ? CARDINAL_IDS[c[0]][c[1] > 0 ? 1 : 0] : null;
 
-/* The two moves a meta-relation trial compares, plus the relation between them.
-   Null when there is no meta judgement to explain: the first comparison of a block
-   has no previous move, and a diagonal has no cardinal direction. Recomputed from
-   the trial rather than read off the judgement so it stays correct for a late press,
-   where the judgement being scored belongs to the interval that already closed. */
-function metaMoves(trial) {
+/* The direction this trial's stimulus arrived from — the move you just made, as an
+   axis id. Not the pair it was compared against: where the sequence came FROM is
+   already spent, and what you need to carry forward is where it is now heading,
+   because this move is the one the trial n ahead will be measured against.
+
+   Recomputed from the trial rather than read off the judgement so it stays correct
+   for a late press, where the judgement being scored belongs to the interval that
+   already closed. Null when there is nothing to draw: the opening trials of a block
+   have no partner, and a diagonal has no cardinal direction. */
+function moveIntoTrial(trial) {
   const pair = trial && trial.pair;
-  if (!pair || !pair[0] || !pair[0].pair) return null;
-  const A = cardinalOf(pair[0].pair[0], pair[0].pair[1]);
-  const B = cardinalOf(pair[0], pair[1]);
-  if (!A || !B) return null;
-  return {
-    from: cardinalId(A), to: cardinalId(B),
-    rel: A[0] !== B[0] ? 'meta-diff' : A[1] === B[1] ? 'meta-same' : 'meta-opp',
-  };
+  return pair ? cardinalId(cardinalOf(pair[0], pair[1])) : null;
 }
 
 function buildJudgments(a, b, extra) {

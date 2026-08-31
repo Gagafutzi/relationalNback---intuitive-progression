@@ -34,7 +34,7 @@ function tick() {
          into a non-miss. */
       if (cfg.moveTrace && cfg.feedback !== 'off' &&
           snap.judgments.some(j => j.correct.some(o => META_CHANNEL_IDS.has(o))))
-        showMoveTrace(snap.trial_);
+        traceMove(snap.trial_);
     }, graceMs());
     revealAnswers();
   }
@@ -47,7 +47,7 @@ function tick() {
   state.trial++;
   /* Counted in trials rather than milliseconds so the trace lasts the same amount of
      TASK however fast the interval is set. */
-  if (state.traceUntil != null && state.trial > state.traceUntil) hideMoveTrace();
+  if (state.traceUntil != null && state.trial > state.traceUntil) hideMoveArrow();
 
   const C = state.chain;
   let pair = null;
@@ -112,7 +112,7 @@ function startBlock() {
   state.presses_log = []; state.stimAt = 0;
   state.tickAt = 0; state.lastSnap = null; clearTimeout(state.buzzTimer);
   state.paused = false; state.interrupted = false;
-  hideMoveTrace();
+  hideMoveArrow();
   $('pauseVeil').classList.remove('show');
 
   /* Rotate the cued stream rather than picking at random, so every stream actually
@@ -152,7 +152,7 @@ function stopBlock(silent) {
   state.paused = false;
   clearCells();
   hideLagCue();
-  hideMoveTrace();
+  hideMoveArrow();
   if (state.sessionStart) {
     addMinutes(Date.now() - state.sessionStart);
     state.sessionStart = null;
