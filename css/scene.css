@@ -197,32 +197,43 @@
 
 /* ---------- MOVE ARROW ----------
    The direction the sequence is currently travelling, drawn through the lattice
-   after a wrong meta-relation. Heavier than the 2px gizmo shafts on purpose: those
-   are permanent scenery and this is a one-off answer to "which way am I going", so
-   it has to win the glance against a lit cell and six arms already on screen. */
+   after a wrong meta-relation.
+
+   The hard part is that it shares a line AND a colour with the gizmo arm for the
+   same axis — both run out of the cube's centre along that axis — so position and
+   hue can do none of the separating. Three things do it instead: real weight
+   (roughly four times the arm's), a white core down the middle of the shaft that
+   nothing else on screen has, and a slow pulse. Motion is what actually wins the
+   glance against static scenery. */
 .move-arrow {
   position: absolute; left: 50%; top: 50%; width: 0; height: 0;
   transform-style: preserve-3d; pointer-events: none;
   display: none; color: #8ab4ff;
 }
-.move-arrow.show { display: block; animation: move-arrow-in .26s ease-out; }
+.move-arrow.show {
+  display: block;
+  animation: move-arrow-in .22s ease-out, move-arrow-pulse 1.15s ease-in-out .22s infinite;
+}
 .move-arrow .ma-shaft {
-  position: absolute; height: 5px; top: -2.5px; left: 0;
-  transform-origin: 0 50%; border-radius: 3px;
+  position: absolute; left: 0; transform-origin: 0 50%; border-radius: 99px;
+  /* Axis colour at the edges, white through the middle. The arms are flat colour,
+     so the core is the one cue that survives them being the same hue. */
   background: currentColor;
-  filter: drop-shadow(0 0 6px currentColor);
+  background: linear-gradient(to bottom,
+    currentColor 0%, #fff 34%, #fff 66%, currentColor 100%);
+  filter: drop-shadow(0 0 9px currentColor);
 }
 .move-arrow .ma-head {
   position: absolute; transform-origin: 0 50%;
-  background: currentColor;
+  background: #fff;
   clip-path: polygon(0 0, 100% 50%, 0 100%);
-  filter: drop-shadow(0 0 6px currentColor);
+  filter: drop-shadow(0 0 9px currentColor);
 }
 .move-arrow .ma-badge { position: absolute; transform-style: preserve-3d; }
 .move-arrow .ma-badge-face {
   position: absolute; width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px; font-weight: 700; border-radius: 5px;
+  font-size: 12.5px; font-weight: 700; border-radius: 5px;
   border: 1px solid currentColor;
   background: var(--bg); user-select: none;
   /* Opaque with no backface, exactly as the gizmo badges: otherwise the letter on
@@ -230,7 +241,7 @@
      happen to a direction label. */
   backface-visibility: hidden;
 }
-@keyframes move-arrow-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
+@keyframes move-arrow-in { from { opacity: 0; } to { opacity: 1; } }
+/* Gentle, and only ever up for one trial after a mistake — enough to be found
+   without becoming something you have to work to ignore. */
+@keyframes move-arrow-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .58; } }

@@ -314,7 +314,11 @@ function buildGuides(size) {
    an arrow still pinned to the old slot would be pointing out of nowhere. Centred,
    it is unmistakably a direction rather than a path between two cells. */
 function buildMoveArrow(size) {
-  const L = size * 0.78, HEAD = size * 0.11, BADGE = 24;
+  /* Sized off the cube, not fixed: the gizmo arm for the same axis runs along the
+     very same line in the very same colour, so the only thing separating the two is
+     weight. A 2px arm against a 5px arrow read as one slightly thicker arm. */
+  const L = size * 0.72, HEAD = size * 0.17, BADGE = 21;
+  const THICK = Math.max(7, size * 0.035);
   const wrap = document.createElement('div');
   wrap.className = 'move-arrow';
 
@@ -322,6 +326,8 @@ function buildMoveArrow(size) {
     const s = document.createElement('div');
     s.className = 'ma-shaft';
     s.style.width = L + 'px';
+    s.style.height = THICK + 'px';
+    s.style.top = `${-THICK / 2}px`;
     s.style.transform = `rotateX(${roll}deg)`;
     wrap.appendChild(s);
 
