@@ -132,8 +132,82 @@ function loadProgress() {
   } catch (e) { return blank; }
 }
 
+/* ---- Press-log compaction ----
+   A block's raw press log is by far the biggest thing in a record: roughly 40 bytes
+   per press against ~700 for everything else combined. That made it the first thing
+   quota pressure reached for, and it used to be deleted outright — throwing away the
+   only per-trial data the app ever collects. Reaction-time SPREAD (which moves before
+   accuracy does), which channel specifically you get wrong, whether you decay across
+   a block: all of it, gone, with a one-line warning in a collapsed panel.
+
+   None of those questions actually need the raw log. They need a summary about a
+   fifth the size, so the log is summarised instead of dropped. */
+function quantiles(sorted, qs) {
+  if (!sorted.length) return null;
+  return qs.map(q => {
+    const i = (sorted.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i);
+    return Math.round(sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo));
+  });
+}
+
+function summarisePresses(b) {
+  const p = b.presses;
+  if (!Array.isArray(p)) return;
+  const rts = p.map(x => x.rt).filter(r => r != null).sort((a, c) => a - c);
+
+  /* Accuracy by position in the block, in thirds. Keeps "do I fade, and is my block
+     length right for me" answerable once the per-trial rows are gone. */
+  const span = Math.max(1, b.trials || b.plannedTrials || 1);
+  const thirds = [[0, 0], [0, 0], [0, 0]];
+  const ch = {};
+  p.forEach(x => {
+    const k = Math.max(0, Math.min(2, Math.floor(((x.t || 1) - 1) / span * 3)));
+    thirds[k][0]++; if (x.ok) thirds[k][1]++;
+    const c = ch[x.ch] || (ch[x.ch] = [0, 0, []]);
+    c[0]++; if (x.ok) c[1]++; if (x.rt != null) c[2].push(x.rt);
+  });
+
+  b.pressSummary = {
+    n: p.length,
+    late: p.filter(x => x.late).length,
+    rt: quantiles(rts, [0.1, 0.25, 0.5, 0.75, 0.9]),   // the median alone hid the spread
+    thirds,                                            // [[n, ok] × 3]
+    ch: Object.fromEntries(Object.entries(ch).map(([k, c]) => {
+      c[2].sort((a, d) => a - d);
+      return [k, [c[0], c[1], c[2].length ? c[2][c[2].length >> 1] : null]];   // n, ok, median rt
+    })),
+  };
+  delete b.presses;
+}
+
+/* Raw logs survive for the most recent blocks and become summaries behind them. Run
+   on EVERY save rather than only once the quota is gone: a bounded steady state means
+   the wall is never reached, and reaching it is what used to cost whole blocks. */
+const FULL_PRESS_BLOCKS = 60;
+function compactPresses(keep = FULL_PRESS_BLOCKS) {
+  const b = progress.blocks, cut = b.length - keep;
+  for (let i = 0; i < cut; i++) if (b[i].presses) summarisePresses(b[i]);
+}
+
+/* Last resort, and the reason the old `slice(-500)` was the worst line in this file:
+   it ran unconditionally on every save, with no quota problem at all, and a block
+   past the cap simply ceased to exist. Blocks that genuinely have to go now leave a
+   per-day line behind, so a year of training can never read as though it did not
+   happen. Sums, not means — that is what merges when the next block folds in. */
+function rollUpBlocks(n) {
+  const roll = progress.rollup || (progress.rollup = {});
+  progress.blocks.splice(0, n).forEach(b => {
+    const d = new Date(b.ts || Date.now()).toISOString().slice(0, 10);
+    const r = roll[d] || (roll[d] = { blocks: 0, trials: 0, scoreSum: 0, loadSum: 0, bestLoad: 0 });
+    r.blocks++;
+    r.trials += b.trials || b.plannedTrials || 0;
+    r.scoreSum += b.score || 0;
+    r.loadSum += b.load || 0;
+    r.bestLoad = Math.max(r.bestLoad, b.load || 0);
+  });
+}
+
 function saveProgress() {
-  if (progress.blocks.length > 500) progress.blocks = progress.blocks.slice(-500);
   progress.build = BUILD;
   progress.prog = prog; progress.tune = tune;
   progress.freeCfg = freeCfg; progress.mode = cfg.mode;
@@ -157,31 +231,39 @@ function saveProgress() {
     [k, { prog: v.prog, tune: v.tune,
           stair: v.stair ? v.stair.map(x => +x.toFixed(4)) : null }]));
 
-  try {
-    localStorage.setItem(storeKey(), JSON.stringify(progress));
-    progress.saveWarning = null;
-  } catch (e) {
-    /* Out of quota. Shed the bulkiest thing (raw per-press logs on older blocks)
-       and retry rather than silently losing every block from here on — an invisible
-       stop would quietly wipe out a whole test round. */
-    try {
-      const keep = 25;
-      progress.blocks.forEach((b, i) => {
-        if (i < progress.blocks.length - keep) delete b.presses;
-      });
-      localStorage.setItem(storeKey(), JSON.stringify(progress));
-      progress.saveWarning = 'storage full — dropped raw press logs from older blocks';
-    } catch (e2) {
-      try {
-        progress.blocks = progress.blocks.slice(-100);
-        localStorage.setItem(storeKey(), JSON.stringify(progress));
-        progress.saveWarning = 'storage full — kept only the last 100 blocks';
-      } catch (e3) {
-        progress.saveWarning = 'could not save — export your JSON before closing';
-      }
+  compactPresses();
+
+  const write = () => {
+    try { localStorage.setItem(storeKey(), JSON.stringify(progress)); return true; }
+    catch (e) { return false; }
+  };
+  /* Re-rendering only when the message actually changes: saveProgress runs on every
+     settings keystroke, and a panel rebuild per keystroke is its own bug. */
+  const done = warning => {
+    const changed = progress.saveWarning !== warning;
+    progress.saveWarning = warning;
+    if (changed) renderDataPanel();
+  };
+
+  if (write()) { done(null); return; }
+
+  /* Out of quota. Each step gives up strictly less than the one below it, and none
+     of them discards a block without leaving the day behind. */
+  compactPresses(10);
+  if (write()) { done('storage tight — older press logs summarised to make room'); return; }
+
+  progress.blocks.forEach(b => { delete b.pressSummary; });
+  if (write()) { done('storage tight — per-press detail dropped from older blocks'); return; }
+
+  while (progress.blocks.length > 50) {
+    rollUpBlocks(Math.max(25, progress.blocks.length >> 2));
+    if (write()) {
+      done(`storage full — oldest blocks folded into daily totals, ` +
+           `${progress.blocks.length} kept in full. Export your JSON to keep the rest.`);
+      return;
     }
-    renderDataPanel();
   }
+  done('could not save — export your JSON now, before closing this tab');
 }
 
 const today = () => new Date().toISOString().slice(0, 10);

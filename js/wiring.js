@@ -159,6 +159,8 @@ $('copyJson').onclick = async () => {
   const txt = exportPayload();
   try {
     await navigator.clipboard.writeText(txt);
+    markExported();
+    /* After renderDataPanel, or the panel it just rebuilt would overwrite this. */
     $('dataStatus').textContent = `Copied ${Math.round(txt.length / 1024)} KB to clipboard.`;
   } catch (e) {
     /* Clipboard needs a secure context; file:// and some browsers refuse it. */

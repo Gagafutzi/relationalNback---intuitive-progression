@@ -288,8 +288,27 @@ function renderDataPanel() {
   if (!st) return;
   const n = progress.blocks.length;
   const days = Object.keys(progress.dailyMinutes || {}).length;
+  const rolled = Object.values(progress.rollup || {}).reduce((s2, r) => s2 + r.blocks, 0);
+  const detail = progress.blocks.filter(b => b.presses || b.pressSummary).length;
+
+  /* Nagging in proportion to what is actually at risk: silent on a fresh profile,
+     a note once there is a week of work in there, red once it is a fortnight old. */
+  const since = progress.lastExport ? Date.now() - progress.lastExport : null;
+  let backup;
+  if (!n) backup = '';
+  else if (since == null)
+    backup = `<br><span style="color:${n >= 10 ? '#ff6b6b' : 'inherit'}">` +
+             `Never exported. This record only exists in this browser.</span>`;
+  else if (since > 14 * DAY_MS)
+    backup = `<br><span style="color:#ff6b6b">Last export ${AGE_LABEL(since)} — ` +
+             `everything since then exists only in this browser.</span>`;
+  else backup = `<br>Last export ${AGE_LABEL(since)}.`;
+
   st.innerHTML = `Build <b>${BUILD}</b> · ${n} block${n === 1 ? '' : 's'} recorded` +
     ` over ${days} day${days === 1 ? '' : 's'}` +
+    (detail < n ? ` · ${detail} with per-press detail` : '') +
+    (rolled ? ` · ${rolled} older folded into daily totals` : '') +
+    backup +
     (progress.saveWarning ? `<br><span style="color:#ff6b6b">${progress.saveWarning}</span>` : '');
 }
 
@@ -332,8 +351,25 @@ function downloadJSON() {
   a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  markExported();
   return name;
 }
+
+/* The whole record lives in localStorage, which one "clear site data" wipes without
+   asking. Nothing in the app ever mentioned that, so a copy off-device was something
+   you had to think of yourself. Stamping the exports is what lets the panel say how
+   long it has been. */
+function markExported() {
+  progress.lastExport = Date.now();
+  saveProgress();
+  renderDataPanel();
+}
+
+const DAY_MS = 86400000;
+const AGE_LABEL = ms => {
+  const d = Math.floor(ms / DAY_MS);
+  return d < 1 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
+};
 
 function importJSON(text) {
   const parsed = JSON.parse(text);
