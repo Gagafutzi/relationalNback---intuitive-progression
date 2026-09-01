@@ -474,6 +474,7 @@ function applyFree() {
     spin: freeCfg.spin,
     blockLength: freeCfg.blockLength,
   });
+  restoreFixedGlyphMap();
   /* A retro trial spends its first stretch showing the stimulus and locks responses
      until the cue, so it needs a floor the plain task doesn't. */
   if (cfg.retro > 0) cfg.interval = Math.max(RETRO_MIN_INTERVAL, cfg.interval);

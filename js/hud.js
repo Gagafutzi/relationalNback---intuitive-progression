@@ -155,7 +155,20 @@ function shuffleGlyphMap() {
   const keys = [...GLYPH_SET_KEYS].sort(() => Math.random() - 0.5);
   state.glyphMap = {};
   keys.forEach((k, i) => { state.glyphMap[k] = pos[i]; });
+  /* The one place the remembered map is defined. Free Play with the setting on is the
+     only thing entitled to define it; every other mode just consumes it. */
+  if (cfg.mode === 'free' && freeCfg.fixedGlyphMap) progress.glyphMap = state.glyphMap;
   renderGlyphLegend();
+}
+
+/* Entering Free Play with a fixed map: put the saved one back before anything else
+   runs. A progression session in between has reshuffled the in-memory map, and
+   without this the next save wrote THAT over the map the setting exists to keep. */
+function restoreFixedGlyphMap() {
+  if (cfg.fixedGlyphMap && progress.glyphMap) {
+    state.glyphMap = progress.glyphMap;
+    renderGlyphLegend();
+  }
 }
 
 function glyphMapHTML() {

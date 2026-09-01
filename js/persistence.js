@@ -235,13 +235,11 @@ function saveProgress() {
   progress.stair = stairLog ? stairLog.map(v => +v.toFixed(4)) : null;
   progress.rcTier = rcTier;
   progress.profileName = activeProfile().name;
-  /* Only Free Play owns the remembered map. Progression reshuffles by design, and
-     writing through from there would overwrite the very map this setting exists to
-     preserve — so a progression session leaves the saved one alone entirely. */
-  if (cfg.mode === 'free') {
-    if (freeCfg.fixedGlyphMap && state.glyphMap) progress.glyphMap = state.glyphMap;
-    else delete progress.glyphMap;
-  }
+  /* progress.glyphMap is deliberately NOT written here. It is written where the map
+     is created (shuffleGlyphMap) and deleted where the setting is turned off, so a
+     progression session — which reshuffles the in-memory map every time — can never
+     save its own map over the one Free Play is holding. Keying this off whatever
+     state.glyphMap happened to contain is exactly how that used to happen. */
   tierState(rcTier).prog = { ...prog };
   tierState(rcTier).stair = stairLog ? stairLog.slice() : null;
   tierState(rcTier).tune = { ...tune };
