@@ -37,7 +37,15 @@ const cfg = {
   retro: 0,           // 0 = off, else how many lags the post-cue can name
   varN: 0,            // 0 = fixed N, else the ± spread the per-trial lag is drawn in
   varPriority: true,  // cue one stream to prioritise per block
+  fixedGlyphMap: false,   // live rule; Progression forces it off, see applyProgression
 };
+
+/* What Progression owns that the ladder does not decide for it. Symmetric with
+   freeCfg below, and it exists because the asymmetry was a bug: Progression had no
+   copy of its own, so its Feedback control wrote straight to cfg — which the first
+   visit to Free Play then overwrote, silently and permanently. It was never saved
+   either, so it reset on every reload. */
+const progCfg = { feedback: 'reveal' };
 
 /* Free Play keeps its own settings so switching modes doesn't clobber either one. */
 const freeCfg = {

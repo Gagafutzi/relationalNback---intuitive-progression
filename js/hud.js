@@ -139,7 +139,14 @@ function showReport(score, verdict, headline, detail, milestone, load) {
    learned instead of re-memorised every session. That makes the glyph stream markedly
    easier, which is the point of it being opt-in. */
 function ensureGlyphMap() {
-  if (freeCfg.fixedGlyphMap && state.glyphMap) { renderGlyphLegend(); return; }
+  if (cfg.fixedGlyphMap) {
+    /* The SAVED map, not merely whatever is in memory: Progression reshuffles every
+       session, so a detour through it leaves state.glyphMap holding a map Free Play
+       never asked for. Restoring from the record is what makes "fixed" actually
+       fixed across a mode switch. */
+    if (progress.glyphMap) { state.glyphMap = progress.glyphMap; renderGlyphLegend(); return; }
+    if (state.glyphMap) { renderGlyphLegend(); return; }
+  }
   shuffleGlyphMap();
 }
 

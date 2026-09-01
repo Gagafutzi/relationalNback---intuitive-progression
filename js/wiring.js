@@ -43,7 +43,11 @@ numIn('nAfterStimulus', v => tune.nAfterStimulus = Math.max(1, Math.round(v)));
 numIn('blockLengthP',   v => tune.blockLength = Math.max(5, Math.round(v)));
 
 $('feedbackMode').onchange = e => {
-  cfg.feedback = e.target.value; renderGlyphLegend(); saveProgress();
+  /* Into Progression's own bag first, then into the live config — writing only the
+     live one is what let Free Play overwrite this setting and keep it. */
+  progCfg.feedback = e.target.value;
+  cfg.feedback = e.target.value;
+  renderGlyphLegend(); saveProgress();
 };
 
 /* --- appearance --- */
@@ -75,6 +79,7 @@ $('rcTier').onchange = e => {
 
 $('fixedGlyphMap').onchange = e => {
   freeCfg.fixedGlyphMap = e.target.checked;
+  cfg.fixedGlyphMap = e.target.checked;
   /* Turning it on pins whatever map is current; turning it off drops the stored one
      so the next session reshuffles as normal. */
   if (!freeCfg.fixedGlyphMap) { delete progress.glyphMap; state.glyphMap = null; }
@@ -83,8 +88,11 @@ $('fixedGlyphMap').onchange = e => {
 };
 
 $('varPriority').onchange = e => {
+  /* Through applyFree like every other Free Play control, rather than reaching into
+     cfg directly — Progression forces this on, and a direct write left the live
+     config disagreeing with the mode until the next apply. */
   freeCfg.varPriority = e.target.checked;
-  cfg.varPriority = e.target.checked;
+  applyFree();
   if (!cfg.varPriority) { state.priorityStream = null; renderPriorityCue(); }
   saveProgress();
 };

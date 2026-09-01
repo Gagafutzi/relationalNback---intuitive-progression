@@ -192,7 +192,7 @@ function renderLadderState() {
 }
 
 function syncSettingsUI() {
-  $('feedbackMode').value = cfg.feedback;
+  $('feedbackMode').value = progCfg.feedback;
   $('feedbackModeF').value = freeCfg.feedback;
   $('adaptMode').value = tune.adapt;
   $('startInterval').value = tune.startInterval / 1000;
@@ -380,6 +380,7 @@ function importJSON(text) {
   if (progress.prog) Object.assign(prog, progress.prog);
   if (progress.tune) Object.assign(tune, progress.tune);
   if (progress.freeCfg) Object.assign(freeCfg, progress.freeCfg);
+  if (progress.progCfg) Object.assign(progCfg, progress.progCfg);
   if (progress.keyBinds) keyBinds = progress.keyBinds;
   if (progress.actionBinds) actionBinds = progress.actionBinds;
   if (Array.isArray(progress.stair) && progress.stair.length === STAIR.steps)

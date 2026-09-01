@@ -419,46 +419,61 @@ function applyProgression() {
     ? Math.max(600, tune.targetInterval * 0.75) : tune.targetInterval;
   prog.interval = Math.min(Math.max(prog.interval, floor), tune.maxInterval);
 
-  cfg.streams = {};
-  STREAM_KEYS.forEach(k => cfg.streams[k] = 'off');
-  PROG_STREAMS.slice(0, prog.streamCount).forEach(s => cfg.streams[s.key] = s.mode);
+  const streams = {};
+  STREAM_KEYS.forEach(k => streams[k] = 'off');
+  PROG_STREAMS.slice(0, prog.streamCount).forEach(s => streams[s.key] = s.mode);
 
-  cfg.n = prog.n;
-  cfg.interval = prog.interval;
-  cfg.lureRate = prog.lureRate;
-  cfg.meta = rcTier >= 4;          // the tier IS the relational-complexity level
-  cfg.gate = 0; cfg.retro = 0; cfg.varN = 0;   // Free Play only, for now
-  cfg.varPriority = true;
-  cfg.dim = 3;
-  cfg.frame = 'cube';
-  cfg.rotation = prog.spinLevel > 0;
-  cfg.spin = prog.spinLevel > 0 ? levels[prog.spinLevel] : 60;
-  cfg.blockLength = tune.blockLength;
+  /* One assign of the whole task, from the same field list applyFree writes. Setting
+     them line by line is how cfg.feedback came to be written by one mode and not the
+     other: nothing about a missing line looks wrong until you are in the other mode
+     wondering why your setting changed. */
+  Object.assign(cfg, {
+    streams,
+    n: prog.n,
+    interval: prog.interval,
+    lureRate: prog.lureRate,
+    feedback: progCfg.feedback,
+    meta: rcTier >= 4,             // the tier IS the relational-complexity level
+    /* Free Play only. Each of these changes how hard the task is, and a ladder has to
+       mean the same thing at every rung — a fixed symbol map in particular makes the
+       glyph stream markedly easier, which is exactly why it is opt-in. */
+    gate: 0, retro: 0, varN: 0, fixedGlyphMap: false,
+    varPriority: true,
+    dim: 3,
+    frame: 'cube',
+    rotation: prog.spinLevel > 0,
+    spin: prog.spinLevel > 0 ? levels[prog.spinLevel] : 60,
+    blockLength: tune.blockLength,
+  });
 
   if (cfg.streams.glyph === 'relational' && !state.glyphMap) ensureGlyphMap();
   onConfigChanged();
 }
 
 function applyFree() {
-  cfg.streams = { ...freeCfg.streams };
-  cfg.n = freeCfg.n;
-  cfg.interval = freeCfg.interval;
-  cfg.dim = freeCfg.dim;
-  cfg.frame = freeCfg.frame;
-  cfg.rotation = freeCfg.rotation;
-  cfg.spin = freeCfg.spin;
-  cfg.blockLength = freeCfg.blockLength;
-  cfg.feedback = freeCfg.feedback;
-  cfg.lureRate = freeCfg.lureRate;
-  cfg.varPriority = !!freeCfg.varPriority;
-  cfg.meta = !!freeCfg.meta;
-  cfg.gate = freeCfg.gate;
+  const meta = !!freeCfg.meta;
   /* Meta and retro-cue ask incompatible questions of the same trial — meta needs a
      fixed n-back pairing to have a "previous move" at all. */
-  cfg.retro = cfg.meta ? 0 : freeCfg.retro;
+  const retro = meta ? 0 : freeCfg.retro;
   /* A retro trial is told which pair to report, so it has already replaced the
      n-back rule — there is no lag left for a variable one to vary. */
-  cfg.varN = cfg.retro > 0 ? 0 : freeCfg.varN;
+  const varN = retro > 0 ? 0 : freeCfg.varN;
+
+  Object.assign(cfg, {
+    streams: { ...freeCfg.streams },
+    n: freeCfg.n,
+    interval: freeCfg.interval,
+    lureRate: freeCfg.lureRate,
+    feedback: freeCfg.feedback,
+    meta, gate: freeCfg.gate, retro, varN,
+    fixedGlyphMap: !!freeCfg.fixedGlyphMap,
+    varPriority: !!freeCfg.varPriority,
+    dim: freeCfg.dim,
+    frame: freeCfg.frame,
+    rotation: freeCfg.rotation,
+    spin: freeCfg.spin,
+    blockLength: freeCfg.blockLength,
+  });
   /* A retro trial spends its first stretch showing the stimulus and locks responses
      until the cue, so it needs a floor the plain task doesn't. */
   if (cfg.retro > 0) cfg.interval = Math.max(RETRO_MIN_INTERVAL, cfg.interval);
