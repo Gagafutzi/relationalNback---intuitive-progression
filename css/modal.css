@@ -113,3 +113,23 @@
 .ch-legend i.band-key { background: rgba(138, 180, 255, .5); height: 9px; border-radius: 2px; }
 .ch-note { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: 8px 0 0; }
 .modal-box.wide .ch-note b { color: var(--text); }
+
+/* ---------- AUTO-ADVANCE COUNTDOWN ----------
+   Under the report and above the button, where the eye already ends up. Hidden
+   entirely when the feature is off, rather than sitting there at zero. */
+.auto-next { display: none; margin-top: 14px; }
+.auto-next.show { display: block; }
+.auto-next .an-track {
+  height: 4px; border-radius: 3px; overflow: hidden;
+  background: rgba(255, 255, 255, .09);
+}
+.auto-next .an-fill {
+  display: block; height: 100%; width: 100%;
+  background: var(--accent, #4d7fd6);
+  /* No transition: the bar is repainted every 100ms and a transition would make it
+     lag its own countdown. */
+}
+.auto-next .an-cap {
+  margin-top: 6px; font-size: 11.5px; color: var(--muted); text-align: center;
+}
+.auto-next .an-cap b { color: var(--text); font-variant-numeric: tabular-nums; }

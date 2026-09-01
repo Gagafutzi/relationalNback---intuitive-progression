@@ -355,6 +355,8 @@ function progressHTML() {
 }
 
 function showProgress() {
+  /* Escape closes any modal without going through its button, so the wide class is
+     cleared on the way IN as well — otherwise the next report inherits a 900px box. */
   modalBox.classList.add('wide');
   modalBox.innerHTML = progressHTML() +
     `<button class="cta" id="progClose">Close</button>`;

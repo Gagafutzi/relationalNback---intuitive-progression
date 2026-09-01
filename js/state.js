@@ -27,6 +27,9 @@ const cfg = {
      trial, so one wrong answer costs you the anchor and every trial after it is a
      guess. On an error the two moves are spelled out so you can rejoin. */
   moveTrace: true,
+  /* Seconds to wait on the report before the next block starts itself, or 0 for the
+     old behaviour of waiting to be told. */
+  autoAdvance: 0,
   feedback: 'reveal',
   lureRate: 0.20,
   meta: false,        // second-order relational judgements
@@ -116,6 +119,7 @@ const state = {
   buzzTimer: null,
   glyphMap: null, cells: [],
   sessionStart: null, keyIndex: {}, traceUntil: null, moveArrowAxis: null,
+  autoTimer: null, autoAt: 0,
 };
 
 /* Declared here, but only populated once the profile registry below has resolved

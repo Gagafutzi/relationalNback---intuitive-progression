@@ -258,6 +258,7 @@ function syncSettingsUI() {
   $('dailyGoal').value = cfg.dailyGoal || 0;
   $('buzzer').checked = !!cfg.buzzer;
   $('moveTraceOn').checked = !!cfg.moveTrace;
+  $('autoAdvance').value = String(cfg.autoAdvance || 0);
   $('cubeSize').value = Math.round((cfg.cubeScale || 1) * 100);
   $('cubeSizeVal').textContent = Math.round((cfg.cubeScale || 1) * 100);
   document.documentElement.style.setProperty('--cube-scale', cfg.cubeScale || 1);

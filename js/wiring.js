@@ -8,6 +8,9 @@
    floating ⚙ button while it is — the button is fixed at the top-left, exactly where
    the panel's own header goes, and it used to sit on top of the first control. */
 function setSettingsOpen(open) {
+  /* Opening settings is unambiguously "not right now" — let a block start itself
+     while someone is halfway through changing what it will be is nobody's intent. */
+  if (open) cancelAutoAdvance();
   $('settingsPanel').classList.toggle('open', open);
   document.body.classList.toggle('settings-open', open);
 }
@@ -254,6 +257,7 @@ $('dailyGoal').oninput = e => {
   renderDailyTimer(); saveProgress();
 };
 $('moveTraceOn').onchange = e => { cfg.moveTrace = e.target.checked; saveProgress(); };
+$('autoAdvance').onchange = e => { cfg.autoAdvance = +e.target.value || 0; saveProgress(); };
 $('buzzer').onchange = e => {
   cfg.buzzer = e.target.checked;
   /* Audition both, so the two error sounds are distinguishable before you meet
@@ -298,9 +302,22 @@ $('stopBtn').onclick = () => stopBlock(false);
    nothing to pause. Stop is deliberately unguarded — pressing it with no block in
    progress clears the last block's feedback off the HUD, which is the behaviour it
    has always had. */
+const modalOpen = () => modalEl.classList.contains('open');
+/* Every modal carries exactly one primary button, so Enter can press whichever one is
+   showing rather than needing to know which modal it is. That keeps the progress view
+   closing on Enter instead of starting a block, while the report still advances and
+   the symbol-map screen still begins — each modal's own handler decides. */
+const modalCta = () => modalEl.querySelector('.cta');
+
 const ACTION_RUN = {
-  start:    () => { if (!state.running) $('startBtn').click(); },
-  stop:     () => stopBlock(false),
+  /* With a modal up, Start presses ITS button. Reaching past it to the Start button
+     began a block behind the report, which looked like the key had done nothing. */
+  start:    () => { const b = modalOpen() && modalCta();
+                    if (b) b.click();
+                    else if (!state.running) $('startBtn').click(); },
+  /* And Stop means "stop the countdown", not "stop a block that already ended". */
+  stop:     () => { if (modalOpen()) { cancelAutoAdvance(); modalEl.classList.remove('open'); }
+                    else stopBlock(false); },
   pause:    () => { if (state.paused) resumeFromPause();
                     else if (state.running) pauseBlock(PAUSE_WHY.manual); },
   settings: () => toggleSettings(),
@@ -340,6 +357,9 @@ document.addEventListener('keydown', e => {
   /* Responses are checked before shortcuts and that order is not negotiable: a deck
      key is pressed under time pressure and must never be second-guessed. A shortcut
      parked on the same key is the one that gives way, and the editor marks it red. */
+  /* Any key at all stops the countdown. Reading a report should never be a race, and
+     the one key that does NOT cancel is Enter, which skips the wait instead. */
+  if (state.autoTimer && k !== 'enter') cancelAutoAdvance();
   const ch = state.keyIndex[k];
   if (ch) { e.preventDefault(); press(ch); return; }
   const act = actionForKey(k);

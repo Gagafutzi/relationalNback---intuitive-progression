@@ -100,6 +100,7 @@ function showReport(score, verdict, headline, detail, milestone, load) {
       <div class="s">Now: <b style="color:#e6ebff">${milestone.what}</b><br>${milestone.why}</div>
     </div>` : '';
 
+  modalBox.classList.remove('wide');
   modalBox.innerHTML = `
     <h2>Block complete</h2>
     <p>Score <b style="color:${barColor(score)}">${Math.round(score*100)}%</b> ·
@@ -112,9 +113,21 @@ function showReport(score, verdict, headline, detail, milestone, load) {
       Bars are chance-corrected: 0% is what you'd score by never pressing, 100% is
       flawless. The block score blends the average across streams with your weakest
       stream, so an abandoned stream costs you either way.</p>
+    <div class="auto-next" id="autoNext">
+      <div class="an-track"><span class="an-fill" id="autoNextBar"></span></div>
+      <div class="an-cap">Next block in <b id="autoNextN">0</b>s ·
+        <b>Enter</b> to go now, any other key to stay</div>
+    </div>
     <button class="cta" id="modalClose">Continue</button>`;
   modalEl.classList.add('open');
-  $('modalClose').onclick = () => modalEl.classList.remove('open');
+  /* With the countdown running the button is no longer "put this away" — it is the
+     thing the countdown was going to do anyway, so it does that. */
+  $('modalClose').textContent = cfg.autoAdvance > 0 ? 'Start next block' : 'Continue';
+  $('modalClose').onclick = () => {
+    if (cfg.autoAdvance > 0) advanceNow();
+    else modalEl.classList.remove('open');
+  };
+  armAutoAdvance();
 }
 
 /* ============================================================
@@ -159,6 +172,7 @@ function renderGlyphLegend() {
 /* Blocking intro — the map must be memorised before trials begin. */
 function showGlyphIntro(then) {
   ensureGlyphMap();
+  modalBox.classList.remove('wide');
   modalBox.innerHTML = `
     <h2>Symbol map</h2>
     <p>These four sets sit on a 2×2 map, reshuffled every session. You will report
@@ -170,3 +184,52 @@ function showGlyphIntro(then) {
   $('modalClose').onclick = () => { modalEl.classList.remove('open'); then(); };
 }
 
+
+/* ============================================================
+   14a. AUTO-ADVANCE
+
+   Training a block at a time means two clicks between every block — dismiss the
+   report, press Start — which is two clicks more than a keyboard-only session can
+   afford. With this on, the report arms a countdown and the next block begins on its
+   own; nothing here runs at all when it is off.
+
+   It only ever arms from endBlock. Stopping a block is an explicit "I am done", and
+   a Stop that restarted the task by itself would be a trap.
+   ============================================================ */
+
+function cancelAutoAdvance() {
+  clearInterval(state.autoTimer);
+  state.autoTimer = null; state.autoAt = 0;
+  const el = $('autoNext');
+  if (el) el.classList.remove('show');
+}
+
+/* Straight to startBlock rather than through the Start button, which detours via the
+   symbol-map intro and waits for a click. That intro is there to teach a map that is
+   reshuffled once a SESSION — on the block you just auto-advanced into you have
+   already read it, and stopping to click "I have it" would defeat the entire point. */
+function advanceNow() {
+  cancelAutoAdvance();
+  modalEl.classList.remove('open');
+  startBlock();
+}
+
+function armAutoAdvance() {
+  cancelAutoAdvance();
+  if (!(cfg.autoAdvance > 0)) return;
+  const el = $('autoNext');
+  if (!el) return;
+  state.autoAt = performance.now() + cfg.autoAdvance * 1000;
+  el.classList.add('show');
+
+  const paint = () => {
+    const left = state.autoAt - performance.now();
+    if (left <= 0) { advanceNow(); return; }
+    $('autoNextN').textContent = Math.ceil(left / 1000);
+    $('autoNextBar').style.width = (100 * left / (cfg.autoAdvance * 1000)).toFixed(1) + '%';
+  };
+  paint();
+  /* 100ms so the bar slides rather than stepping. The block loop is not running
+     between blocks, so nothing is competing for the frame. */
+  state.autoTimer = setInterval(paint, 100);
+}

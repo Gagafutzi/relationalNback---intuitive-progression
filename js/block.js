@@ -153,6 +153,7 @@ function stopBlock(silent) {
   state.running = false;
   document.body.classList.remove('running');
   state.cued = true;
+  cancelAutoAdvance();
   $('retroCue').classList.remove('show');
   $('pauseVeil').classList.remove('show');
   state.paused = false;
