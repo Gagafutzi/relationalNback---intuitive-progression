@@ -65,7 +65,7 @@ const TUNE_DEFAULTS = {
   /* Chance-corrected: 0 is a player who never presses, 1 is perfect. See
      `targetAccuracy` in ladder.js for why one number means the same thing at
      every milestone, and why it belongs per tier. */
-  targetAccuracy: 0.80,
+  targetAccuracy: 0.40,
 };
 
 /* The tunables for the tier you are on. Always mutated in place, never reassigned —

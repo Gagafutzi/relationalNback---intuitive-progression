@@ -100,6 +100,15 @@ function loadProgress() {
     const p = Object.assign(blank, JSON.parse(raw));
     if (p.prog) Object.assign(prog, p.prog);
     if (p.tune) Object.assign(tune, p.tune);
+    /*
+     * A record written before the target was a setting was fitted at 0.80, and
+     * its posterior means "the interval at which you score 0.80". Adopting the
+     * new default without moving the grid would relabel that evidence rather
+     * than re-read it — see `stairRetarget`. The shift is applied below, once
+     * the posterior it belongs to has actually been restored.
+     */
+    const legacyTarget = !(p.tune && p.tune.targetAccuracy != null);
+    if (legacyTarget) tune.targetAccuracy = TUNE_DEFAULTS.targetAccuracy;
     if (p.freeCfg) Object.assign(freeCfg, p.freeCfg);
     if (p.progCfg) Object.assign(progCfg, p.progCfg);
     if (p.keyBinds) keyBinds = p.keyBinds;
@@ -107,6 +116,7 @@ function loadProgress() {
     /* Only accept a posterior that matches the current grid, so changing STAIR.steps
        can never silently reinterpret an old array against a different grid. */
     if (Array.isArray(p.stair) && p.stair.length === STAIR.steps) stairLog = p.stair.slice();
+    if (legacyTarget) stairRetarget(LEGACY_P_TARGET, tune.targetAccuracy);
     if (p.tiers) Object.entries(p.tiers).forEach(([k, v]) => {
       tiers[k] = { prog: v.prog,
         stair: Array.isArray(v.stair) && v.stair.length === STAIR.steps ? v.stair.slice() : null,
@@ -114,6 +124,18 @@ function loadProgress() {
            every tier from the one global set that record does have keeps whatever was
            configured, rather than resetting a tuned ladder to the factory numbers. */
         tune: { ...TUNE_DEFAULTS, ...(v.tune || p.tune || {}) } };
+      /*
+       * Each tier keeps its own posterior and its own target, so each needs its
+       * own shift — done here rather than on the way in to `switchTier`, which
+       * would apply it again on every switch.
+       */
+      if (!(v.tune && v.tune.targetAccuracy != null) && tiers[k].stair) {
+        const held = stairLog;
+        stairLog = tiers[k].stair;
+        stairRetarget(LEGACY_P_TARGET, tiers[k].tune.targetAccuracy);
+        tiers[k].stair = stairLog;
+        stairLog = held;
+      }
     });
     if (p.rcTier) rcTier = p.rcTier;
     /* A fixed symbol map is only fixed if it outlives the session that made it. */

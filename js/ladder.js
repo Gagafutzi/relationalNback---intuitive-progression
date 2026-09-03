@@ -60,8 +60,25 @@ const STAIR = {
   lo: 2.85, hi: 4.20, steps: 136,   // log10 ms: 708ms … 15.8s
   beta: 6.0,                        // slope, log10 units
   lapse: 0.03,                      // attention lapses; without it one bad block bites hard
-  pTarget: 0.80,                    // default performance the interval is placed at
-  pTargetMin: 0.55, pTargetMax: 0.92,  // the ceiling keeps STAIR_C finite against `lapse`
+  /*
+   * Where the interval is placed, ON THE CHANCE-CORRECTED SCALE.
+   *
+   * This was 0.80, and the 0.85/0.70 band with it, as though the score it is
+   * compared against were a raw accuracy. It is not: `streamScore` maps "never
+   * pressed" to 0 and perfect to 1, and for the relational position stream the
+   * never-press rate is 2/3 by construction — three axis judgments per interval,
+   * one of them non-empty for an axis-aligned move. So 0.80 chance-corrected is
+   * about 93% of judgments answered exactly right, and the old band told a
+   * player scoring 85% raw to ease off.
+   *
+   * 0.40 is roughly 80% raw on that stream, which is the conventional target for
+   * adaptive n-back and comfortably inside what the staircase can resolve.
+   */
+  pTarget: 0.40,                    // default performance the interval is placed at
+  /* The floor is low because the scale is: 0.20 is still well clear of chance.
+     The ceiling keeps `stairC` finite against `lapse` — at 1 - lapse the log
+     diverges — and 0.90 is already ~97% raw, past anyone's ceiling. */
+  pTargetMin: 0.20, pTargetMax: 0.90,
   /* Posterior tempering. The threshold MOVES as the player learns, so an untempered
      posterior gets steadily overconfident and lags reality. Swept empirically: 1.00
      lags a fast learner by 40%, 0.92 by 27%, 0.85 by 13% — and past 0.85 the returns
@@ -212,6 +229,17 @@ function stairRetarget(from, to) {
   if (!stairLog || !(from > 0) || !(to > 0) || Math.abs(to - from) < 1e-9) return;
   stairShift((stairC(to) - stairC(from)) / STAIR.beta);
 }
+
+/*
+ * The criterion every posterior written before the target was a setting was
+ * fitted at.
+ *
+ * Those records carry no `targetAccuracy`, and their grid parameter means "the
+ * interval at which you score 0.80" — so simply adopting the new default would
+ * relabel that evidence as though it had been fitted at the new criterion, which
+ * is exactly the silent reinterpretation `stairRetarget` exists to prevent.
+ */
+const LEGACY_P_TARGET = 0.80;
 
 /* Carry across a milestone: the new task is harder, so the threshold moves slower —
    and we are less certain about it than we were a moment ago. */

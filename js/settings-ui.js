@@ -191,6 +191,14 @@ function renderLadderState() {
     `chance-corrected — 0% is never pressing, 100% is perfect. ` +
     `Above <b>${Math.round(advanceAt() * 100)}%</b> speeds you up, ` +
     `below <b>${Math.round(demoteAt() * 100)}%</b> eases off. ` +
+    /*
+     * The raw figure alongside it, because the corrected one is unintuitive and
+     * setting it by feel is exactly how the old 80% default came about: on a
+     * relational position stream two thirds of judgments are "press nothing",
+     * so 40% corrected is about 80% of judgments answered exactly right.
+     */
+    `On a relational position stream that is roughly ` +
+    `<b>${Math.round((2 / 3 + ta / 3) * 100)}%</b> of judgments answered exactly right. ` +
     `Aim lower for a harder, faster session; higher to consolidate.`;
 
   $('adaptHint').textContent = tune.adapt === 'bayes'

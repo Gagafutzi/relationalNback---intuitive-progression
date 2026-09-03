@@ -307,8 +307,20 @@ function endBlock() {
       headline = 'Stepped back a milestone';
       detail = `Your threshold is estimated at ${fmt(est)}, past the slowest interval.`;
     } else {
+      /*
+       * The colour says what the staircase did, not what a second measure would
+       * have said about it.
+       *
+       * This compared `score` — the weakest-link blend — against the same band
+       * the fixed-step mode steps on, while the interval was being placed by the
+       * posterior from `pooledRate`. Those are two different numbers: the blend
+       * carries a 0.4 * min term, so it sits further below the pooled rate the
+       * more streams are running, and the label drifted from the decision it was
+       * labelling. Reading the interval before and after is the decision itself.
+       */
+      const was = prog.interval;
       prog.interval = stairNextInterval();
-      verdict = score >= advanceAt() ? 'up' : score <= demoteAt() ? 'down' : 'hold';
+      verdict = prog.interval < was ? 'up' : prog.interval > was ? 'down' : 'hold';
       headline = `Next block at ${fmt(prog.interval)}`;
       detail = `Threshold estimate <b>${fmt(est)}</b> ` +
                `<span style="opacity:.6">(90% CI ${fmt(ci[0])}–${fmt(ci[1])})</span> · ` +
