@@ -24,8 +24,16 @@ const PROG_STREAMS = [
   { key:'quantity', mode:'relational' },
 ];
 
-const ADVANCE_AT = 0.85;   // block score that earns a speed-up (fixed-step mode)
-const DEMOTE_AT  = 0.70;   // block score that forces a slow-down (fixed-step mode)
+/* How far either side of the target a block has to land before anything moves.
+   The band, not the thresholds, is what is fixed: a target of 0.80 gives the 0.85
+   and 0.70 these were, and moving the target carries them with it. Asymmetric on
+   purpose — speeding up on a hair above target would ratchet the interval down on
+   noise, while a block well below target is worth easing off for straight away. */
+const ADVANCE_MARGIN = 0.05;
+const DEMOTE_MARGIN  = 0.10;
+
+const advanceAt = () => Math.min(0.98, targetAccuracy() + ADVANCE_MARGIN);
+const demoteAt  = () => Math.max(0.02, targetAccuracy() - DEMOTE_MARGIN);
 
 /* ============================================================
    2a. BAYESIAN ADAPTIVE STAIRCASE
@@ -52,7 +60,8 @@ const STAIR = {
   lo: 2.85, hi: 4.20, steps: 136,   // log10 ms: 708ms … 15.8s
   beta: 6.0,                        // slope, log10 units
   lapse: 0.03,                      // attention lapses; without it one bad block bites hard
-  pTarget: 0.80,                    // performance the interval is placed at
+  pTarget: 0.80,                    // default performance the interval is placed at
+  pTargetMin: 0.55, pTargetMax: 0.92,  // the ceiling keeps STAIR_C finite against `lapse`
   /* Posterior tempering. The threshold MOVES as the player learns, so an untempered
      posterior gets steadily overconfident and lags reality. Swept empirically: 1.00
      lags a fast learner by 40%, 0.92 by 27%, 0.85 by 13% — and past 0.85 the returns
@@ -68,10 +77,31 @@ const T_GRID = Array.from({ length: STAIR.steps }, (_, i) =>
   STAIR.lo + (STAIR.hi - STAIR.lo) * i / (STAIR.steps - 1));
 const T_STEP = (STAIR.hi - STAIR.lo) / (STAIR.steps - 1);
 
-/* Offset that makes psi(T) == pTarget exactly, so the grid parameter IS the threshold. */
-const STAIR_C = Math.log(STAIR.pTarget / ((1 - STAIR.lapse) - STAIR.pTarget));
+/*
+ * The accuracy the ladder aims at, on the chance-corrected scale.
+ *
+ * Zero is what a player who never presses scores and one is perfect, at every
+ * milestone — `chanceOf` measures the block's own base rates, which is what lets a
+ * single number mean the same thing under one stream as under eight.
+ *
+ * Per tier, because it lives in `tune`: what is a productive difficulty under a
+ * ternary relational load is not the same under a quaternary one.
+ */
+function targetAccuracy() {
+  const v = (typeof tune !== 'undefined' && tune.targetAccuracy) || STAIR.pTarget;
+  return Math.min(STAIR.pTargetMax, Math.max(STAIR.pTargetMin, v));
+}
+
+/* Offset that makes psi(T) == pTarget exactly, so the grid parameter IS the threshold.
+   A function rather than a constant now that the target is a setting: it has to be
+   read at use, or changing the target would move the criterion everywhere except in
+   the likelihood the posterior is actually updated with. */
+const stairC = p => {
+  const t = p == null ? targetAccuracy() : p;
+  return Math.log(t / ((1 - STAIR.lapse) - t));
+};
 const psi = (x, T) => (1 - STAIR.lapse) /
-                      (1 + Math.exp(-(STAIR.beta * (x - T) + STAIR_C)));
+                      (1 + Math.exp(-(STAIR.beta * (x - T) + stairC())));
 
 let stairLog = null;      // unnormalised log posterior over T_GRID
 
@@ -157,6 +187,30 @@ function stairShift(s) {
   });
   const sum = out.reduce((a, b) => a + b, 0) || 1;
   stairLog = out.map(v => Math.log(Math.max(v / sum, 1e-300)));
+}
+
+/*
+ * Re-read the same fitted curve at a different criterion.
+ *
+ * The grid parameter is "the interval at which you score `pTarget`", so changing the
+ * target changes what every cell of the posterior *means*. Leaving it alone would
+ * silently relabel months of evidence: a threshold fitted at 80% would be read as
+ * though it had been fitted at 90%, and the ladder would place the next block far
+ * too fast and then wonder why the blocks stopped clearing.
+ *
+ * The player's psychometric curve does not move when you change your mind about
+ * which point on it to aim for. Holding the curve fixed,
+ *
+ *     beta*(x - T_old) + C_old  ==  beta*(x - T_new) + C_new   for all x
+ *  => T_new = T_old + (C_new - C_old) / beta
+ *
+ * — a pure translation along the grid, which `stairShift` already does. Aiming
+ * higher shifts the threshold slower, which is the right direction: scoring 90%
+ * takes more time per stimulus than scoring 70%.
+ */
+function stairRetarget(from, to) {
+  if (!stairLog || !(from > 0) || !(to > 0) || Math.abs(to - from) < 1e-9) return;
+  stairShift((stairC(to) - stairC(from)) / STAIR.beta);
 }
 
 /* Carry across a milestone: the new task is harder, so the threshold moves slower —

@@ -99,6 +99,11 @@
         <label>Step per block (s)</label>
         <input type="number" id="intervalStep" value="0.25" min="0.05" max="2" step="0.05" />
       </div>
+      <div class="setting-group">
+        <label>Target accuracy (%)</label>
+        <input type="number" id="targetAccuracy" value="80" min="55" max="92" step="1" />
+        <div class="hint" id="targetAccuracyHint"></div>
+      </div>
       <div class="hint">Beat a block and the interval drops one step. Reach the target and
         you clear the milestone — the interval resets and the next difficulty comes in.</div>
       </div>

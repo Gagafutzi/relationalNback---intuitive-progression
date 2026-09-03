@@ -35,6 +35,20 @@ numIn('startInterval',  v => { tune.startInterval = Math.max(1000, v * 1000);
                                tune.maxInterval = tune.startInterval + 1500; });
 numIn('targetInterval', v => tune.targetInterval = Math.max(500, v * 1000));
 numIn('intervalStep',   v => tune.intervalStep = Math.max(50, v * 1000));
+/*
+ * Target accuracy, entered as a percentage and held as a proportion.
+ *
+ * The posterior is re-read at the new criterion rather than left to be
+ * reinterpreted: its grid parameter is "the interval at which you score the
+ * target", so without the shift every block of evidence already gathered would
+ * silently start claiming to be about a different accuracy. See `stairRetarget`.
+ */
+numIn('targetAccuracy', v => {
+  const was = targetAccuracy();
+  tune.targetAccuracy = Math.min(STAIR.pTargetMax, Math.max(STAIR.pTargetMin, v / 100));
+  stairRetarget(was, targetAccuracy());
+  if (tune.adapt === 'bayes' && stairLog) prog.interval = stairNextInterval();
+});
 numIn('spinStart',      v => tune.spinStart = Math.max(5, v));
 numIn('spinEnd',        v => tune.spinEnd = Math.max(3, v));
 numIn('spinStep',       v => tune.spinStep = Math.max(1, v));

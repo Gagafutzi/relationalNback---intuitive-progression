@@ -179,6 +179,20 @@ function renderLadderState() {
                `You are editing the RC ${rcTier} track.`;
   });
 
+  /*
+   * What the target actually buys, in the terms the panel already uses: where the
+   * interval gets placed, and where the up/down band sits. Both move together --
+   * a target the Bayesian mode honoured and the fixed-step mode ignored would be a
+   * setting that silently does nothing on half the screen.
+   */
+  const ta = targetAccuracy();
+  $('targetAccuracyHint').innerHTML =
+    `Blocks are placed where you score about <b>${Math.round(ta * 100)}%</b>, ` +
+    `chance-corrected — 0% is never pressing, 100% is perfect. ` +
+    `Above <b>${Math.round(advanceAt() * 100)}%</b> speeds you up, ` +
+    `below <b>${Math.round(demoteAt() * 100)}%</b> eases off. ` +
+    `Aim lower for a harder, faster session; higher to consolidate.`;
+
   $('adaptHint').textContent = tune.adapt === 'bayes'
     ? 'Estimates your speed threshold and places each block where it learns most. Carries what it knows across milestones instead of restarting at the top.'
     : 'Walks the interval down one fixed step per good block, resetting to the start at every milestone.';
@@ -198,6 +212,7 @@ function syncSettingsUI() {
   $('startInterval').value = tune.startInterval / 1000;
   $('targetInterval').value = tune.targetInterval / 1000;
   $('intervalStep').value = tune.intervalStep / 1000;
+  $('targetAccuracy').value = Math.round(targetAccuracy() * 100);
   $('spinStart').value = tune.spinStart;
   $('spinEnd').value = tune.spinEnd;
   $('spinStep').value = tune.spinStep;

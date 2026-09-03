@@ -308,7 +308,7 @@ function endBlock() {
       detail = `Your threshold is estimated at ${fmt(est)}, past the slowest interval.`;
     } else {
       prog.interval = stairNextInterval();
-      verdict = score >= ADVANCE_AT ? 'up' : score <= DEMOTE_AT ? 'down' : 'hold';
+      verdict = score >= advanceAt() ? 'up' : score <= demoteAt() ? 'down' : 'hold';
       headline = `Next block at ${fmt(prog.interval)}`;
       detail = `Threshold estimate <b>${fmt(est)}</b> ` +
                `<span style="opacity:.6">(90% CI ${fmt(ci[0])}–${fmt(ci[1])})</span> · ` +
@@ -317,7 +317,7 @@ function endBlock() {
     }
     applyProgression();
   } else if (cfg.mode === 'progression') {
-    if (score >= ADVANCE_AT) {
+    if (score >= advanceAt()) {
       verdict = 'up';
       if (prog.interval <= tune.targetInterval + 1e-6) {
         /* Already at target speed and just held it — the milestone is proven, so
@@ -335,34 +335,34 @@ function endBlock() {
           ? `${left} more step${left > 1 ? 's' : ''}, then hold ${(tune.targetInterval / 1000).toFixed(2)}s to clear this milestone.`
           : `Hold ${(tune.targetInterval / 1000).toFixed(2)}s for one block to clear this milestone.`;
       }
-    } else if (score <= DEMOTE_AT) {
+    } else if (score <= demoteAt()) {
       verdict = 'down';
       prog.interval += tune.intervalStep;
       if (prog.interval > tune.maxInterval) {
         regressLadder(prog);
         headline = 'Stepped back a milestone';
-        detail = 'You were at the slowest interval and still under 70%.';
+        detail = `You were at the slowest interval and still under ${Math.round(demoteAt() * 100)}%.`;
       } else {
         headline = `Slower — ${(prog.interval / 1000).toFixed(2)}s per stimulus`;
         detail = 'Interval eased off. Same milestone.';
       }
     } else {
       headline = `Holding at ${(prog.interval / 1000).toFixed(2)}s`;
-      detail = `Score ${Math.round(ADVANCE_AT * 100)}% or better speeds you up.`;
+      detail = `Score ${Math.round(advanceAt() * 100)}% or better speeds you up.`;
     }
     applyProgression();
   } else {
     /* Free Play adapts N the classic way and leaves everything else alone. */
-    if (score >= ADVANCE_AT) { freeCfg.n = Math.min(9, freeCfg.n + 1); verdict = 'up';
+    if (score >= advanceAt()) { freeCfg.n = Math.min(9, freeCfg.n + 1); verdict = 'up';
       headline = `N rises to ${freeCfg.n}`; }
-    else if (score <= DEMOTE_AT) { freeCfg.n = Math.max(1, freeCfg.n - 1); verdict = 'down';
+    else if (score <= demoteAt()) { freeCfg.n = Math.max(1, freeCfg.n - 1); verdict = 'down';
       headline = `N falls to ${freeCfg.n}`; }
     else headline = `N holds at ${freeCfg.n}`;
     cfg.n = freeCfg.n;
     $('nValue').value = freeCfg.n;
   }
 
-  if (score >= ADVANCE_AT) progress.bestLoad = Math.max(progress.bestLoad || 0, load);
+  if (score >= advanceAt()) progress.bestLoad = Math.max(progress.bestLoad || 0, load);
   const rts = state.presses_log.map(p => p.rt).filter(r => r != null).sort((a, b) => a - b);
   const median = rts.length ? rts[rts.length >> 1] : null;
 
