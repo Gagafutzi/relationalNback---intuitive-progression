@@ -80,7 +80,14 @@ function renderDailyTimer() {
 /* One second is plenty for a minutes display, and it keeps ticking between blocks. */
 setInterval(renderDailyTimer, 1000);
 
-const barColor = a => a >= 0.85 ? '#51cf66' : a >= 0.7 ? '#fcc419' : '#ff6b6b';
+/* Coloured against the target you are actually being held to, not against 85%.
+   These were fixed at 0.85 and 0.70, which were the right lines when every block
+   aimed at 80% — the staircase now places you wherever `targetAccuracy` says, and
+   it defaults to 40%. So a block that cleared a milestone was being painted red
+   for scoring 56%: the colour said failure while the ladder promoted you.
+   `advanceAt` and `demoteAt` are the lines the ladder itself moves on, so green
+   means "this would advance you", amber "this holds", red "this would demote". */
+const barColor = a => a >= advanceAt() ? '#51cf66' : a >= demoteAt() ? '#fcc419' : '#ff6b6b';
 
 function showReport(score, verdict, headline, detail, milestone, load) {
   const rows = Object.entries(state.tally).map(([k, t]) => {

@@ -149,5 +149,36 @@ ok('the constant the migration reads is the criterion those records were fitted 
 console.log(`   a stored 4.00s threshold at the old criterion reads as `
   + `${(10 ** adoptedT / 1000).toFixed(2)}s at the new one`);
 
+/* ------------------------------------------------------------------ *
+ * What the report says about a score                                  *
+ * ------------------------------------------------------------------ */
+
+/*
+ * The colours and the criterion have to move with the target too.
+ *
+ * They did not. `barColor` was fixed at 0.85 and 0.70 and `progressSummary` held
+ * a `CRIT = 0.80`, all three of which were the right numbers while every block
+ * aimed at 80%. At the 40% default a cleared milestone was painted red for
+ * scoring 56%, and "Load held" read "no block at ≥80% yet" for everybody
+ * permanently, because no block at that target ever scores 0.80.
+ *
+ * Checked by reading the source rather than by calling it: both files reach for
+ * the DOM at load, and what went wrong is a literal in the file, which is
+ * exactly what a source scan can see.
+ */
+const src = f => fs.readFileSync(path.join(ROOT, f), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
+const hud = src('js/hud.js');
+const barLine = (hud.match(/const barColor = [^;]*;/) || [''])[0];
+ok('the report colours a score against the target, not against 80%',
+   /advanceAt\(\)/.test(barLine) && /demoteAt\(\)/.test(barLine)
+     && !/0\.\d/.test(barLine.replace(/#[0-9a-f]{6}/gi, '')),
+   `barColor reads: ${barLine || '(not found)'}`);
+
+const crit = (src('js/analysis.js').match(/const CRIT = [^;]*;/) || [''])[0];
+ok('"load held" is held to the score that would advance you',
+   /advanceAt\(\)/.test(crit), `CRIT reads: ${crit || '(not found)'}`);
+
 console.log(bad ? `\n${bad} FAILED` : '\nall checks passed');
 process.exit(bad ? 1 : 0);

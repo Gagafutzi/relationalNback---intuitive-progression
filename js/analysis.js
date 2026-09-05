@@ -106,8 +106,14 @@ function progressSummary(blocks) {
   const rolled = Object.values(progress.rollup || {}).reduce((s, r) => s + r.blocks, 0);
 
   /* Highest load carried at a real standard, rather than the highest load ever set.
-     bestLoad already answers "what did you attempt"; this answers "what held". */
-  const CRIT = 0.80;
+     bestLoad already answers "what did you attempt"; this answers "what held".
+
+     The standard is the score that would advance you, not a fixed 80%. That was
+     the right number while every block aimed at 80%; the staircase now places
+     you at whatever `targetAccuracy` says and defaults to 40%, at which no block
+     ever reaches 0.80 — so this read "no block at ≥80% yet" for everybody,
+     permanently, whatever they had actually held. */
+  const CRIT = advanceAt();
   const held = ok.filter(b => b.score >= CRIT).map(b => b.load || 0);
   return {
     blocks: ok.length, rolled,
