@@ -137,7 +137,12 @@ const TUNE_DEFAULTS = {
    tiers copies values through it rather than swapping the reference. */
 const tune = { ...TUNE_DEFAULTS };
 
-let prog = { streamCount: 1, n: 1, spinLevel: 0, interval: 5000, lureRate: 0.20 };
+/* `axisCount` and `capLevel` are the two digits above stream count, and only turn
+   at quaternary and up — see PROG_AXES. Both default to 0, which is exactly the
+   ladder as it was, so a record written before they existed restores onto a rung
+   that still means what it meant. */
+let prog = { streamCount: 1, n: 1, spinLevel: 0, interval: 5000, lureRate: 0.20,
+             axisCount: 0, capLevel: 0 };
 
 /* Each relational-complexity tier keeps its own ladder, its own staircase and its
    own tunables, so quaternary is a parallel track rather than something gated behind
@@ -149,7 +154,8 @@ let rcTier = 3;
 const tiers = {};
 function tierState(rc) {
   return tiers[rc] || (tiers[rc] = {
-    prog: { streamCount: 1, n: 1, spinLevel: 0, interval: 5000, lureRate: 0.20 },
+    prog: { streamCount: 1, n: 1, spinLevel: 0, interval: 5000, lureRate: 0.20,
+            axisCount: 0, capLevel: 0 },
     stair: null,
     /* A tier first visited mid-session inherits the settings you are already using,
        so the first switch carries your speeds across instead of dropping you on the
@@ -165,7 +171,10 @@ function switchTier(rc) {
   /* Read before the assign below: a tier being created right now copies `tune` as it
      still stands, which is what makes the inheritance above work. */
   const nx = tierState(rc);
-  prog = { ...nx.prog };
+  /* Defaults for a tier stored before these digits existed, applied on the way OUT
+     of the store rather than on the way in, so a record is never rewritten by the
+     act of looking at it. */
+  prog = { axisCount: 0, capLevel: 0, ...nx.prog };
   Object.assign(tune, nx.tune);
   stairLog = nx.stair ? nx.stair.slice() : null;
   if (!stairLog) stairInit(tune.startInterval);

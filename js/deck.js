@@ -13,8 +13,16 @@ function deckGroups() {
     const spec = STREAMS[k];
 
     if (k === 'position' && m === 'relational' && cfg.meta) {
-      groups.push({ key:'position', label:'Move vs. previous move ↺',
-                    color: spec.color, channels: spec.meta });
+      /* One group per frame the relation is asked in, exactly as the first-order
+         judgement splits — at quinary both are live on the same trial and two
+         answers have to be statable at once. */
+      const both = cfg.frame === 'both';
+      if (cfg.frame === 'cube' || both)
+        groups.push({ key:'position', label:'Move vs. previous move ↺' + (both ? ' · cube' : ''),
+                      color: spec.color, channels: spec.meta });
+      if (cfg.frame === 'screen' || both)
+        groups.push({ key:'position2', label:'Move vs. previous move ↺ · screen',
+                      color:'#9ccc65', channels: spec.metaScreen });
     } else if (k === 'position' && m === 'relational') {
       const both = cfg.frame === 'both';
       if (cfg.frame === 'cube' || both)
@@ -144,7 +152,8 @@ const graceMs = () => Math.min(LATE_PRESS_GRACE, cfg.interval * 0.25);
    compares this move against the move you reported last time, so an error there
    takes the anchor with it and the rest of the block is guesswork. This hands the
    anchor back. */
-const META_CHANNEL_IDS = new Set((STREAMS.position.meta || []).map(c => c.id));
+const META_CHANNEL_IDS = new Set(
+  (STREAMS.position.meta || []).concat(STREAMS.position.metaScreen || []).map(c => c.id));
 
 /* Deliberately left up through the FOLLOWING trial, not flashed and cleared. The
    direction it draws is the one the next trial has to be judged against, so the

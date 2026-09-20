@@ -244,7 +244,9 @@ $('retroOn').onchange = e => { freeCfg.retro = +e.target.value; applyFree(); syn
 $('varNBack').onchange = e => { freeCfg.varN = +e.target.value; applyFree(); syncSettingsUI(); updateHUD(); saveProgress(); };
 
 $('cubeDimension').onchange = e => { freeCfg.dim = +e.target.value; applyFree(); buildCube(cfg.dim); updateHUD(); saveProgress(); };
-$('rotationOn').onchange    = e => { freeCfg.rotation = e.target.checked; applyFree(); updateHUD(); saveProgress(); };
+/* syncSettingsUI, because rotation is what decides whether the second frame of a
+   meta block asks anything of its own — and the hint that says so is in this panel. */
+$('rotationOn').onchange    = e => { freeCfg.rotation = e.target.checked; applyFree(); syncSettingsUI(); updateHUD(); saveProgress(); };
 /* Order matters — it is the order the axes are judged and named in — so a box
    being ticked appends rather than rebuilding the list from the DOM. */
 document.querySelectorAll('#coordAxes input[data-coord]').forEach(box => {
@@ -269,7 +271,7 @@ document.querySelectorAll('#progCoordAxes input[data-coord]').forEach(box => {
 $('progMagnitudeCap').onchange = e => { progCfg.magnitudeCap = Number(e.target.value); applyProgression(); updateHUD(); saveProgress(); };
 $('progPitchLoudness').onchange = e => { progCfg.pitchLoudness = e.target.checked; applyProgression(); saveProgress(); };
 $('pitchLoudness').onchange = e => { freeCfg.pitchLoudness = e.target.checked; applyFree(); saveProgress(); };
-$('frameMode').onchange     = e => { freeCfg.frame = e.target.value; applyFree(); updateHUD(); saveProgress(); };
+$('frameMode').onchange     = e => { freeCfg.frame = e.target.value; applyFree(); syncSettingsUI(); updateHUD(); saveProgress(); };
 $('feedbackModeF').onchange = e => { freeCfg.feedback = e.target.value; cfg.feedback = e.target.value; renderGlyphLegend(); saveProgress(); };
 /* --- display (shared by both modes) --- */
 /* Rebuilds rather than just toggling visibility: with the arms gone the stage needs

@@ -60,7 +60,8 @@ progress = loadProgress();
    profile changes. Reset first, then load, so a profile with no saved value inherits
    a clean default rather than the previous profile's. */
 function resetInMemoryState() {
-  prog = { streamCount:1, n:1, spinLevel:0, interval:5000, lureRate:0.20 };
+  prog = { streamCount:1, n:1, spinLevel:0, interval:5000, lureRate:0.20,
+           axisCount:0, capLevel:0 };
   Object.keys(tiers).forEach(k => delete tiers[k]);
   rcTier = 3;
   stairLog = null;
@@ -100,7 +101,10 @@ function loadProgress() {
     const raw = localStorage.getItem(storeKey());
     if (!raw) return blank;
     const p = Object.assign(blank, JSON.parse(raw));
-    if (p.prog) Object.assign(prog, p.prog);
+    /* A record written before the axis digits existed carries neither, and
+       `Object.assign` would leave whatever the outgoing profile had — so they are
+       defaulted here rather than inherited. */
+    if (p.prog) Object.assign(prog, { axisCount: 0, capLevel: 0 }, p.prog);
     if (p.tune) Object.assign(tune, p.tune);
     /*
      * A record written before the target was a setting was fitted at 0.80, and

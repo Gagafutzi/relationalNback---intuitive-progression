@@ -21,7 +21,11 @@ function updateHUD() {
     : 'Free Play';
   const rc = relationalComplexity();
   $('hudRC').textContent = 'RC ' + rc;
-  $('hudRCName').textContent = RC_NAMES[rc] + (rc >= 4 ? ' · adult ceiling' : '');
+  /* Quinary is not a deeper binding than quaternary, it is two of them at once —
+     so it is named as what it is rather than as one rung further up the same
+     scale, which "past the adult ceiling" would have implied. */
+  $('hudRCName').textContent = RC_NAMES[rc] +
+    (rc >= 5 ? ' · two frames at once' : rc === 4 ? ' · adult ceiling' : '');
   /* In variable mode the single number is a lie — what is fixed is the span the
      lag is drawn from, so that is what the HUD shows. */
   $('hudN').textContent = cfg.varN ? `${cfg.n}±${cfg.varN}` : cfg.n;

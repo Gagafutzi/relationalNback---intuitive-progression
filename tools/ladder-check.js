@@ -223,7 +223,30 @@ vm.runInContext(fs.readFileSync(path.join(ROOT, 'js/constants.js'), 'utf8')
 
 /* A 3×3×3 lattice, which is what `dim: 3` builds. */
 vm.runInContext(`
-  var cfg = { coordAxes: ['pitch'], magnitudeCap: 2, streams: { position: 'relational' } };
+  /* frame belongs here because the meta judgement reads it now: before, it was
+     the first arm of a chain that never consulted it, so "both frames" asked the
+     one cube-frame question. A stub without it asks no position question at all. */
+  var cfg = { coordAxes: ['pitch'], magnitudeCap: 2, frame: 'cube',
+              streams: { position: 'relational' } };
+  /* What geometry.js supplies in the browser. Real arithmetic against a plain
+     rotation matrix — DOMMatrixReadOnly is exactly a transformPoint to the one
+     caller here, so the stub is the same shape and not a stand-in. */
+  var projectScreen = function (d, m) {
+    if (!m) return d;
+    var p = m.transformPoint({ x: d[0], y: d[1], z: d[2], w: 0 });
+    return [p.x, p.y, p.z];
+  };
+  var normalise = function (v) {
+    var m = Math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+    return m < 1e-6 ? [0,0,0] : [v[0]/m, v[1]/m, v[2]/m];
+  };
+  /* A turn of deg about the screen's vertical, which is what the cube spinning
+     between two trials does to the picture. */
+  var spin = function (deg) {
+    var r = deg * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+    return { transformPoint: function (p) {
+      return { x: c * p.x + s * p.z, y: p.y, z: -s * p.x + c * p.z }; } };
+  };
   var state = { cells: [] };
   for (var x = 0; x < 3; x++) for (var y = 0; y < 3; y++) for (var z = 0; z < 3; z++)
     state.cells.push({ x: x, y: y, z: z });
@@ -426,15 +449,155 @@ ok('and the axis-aligned case still is',
    g4(`metaRelationOf([1,0,0], [0,1,0])`) === 'diff');
 
 /*
- * The case three buttons cannot express, and the reason the generator draws only
- * the clean three. (1,0,0) against (1,1,0) is 45° — neither the same direction
- * nor a right angle.
+ * The fourth relation. (1,0,0) against (1,1,0) is 45° — neither the same
+ * direction, nor reversed, nor a right angle — and it is a relation rather than
+ * a gap: it is stated by pressing none of the three buttons.
+ *
+ * It used to come back null and be dropped by the generator, which restricted a
+ * mode built on composite moves to the three special cases where a composite
+ * move happens to behave like a single-axis one.
  */
-ok('oblique asks nothing rather than scoring a coin toss',
-   g4(`metaRelationOf([1,0,0], [1,1,0])`) === null,
-   'a 45-degree relation was given one of the three answers');
-ok('a move that goes nowhere states no relation',
-   g4(`metaRelationOf([1,0,0], [0,0,0])`) === null);
+ok('oblique is its own relation, not a missing one',
+   g4(`metaRelationOf([1,0,0], [1,1,0])`) === 'obl',
+   'a 45-degree relation did not come back as oblique');
+ok('a move that goes nowhere still states no relation',
+   g4(`metaRelationOf([1,0,0], [0,0,0])`) === null,
+   'a move of zero length was given a relation');
+
+/*
+ * And the deck does not grow to hold it — the whole reason it can be added at
+ * quaternary, where the buttons are the scarce resource. An oblique trial asks
+ * the same three options with no correct answer among them.
+ */
+ok('an oblique trial asks the same three buttons and wants none of them',
+   (function () {
+     vm.runInContext("cfg.coordAxes = []; cfg.meta = true; cfg.streams.position = 'relational';", geo);
+     const j = g4(`(function () {
+       var p0 = { cellIdx: idx(0,1,1) }, p1 = { cellIdx: idx(1,1,1) };
+       var b0 = { cellIdx: idx(1,1,1) }, b1 = { cellIdx: idx(2,2,1) };
+       return buildJudgments(b0, b1, { metaPrev: [p0, p1] })
+         .filter(function (x) { return x.stream === 'position'; })[0];
+     })()`);
+     return j && j.options.length === 3 && j.correct.length === 0;
+   })(),
+   'an oblique trial did not come out as a three-option question with an empty answer');
+vm.runInContext("cfg.meta = false;", geo);
+
+/* ------------------------------------------------------------------ *
+ * Quinary: the same relation, asked in two frames                    *
+ * ------------------------------------------------------------------ *
+ *
+ * The tier this file previously showed to be vapour. `relationalComplexity`
+ * returned 5 for meta + both frames, `computeLoad` charged 34 for the second
+ * frame, and `buildJudgments` read `cfg.frame` only in an arm the meta branch
+ * had already short-circuited — so the block asked the one cube-frame question
+ * and the HUD called it quinary.
+ *
+ * What makes the second frame worth asking is that a rotation preserves angles:
+ * the relation between two moves is the SAME number in every frame related to
+ * the cube's by one turn, so the screen answer departs from the cube answer only
+ * over a turn the cube made BETWEEN the two moves. That is the invariant the
+ * tier rests on, so it is checked directly rather than assumed.
+ */
+const metaJudgments = (frame, spinDeg) => {
+  vm.runInContext(`cfg.coordAxes = []; cfg.meta = true; cfg.frame = '${frame}';
+                   cfg.streams.position = 'relational';`, geo);
+  return g4(`(function () {
+    var m0 = spin(0), m1 = spin(${spinDeg});
+    /* Previous move: east, seen with the cube at rest. This move: east again,
+       seen after the cube has turned ${spinDeg} degrees. */
+    var p0 = { cellIdx: idx(0,1,1), matrix: m0 }, p1 = { cellIdx: idx(1,1,1), matrix: m0 };
+    var b0 = { cellIdx: idx(1,1,1), matrix: m1 }, b1 = { cellIdx: idx(2,1,1), matrix: m1 };
+    return buildJudgments(b0, b1, { metaPrev: [p0, p1] })
+      .filter(function (x) { return x.stream === 'position' || x.stream === 'position2'; })
+      .map(function (x) { return [x.stream, x.options.join('|'), x.correct.join('|')]; });
+  })()`);
+};
+
+ok('the cube frame alone asks one relation, as it always did',
+   (function () { const j = metaJudgments('cube', 0);
+     return j.length === 1 && j[0][0] === 'position'; })(),
+   'meta in the cube frame stopped asking exactly one cube-frame question');
+
+ok('and the screen frame alone asks it of the screen instead',
+   (function () { const j = metaJudgments('screen', 0);
+     return j.length === 1 && j[0][0] === 'position2' &&
+            j[0][1] === 's-meta-same|s-meta-opp|s-meta-diff'; })(),
+   'frame was still being swallowed by the meta branch');
+
+ok('both frames ask two, on two separate sets of buttons',
+   (function () { const j = metaJudgments('both', 90);
+     return j.length === 2 && j[0][0] === 'position' && j[1][0] === 'position2' &&
+            j[0][1] !== j[1][1]; })(),
+   'quinary could not state two answers at once — the tier is vapour again');
+
+/*
+ * The invariant, from both sides. A still cube makes the second judgement a copy
+ * of the first, which is quaternary charging twice; a turn between the two moves
+ * is what makes the screen answer its own fact.
+ */
+ok('with a still cube the screen answer IS the cube answer',
+   (function () { const j = metaJudgments('both', 0);
+     return j.length === 2 && j[0][2] === 'meta-same' && j[1][2] === 's-meta-same'; })(),
+   'the rotation-invariance this tier is built on does not hold');
+
+ok('and a quarter turn between the moves pulls them apart',
+   (function () { const j = metaJudgments('both', 90);
+     /* Cube frame: east then east — the same direction, whatever the cube did.
+        Screen frame: what went to the right now goes away from you, which is
+        square to it. Two true answers about one event, and neither recoverable
+        from the other without knowing how far the cube turned. */
+     return j.length === 2 && j[0][2] === 'meta-same' && j[1][2] === 's-meta-diff'; })(),
+   'the screen frame answered the cube-frame question after a 90-degree turn');
+
+ok('a turn the eye can read leaves both frames answerable and disagreeing',
+   (function () { const j = metaJudgments('both', 180);
+     /* Reversed on screen while unchanged on the cube: the one case that proves
+        the second frame is carrying its own information rather than a copy. */
+     return j.length === 2 && j[0][2] === 'meta-same' && j[1][2] === 's-meta-opp'; })(),
+   'a half turn did not reverse the move on screen');
+
+/*
+ * The quantisation. A projected move is floats, and an exact test would call
+ * almost every pair of them oblique — so the screen vector is rounded to the six
+ * directions the screen deck already answers in, at the same EPS the first-order
+ * screen judgement uses.
+ */
+/*
+ * And the tier is named for what the block asks, not for what is switched on. A
+ * still cube with both frames ticked asks the quaternary question twice; calling
+ * that quinary is the same overclaim as charging Load for it.
+ */
+ok('a still cube with both frames ticked is not quinary',
+   (function () {
+     vm.runInContext(`cfg.meta = true; cfg.frame = 'both'; cfg.rotation = false;
+                      cfg.streams.position = 'relational';`, geo);
+     const still = g4('relationalComplexity(cfg)');
+     vm.runInContext('cfg.rotation = true;', geo);
+     return still === 4 && g4('relationalComplexity(cfg)') === 5;
+   })(),
+   'the HUD would print quinary over a block whose second answer restates the first');
+
+ok('and neither is a second frame of a judgement that names no direction',
+   (function () {
+     vm.runInContext(`cfg.meta = true; cfg.frame = 'both'; cfg.rotation = true;
+                      cfg.streams.position = 'identity';`, geo);
+     const r = g4('relationalComplexity(cfg)');
+     vm.runInContext("cfg.streams.position = 'relational';", geo);
+     return r < 5;
+   })(),
+   'meta and frame are dead settings while position is judged as identity');
+
+ok('a projected move is quantised to the directions the deck can name',
+   (function () {
+     vm.runInContext("cfg.coordAxes = [];", geo);
+     const v = g4(`screenVectorOf({ cellIdx: idx(0,1,1), matrix: spin(20) },
+                                  { cellIdx: idx(1,1,1), matrix: spin(20) })`);
+     return v.every(c => c === 0 || c === 1 || c === -1);
+   })(),
+   'the screen relation is being derived from a float nobody can see');
+
+vm.runInContext("cfg.meta = false; cfg.frame = 'cube';", geo);
 
 /* The count that makes the mode less slow: how many directions are orthogonal
    to a given move, once a move may combine axes. */
@@ -560,10 +723,65 @@ const rels = g4(`(function () {
   }
   return Object.keys(seen).sort();
 })()`);
-ok('no trial is drawn oblique, which has no answer',
+ok('no trial is drawn with no relation at all',
    rels.indexOf('null') < 0, `drew ${rels.join(', ')}`);
-ok('and all three answers do get drawn',
-   ['same', 'opp', 'diff'].every(r => rels.indexOf(r) >= 0), `drew ${rels.join(', ')}`);
+ok('and all four relations do get drawn, oblique among them',
+   ['same', 'opp', 'diff', 'obl'].every(r => rels.indexOf(r) >= 0),
+   `drew ${rels.join(', ')}`);
+
+/*
+ * How often each relation actually comes up, from random positions against
+ * random previous moves — which is the block, rather than the one start cell
+ * the checks above use.
+ *
+ * This is what the weights are for, and the reason to measure rather than
+ * assert the weights themselves: `chanceOf` scores a block against its own
+ * modal answer, so the base rates ARE the difficulty. Two ways to get this
+ * wrong, and both are silent. Oblique is the biggest bucket once the space is
+ * wide, so drawing uniformly over destinations rather than over types would
+ * make "press nothing" the usual answer and reward sitting the block out. And
+ * same and opposite are each a single direction out of the whole space, so a
+ * wall blocks them equally — leaving opposite at weight 1 while same carried 3
+ * starved it to under a tenth of trials.
+ */
+const relShare = (axes) => {
+  vm.runInContext(`cfg.coordAxes = ${JSON.stringify(axes)};`, geo);
+  return g4(`(function () {
+    var axes = ${JSON.stringify(axes)}, dims = 3 + axes.length;
+    var n = { same: 0, opp: 0, diff: 0, obl: 0 }, total = 0;
+    for (var t = 0; t < 2000; t++) {
+      var ci = randInt(state.cells.length);
+      var from = { cellIdx: ci };
+      axes.forEach(function (k) { from[k] = randInt(poolFor(k).length); });
+      /* A random previous move, composite as often as the task makes them. */
+      var A = [];
+      for (var i = 0; i < dims; i++) A.push(randInt(3) - 1);
+      if (A.every(function (c) { return c === 0; })) continue;
+      var m = pickMetaMove(ci, from, A, -1);
+      if (!m) continue;
+      var b = { cellIdx: m.cellIdx };
+      axes.forEach(function (k) { b[k] = m.levels[k]; });
+      var r = metaRelationOf(A, moveVectorOf(from, b));
+      if (n[r] == null) continue;
+      n[r]++; total++;
+    }
+    Object.keys(n).forEach(function (k) { n[k] = n[k] / total; });
+    return n;
+  })()`);
+};
+
+[[], ['pitch'], ['pitch', 'color']].forEach(axes => {
+  const n = relShare(axes);
+  const where = axes.length ? axes.join(' + ') : 'the cube alone';
+  const shown = Object.keys(n).map(k => `${k} ${Math.round(n[k] * 100)}%`).join(', ');
+  /* Chance on this stream is the modal answer's share. Half would put it back
+     where three relations and one forced answer had it. */
+  ok(`no one relation owns the block with ${where}`,
+     Math.max(...Object.values(n)) < 0.45, shown);
+  ok(`and every relation is askable with ${where}`,
+     Math.min(...Object.values(n)) > 0.08, shown);
+});
+vm.runInContext("cfg.coordAxes = ['pitch', 'size'];", geo);
 vm.runInContext("cfg.coordAxes = ['pitch']; cfg.magnitudeCap = 2;", geo);
 
 /* ------------------------------------------------------------------ *
@@ -682,5 +900,199 @@ ok('both panes sync through the one helper',
    (sui.match(/syncCoordUI\(/g) || []).length >= 3,
    'a second copy of the sync is how the two modes drift apart');
 
+
+/* ------------------------------------------------------------------ *
+ * The quaternary ladder's two new digits                             *
+ * ------------------------------------------------------------------ *
+ *
+ * Axis count and the magnitude cap sit above stream count on the odometer, and
+ * only turn at quaternary and up — at ternary an axis is one more independent
+ * up/down/neither and nothing a ladder can grade. `ladder.js` is loaded in its
+ * own sandbox with the globals it reaches for, so the walk is the real one.
+ */
+const lad = vm.createContext({ console, Math, Array, Object, JSON });
+vm.runInContext(`
+  var TUNE_DEFAULTS = { targetAccuracy: 0.40 };
+  var tune = { startInterval: 5000, targetInterval: 3000, maxInterval: 6500,
+               nMax: 3, nAfterStimulus: 2, spinStart: 100, spinEnd: 20, spinStep: 10,
+               targetAccuracy: 0.40, adapt: 'bayes' };
+  var rcTier = 3;
+  /* PROG_STREAMS and PROG_AXES are ladder.js's own — declaring them here would
+     collide with it, and stubbing them would test a ladder nobody climbs. */
+  var state = {}, cfg = {};
+`, lad);
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'js/ladder.js'), 'utf8')
+  .replace(/^"use strict";/, ''), lad);
+const gl = k => vm.runInContext(k, lad);
+
+/* Walk the whole ladder from the bottom and report what it passed through. */
+const walk = tier => gl(`(function () {
+  rcTier = ${tier};
+  var p = { streamCount:1, n:1, spinLevel:minSpinLevel(), axisCount:0, capLevel:0,
+            interval:tune.startInterval };
+  var rungs = 0, sawStill = false, maxAxis = 0, sawCap = false, kinds = {};
+  for (var i = 0; i < 20000; i++) {
+    if (p.spinLevel === 0) sawStill = true;
+    maxAxis = Math.max(maxAxis, p.axisCount || 0);
+    if (p.capLevel) sawCap = true;
+    kinds[carryKind(p)] = true;
+    rungs++;
+    if (!advanceLadder(p)) break;
+  }
+  return { rungs: rungs, sawStill: sawStill, maxAxis: maxAxis, sawCap: sawCap,
+           kinds: Object.keys(kinds).sort().join(','), end: p };
+})()`);
+
+const t3 = walk(3), t4 = walk(4), t5 = walk(5);
+
+ok('the ternary ladder is exactly the ladder it was',
+   t3.maxAxis === 0 && t3.sawCap === false,
+   'ternary picked up digits that only mean something at quaternary');
+ok('and quaternary climbs past the last stimulus into the axes',
+   t4.maxAxis === 4 && t4.sawCap === true && t4.rungs > t3.rungs,
+   `quaternary ended at ${t4.maxAxis} axes, cap ${t4.sawCap}`);
+ok('every new digit gets a carry of its own',
+   t4.kinds.indexOf('axis') >= 0 && t4.kinds.indexOf('cap') >= 0,
+   `the staircase would size an axis carry as something else: ${t4.kinds}`);
+ok('the axes come in one at a time',
+   gl(`(function () {
+     rcTier = 4;
+     var p = { streamCount: PROG_STREAMS.length, n: tune.nMax,
+               spinLevel: spinLevels().length - 1, axisCount: 0, capLevel: 0 };
+     var seen = [];
+     for (var i = 0; i < 400 && advanceLadder(p); i++) seen.push(p.axisCount);
+     return seen.slice(0, 1).join() === '1';
+   })()`),
+   'the first carry past the last stimulus was not a single axis');
+
+/* Quinary never offers a still cube: with one, the screen relation is the cube
+   relation and the tier's second judgement is the first one copied out. */
+ok('quinary never puts a still cube on the ladder',
+   t5.sawStill === false && t3.sawStill === true,
+   'a quinary rung would have asked the same relation twice and scored it twice');
+ok('and stepping backwards cannot reach one either',
+   gl(`(function () {
+     rcTier = 5;
+     var p = { streamCount:1, n:1, spinLevel:1, axisCount:0, capLevel:0 };
+     for (var i = 0; i < 200; i++) { regressLadder(p); if (p.spinLevel === 0) return false; }
+     return true;
+   })()`),
+   'regressing off the bottom of the quinary ladder stopped the cube');
+
+/*
+ * Down is not the exact inverse of up, and never was: a rung is entered at
+ * `nAfterStimulus` and stepped off at N=1, so regress deliberately visits rungs
+ * the climb skipped — that is the easing-off it exists for. What it does owe is
+ * that every state it passes through is a state the rest of the app can render:
+ * an axis count inside the list, a spin inside the levels and above the tier's
+ * floor, and no digit walking off the bottom.
+ */
+ok('stepping all the way back down stays inside the ladder at every rung',
+   gl(`(function () {
+     rcTier = 4;
+     var levels = spinLevels().length - 1;
+     var p = { streamCount:1, n:1, spinLevel:0, axisCount:0, capLevel:0 };
+     for (var i = 0; i < 20000; i++) if (!advanceLadder(p)) break;   // to the top
+     for (var j = 0; j < 20000; j++) {
+       if (!(p.axisCount >= 0 && p.axisCount <= PROG_AXES.length)) return 'axisCount ' + p.axisCount;
+       if (!(p.capLevel === 0 || p.capLevel === 1)) return 'capLevel ' + p.capLevel;
+       if (!(p.n >= 1)) return 'n ' + p.n;
+       if (!(p.streamCount >= 1)) return 'streamCount ' + p.streamCount;
+       if (!(p.spinLevel >= minSpinLevel() && p.spinLevel <= levels)) return 'spin ' + p.spinLevel;
+       if (p.streamCount === 1 && p.n === 1 && !p.axisCount && !p.capLevel) return true;
+       regressLadder(p);
+     }
+     return 'never reached the bottom';
+   })()`) === true,
+   'regressing off the top of the quaternary ladder leaves it somewhere it cannot render');
+
+/* And it unwinds in the order it wound: the cap before the axes it stretched,
+   the axes before the streams they were converted from. A digit undone out of
+   order drops the player onto a rung harder than the one they just failed. */
+ok('and unwinds the digits in the order it wound them',
+   gl(`(function () {
+     rcTier = 4;
+     var p = { streamCount:1, n:1, spinLevel:0, axisCount:0, capLevel:0 };
+     for (var i = 0; i < 20000; i++) if (!advanceLadder(p)) break;
+     var cappedUntil = -1, axesFellAt = -1, streamsFellAt = -1;
+     for (var j = 0; j < 20000; j++) {
+       if (p.capLevel) cappedUntil = j;
+       if (axesFellAt < 0 && p.axisCount < PROG_AXES.length) axesFellAt = j;
+       if (streamsFellAt < 0 && p.streamCount < PROG_STREAMS.length) streamsFellAt = j;
+       if (streamsFellAt >= 0) break;
+       regressLadder(p);
+     }
+     return cappedUntil < axesFellAt && axesFellAt < streamsFellAt;
+   })()`),
+   'the ladder gave back a stimulus before it gave back the axis that replaced it');
+
+/* ------------------------------------------------------------------ *
+ * Load can see the top half of the app                               *
+ * ------------------------------------------------------------------ *
+ *
+ * It could not. `computeLoad` counted N, streams, lattice, interval, rotation and
+ * frame, and stopped — so a ternary block and a quaternary one scored the SAME
+ * number at the same settings, and four coordinate axes moved it by nothing at
+ * all. Free Play's whole promise is that Load scores the setup; the part of the
+ * setup worth climbing was invisible to it.
+ */
+const ld = vm.createContext({ console, Math, Array, Object, JSON });
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'js/constants.js'), 'utf8')
+  .replace(/^"use strict";/, ''), ld);
+vm.runInContext(`
+  var cfg = {};
+  var STREAM_KEYS_ALL = STREAM_KEYS;
+  var base = function (over) {
+    var c = { n: 2, varN: 0, dim: 3, interval: 2500, rotation: false, spin: 60,
+              frame: 'cube', meta: false, coordAxes: [], magnitudeCap: 2,
+              streams: { position: 'relational' } };
+    for (var k in (over || {})) c[k] = over[k];
+    return c;
+  };
+`, ld);
+{
+  const src = fs.readFileSync(path.join(ROOT, 'js/block.js'), 'utf8');
+  const at = src.indexOf('function computeLoad');
+  vm.runInContext(src.slice(at, src.indexOf('\n}', at) + 2), ld);
+}
+/* computeLoad reads the live cfg, so each call swaps it in. */
+const load = over => {
+  vm.runInContext(`cfg = base(${JSON.stringify(over || {})});`, ld);
+  return vm.runInContext('computeLoad()', ld);
+};
+
+const ternary = load({});
+ok('quaternary outscores ternary at identical settings',
+   load({ meta: true }) > ternary,
+   'meta was worth nothing to Load, so the ladder\'s headline number could not see the tier');
+ok('and quinary outscores quaternary',
+   load({ meta: true, frame: 'both', rotation: true }) > load({ meta: true }),
+   'the second frame was free');
+ok('but only while the cube actually turns',
+   load({ meta: true, frame: 'both', rotation: false }) <
+   load({ meta: true, frame: 'both', rotation: true }),
+   'a still cube was charged for a second binding it does not ask');
+ok('each coordinate axis is worth something',
+   load({ coordAxes: ['pitch'] }) > ternary &&
+   load({ coordAxes: ['pitch', 'color'] }) > load({ coordAxes: ['pitch'] }),
+   'the most principled difficulty in the app moved Load by nothing');
+ok('and is worth more again under a second-order judgement',
+   load({ meta: true, coordAxes: ['pitch'] }) - load({ meta: true }) >
+   load({ coordAxes: ['pitch'] }) - ternary,
+   'an axis counted the same whether or not anything asked about orthogonality');
+ok('a longer step on the axes costs more than a shorter one',
+   load({ coordAxes: ['pitch'], magnitudeCap: 3 }) > load({ coordAxes: ['pitch'] }));
+ok('a reference frame is worth nothing while position is not relational',
+   load({ streams: { position: 'identity' }, frame: 'both' }) ===
+   load({ streams: { position: 'identity' }, frame: 'cube' }),
+   'Load charged 34 for a second frame of a judgement that names no direction');
+/* The rung the ladder actually climbs: a stream converted into an axis. The point
+   of the trade is that it buys more than it spends. */
+ok('converting a stream into an axis is a step up, not sideways',
+   load({ meta: true, streams: { position: 'relational', pitch: 'identity' } }) <
+   load({ meta: true, streams: { position: 'relational' }, coordAxes: ['pitch'] }),
+   'the axis digit would lower Load, so the ladder would climb into an easier block');
+
 console.log(bad ? `\n${bad} FAILED` : '\nall checks passed');
+
 process.exit(bad ? 1 : 0);

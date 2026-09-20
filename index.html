@@ -49,6 +49,7 @@
       <select id="rcTier">
         <option value="3">Ternary — report the direction</option>
         <option value="4">Quaternary — relate two directions</option>
+        <option value="5">Quinary — the same relation in two frames</option>
       </select>
       <div class="hint" id="rcHint"></div>
     </div>
@@ -66,10 +67,12 @@
         <div class="hint">Each becomes a <b>coordinate of the move</b> rather than a
           stream beside it. There are as many mutually orthogonal directions as
           dimensions, so every axis added is another way for two moves to be at
-          right angles &mdash; the answers stay three while the space behind them
-          grows. Quaternary is where that pays: relating two directions in a wider
+          right angles, and another way for two to sit at no tidy angle at all
+          &mdash; the buttons stay three while the space behind them grows.
+          Quaternary is where that pays: relating two directions in a wider
           space carries more without asking memory to hold more.</div>
         <div class="hint" id="progCoordCount"></div>
+        <div class="hint" id="progCoordOwned"></div>
       </div>
       <div class="setting-group">
         <label>Furthest step</label>
@@ -81,9 +84,7 @@
       <div class="setting-group">
         <label class="row"><input type="checkbox" id="progPitchLoudness"> Deeper tones louder</label>
       </div>
-      <div class="hint">The ladder never moves these &mdash; a rung has to mean the
-        same thing each time you reach it. Changing them changes what your recorded
-        speed and N are about.</div>
+      <div class="hint" id="progCoordRule"></div>
       </div>
     </details>
 
@@ -254,9 +255,12 @@
         <label><input type="checkbox" id="metaOn" style="width:auto"> Meta-relations
           (2nd order)</label>
         <div class="hint">Report how this move relates to the move you reported N trials
-          ago — <b>same</b>, <b>opposite</b>, or a <b>different axis</b> — instead of
-          which way it went. Forces every move to be axis-aligned, otherwise
-          "same/opposite" has no answer for a diagonal. Punishing above N=2.</div>
+          ago — <b>same</b>, <b>opposite</b>, <b>orthogonal</b>, or <b>none of
+          those</b> — instead of which way it went. A move may run on several axes
+          at once, so the relation is an angle rather than a choice of axis: when
+          it is neither 0°, 180° nor square, <b>press nothing</b>. That fourth
+          answer has no button, which is what keeps it a derivation — you cannot
+          reach it by elimination across the deck. Punishing above N=2.</div>
       </div>
       <div class="setting-group">
         <label>Gate closing (compare-only trials)</label>
@@ -349,9 +353,11 @@
         <div class="hint">Each one becomes a <b>coordinate of the move</b> rather
           than a stream beside it, judged exactly as the three cube axes are.
           There are as many mutually orthogonal directions as dimensions, so every
-          axis added is another way for two moves to be at right angles &mdash;
-          the answers stay three while the space behind them grows. A property
-          cannot also be judged as its own stream while it is a coordinate.</div>
+          axis added is another way for two moves to be at right angles &mdash; and
+          more ways again for them to be at no tidy angle at all, which under
+          meta-relations is its own answer. The buttons stay three while the space
+          behind them grows. A property cannot also be judged as its own stream
+          while it is a coordinate.</div>
         <div class="hint" id="coordCount"></div>
       </div>
       <div class="setting-group">
@@ -381,8 +387,9 @@
           <option value="both">Both at once</option>
         </select>
         <div class="hint">Screen frame projects the movement through the cube's live
-          rotation — you answer in what you <em>see</em>. <b>Both</b> asks for the same
+          rotation &mdash; you answer in what you <em>see</em>. <b>Both</b> asks for the same
           movement in each frame simultaneously.</div>
+        <div class="hint" id="frameMetaHint"></div>
       </div>
       </div>
     </details>

@@ -24,6 +24,31 @@ const PROG_STREAMS = [
   { key:'quantity', mode:'relational' },
 ];
 
+/*
+ * The properties the ladder turns into coordinate axes, in the order it does it.
+ *
+ * Identity streams first. Every one of these is also a stream on `PROG_STREAMS`,
+ * and a property cannot be both (see `applyDimensions`) — so the axis digit
+ * CONVERTS a stream rather than adding to it. Converting an identity stream is
+ * the gentler trade: "was it the same tone" becomes "which way did the tone go,
+ * as part of where the stimulus went", which is a step up on the same property.
+ * Size and quantity are already relational and come last, where the trade buys
+ * dimension rather than depth.
+ */
+const PROG_AXES = ['pitch', 'color', 'size', 'quantity'];
+
+/* Extra axes are a quaternary-and-up affair. At ternary an axis is one more
+   independent up/down/neither and nothing else; the reason to want several is
+   orthogonality, and only a second-order judgement ever asks about that. Below
+   quaternary the boxes stay the player's own, exactly as they were. */
+const laddersAxes = () => typeof rcTier !== 'undefined' && rcTier >= 4;
+const maxAxisCount = () => laddersAxes() ? PROG_AXES.length : 0;
+
+/* Rotation is the whole of what separates the two frames at quinary: angles are
+   rotation-invariant, so a still cube makes the screen relation a copy of the
+   cube one. The ladder therefore never offers a still cube on that tier. */
+const minSpinLevel = () => (typeof rcTier !== 'undefined' && rcTier >= 5) ? 1 : 0;
+
 /* How far either side of the target a block has to land before anything moves.
    The band, not the thresholds, is what is fixed: a target of 0.80 gives the 0.85
    and 0.70 these were, and moving the target carries them with it. Asymmetric on
@@ -87,7 +112,11 @@ const STAIR = {
   clearAt: 0.90,                    // posterior mass below target needed to clear
   priorSigma: 0.22,                 // ±1σ ≈ 3.0s … 8.3s for a 5s prior
   carryWiden: 1.6,                  // variance inflation when the task changes
-  carryShift: { spin: 0.04, n: 0.12, stimulus: 0.15 },   // log10 ms, harder ⇒ slower
+  /* An axis is the heaviest carry on the board: it converts a stream AND widens
+     the space every relation is derived in, so the threshold moves further than
+     it does for one more stimulus. The cap is the mildest — the same axes, a
+     step further apart. */
+  carryShift: { spin: 0.04, n: 0.12, stimulus: 0.15, cap: 0.06, axis: 0.18 },
 };
 
 const T_GRID = Array.from({ length: STAIR.steps }, (_, i) =>
@@ -255,7 +284,9 @@ function carryKind(p) {
   if (p.spinLevel === 0) return p.n < 2 ? 'n' : 'stimulus';   // rotation entering = major
   if (p.spinLevel < levels.length - 1) return 'spin';
   if (p.n < tune.nMax) return 'n';
-  return 'stimulus';
+  if (p.streamCount < PROG_STREAMS.length) return 'stimulus';
+  if ((p.axisCount || 0) < maxAxisCount()) return 'axis';
+  return 'cap';
 }
 
 /* Pooled chance-corrected judgment rate. The displayed block score is a weakest-link
@@ -298,16 +329,38 @@ function advanceLadder(p) {
     p.n++; p.spinLevel = 1;
   } else if (p.streamCount < PROG_STREAMS.length) {
     p.streamCount++; p.n = Math.min(tune.nAfterStimulus, tune.nMax); p.spinLevel = 1;
+  } else if ((p.axisCount || 0) < maxAxisCount()) {
+    /*
+     * Past every stimulus, the space itself. Each axis is another mutually
+     * orthogonal direction, so it is another way for two moves to be square to
+     * each other and another way for them to sit at no tidy angle at all — the
+     * deck stays at three buttons while the state behind them grows, which is
+     * the only difficulty a quaternary block has room for.
+     */
+    p.axisCount = (p.axisCount || 0) + 1;
+    p.n = Math.min(tune.nAfterStimulus, tune.nMax); p.spinLevel = 1;
+  } else if (!p.capLevel && laddersAxes()) {
+    /* Last: the same axes, a step further apart. Cheapest of the carries and so
+       the one the ladder ends on rather than opens the axis run with. */
+    p.capLevel = 1; p.spinLevel = 1;
   } else {
     return false;                     // ladder complete
   }
+  p.spinLevel = Math.max(p.spinLevel, minSpinLevel());
   p.interval = tune.startInterval;
   return true;
 }
 
 function regressLadder(p) {
   const levels = spinLevels();
-  if (p.spinLevel === 0) {
+  /* Unwound in the order it was wound, so stepping back off the first rung of a
+     new axis lands on the last rung of the one before it rather than somewhere
+     the ladder never put anybody. */
+  if (p.capLevel && p.spinLevel <= 1 && p.n <= 1) {
+    p.capLevel = 0; p.spinLevel = levels.length - 1; p.n = tune.nMax;
+  } else if ((p.axisCount || 0) > 0 && p.spinLevel <= 1 && p.n <= 1) {
+    p.axisCount--; p.n = tune.nMax; p.spinLevel = levels.length - 1;
+  } else if (p.spinLevel === 0) {
     if (p.n > 1) p.n--; else return false;
   } else if (p.spinLevel > 1) {
     p.spinLevel--;
@@ -318,6 +371,7 @@ function regressLadder(p) {
   } else {
     p.spinLevel = 0; p.n = 2;
   }
+  p.spinLevel = Math.max(p.spinLevel, minSpinLevel());
   p.interval = tune.startInterval;
   return true;
 }
@@ -339,14 +393,28 @@ function describeNext(p) {
     return { what: `${STREAMS[nx.key].label} joins (${nx.mode})`,
              why: `N drops to ${Math.min(tune.nAfterStimulus, tune.nMax)}, rotation resets` };
   }
+  if ((p.axisCount || 0) < maxAxisCount()) {
+    const nx = PROG_AXES[p.axisCount || 0];
+    const label = STREAMS[nx] ? STREAMS[nx].label : nx;
+    return { what: `${label} becomes an axis of the move`,
+             why: `no longer a stream beside it — one more direction to be ` +
+                  `orthogonal to, and the buttons stay as they are` };
+  }
+  if (!p.capLevel && laddersAxes())
+    return { what: 'the axes stretch to three steps',
+             why: 'the same directions, further apart — a longer move to place' };
   return { what: 'the ladder is complete', why: 'switch to Free Play to keep pushing Load' };
 }
 
 /* Position on the ladder, found by replaying it from the start. Cheaper than a
    closed-form index and impossible to get out of sync with advanceLadder. */
 function ladderPosition() {
-  const start = { streamCount:1, n:1, spinLevel:0, interval:tune.startInterval };
-  const same = (a, b) => a.streamCount === b.streamCount && a.n === b.n && a.spinLevel === b.spinLevel;
+  const start = { streamCount:1, n:1, spinLevel:minSpinLevel(), axisCount:0, capLevel:0,
+                  interval:tune.startInterval };
+  const same = (a, b) => a.streamCount === b.streamCount && a.n === b.n &&
+                         a.spinLevel === b.spinLevel &&
+                         (a.axisCount || 0) === (b.axisCount || 0) &&
+                         !!a.capLevel === !!b.capLevel;
   const p = { ...start };
   let index = 0, total = 0, found = -1;
   for (let i = 0; i < 5000; i++) {

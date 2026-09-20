@@ -382,14 +382,12 @@ function endBlock() {
     }
     applyProgression();
   } else {
-    /* Free Play adapts N the classic way and leaves everything else alone. */
-    if (score >= advanceAt()) { freeCfg.n = Math.min(9, freeCfg.n + 1); verdict = 'up';
-      headline = `N rises to ${freeCfg.n}`; }
-    else if (score <= demoteAt()) { freeCfg.n = Math.max(1, freeCfg.n - 1); verdict = 'down';
-      headline = `N falls to ${freeCfg.n}`; }
-    else headline = `N holds at ${freeCfg.n}`;
-    cfg.n = freeCfg.n;
-    $('nValue').value = freeCfg.n;
+    /* Free Play changes nothing. Adapting N here moved a setting the player had
+       chosen and then had to put back by hand every block — the mode whose whole
+       point is that the task stays exactly as you set it. Progression is where the
+       task is allowed to adapt; here the report only says how the block went. */
+    headline = `N stays at ${cfg.n}`;
+    detail = 'Free Play leaves your settings alone — change them in Settings.';
   }
 
   if (score >= advanceAt()) progress.bestLoad = Math.max(progress.bestLoad || 0, load);
@@ -428,8 +426,62 @@ function computeLoad() {
      Load with a silly interval instead of actual difficulty. */
   load += Math.min(30, Math.max(0, 12 * (2500 / cfg.interval - 1)));
   if (cfg.rotation) load += 6 + 600 / cfg.spin;
-  if (cfg.frame === 'screen') load += 20;
-  if (cfg.frame === 'both') load += 34;
+
+  /*
+   * ---- Everything the position judgement is worth beyond its flat stream term ----
+   *
+   * The loop above pays 9 for "position, relational" and stopped there, so Load
+   * was blind to the entire top half of the app: a ternary block and a quaternary
+   * one scored the SAME number at the same settings, and four coordinate axes —
+   * the most principled difficulty in here — moved it by nothing at all. Free
+   * Play's whole promise is that Load scores the setup; it could not score the
+   * part of the setup worth climbing.
+   *
+   * Frames are charged here rather than unconditionally, too. A reference frame
+   * is a way of naming where the stimulus went, so it is worth nothing while
+   * position is off or judged as identity — and it used to be charged anyway.
+   */
+  if (cfg.streams.position === 'relational') {
+    /* A second frame asks the same event again in coordinates the first cannot
+       supply. Charged per frame rather than as a flat "both", so the second one
+       costs less than the first: the moves are the same moves. */
+    if (cfg.frame === 'screen') load += 20;
+    else if (cfg.frame === 'both') load += 34;
+
+    if (cfg.meta) {
+      /*
+       * Second order. The first-order term buys reporting a move; this buys
+       * binding it to another move that is no longer on screen — the step from
+       * ternary to quaternary, and the one Halford's ceiling is measured in.
+       */
+      load += 14;
+      /*
+       * Quinary: the second binding, over the same event, in a frame the first
+       * cannot be converted into. Only when the cube actually turns — angles are
+       * rotation-invariant, so a still cube makes the screen answer a copy of the
+       * cube answer and there is no second binding to pay for.
+       */
+      if (dualFrameLive(cfg)) load += 20;
+    }
+
+    /*
+     * Coordinate axes. Each is an independent up/down/neither inside the position
+     * judgement — a little under a relational stream, since it shares the bucket
+     * and borrows the property's own two buttons.
+     */
+    const axes = coordAxes(cfg).length;
+    if (axes) {
+      load += 7 * axes;
+      /* And worth more again under a second-order judgement, which is the case
+         they exist for: there are as many mutually orthogonal directions as
+         dimensions, so each one added is another way for two moves to be square
+         — and another way for them to sit at no tidy angle at all. */
+      if (cfg.meta) load += 3 * axes;
+      /* The same axes, a step further apart: a longer move to place, on every
+         one of them. */
+      if (magnitudeCap(cfg) === 3) load += 2 * axes;
+    }
+  }
   return Math.round(load);
 }
 
@@ -437,10 +489,34 @@ function computeLoad() {
    13. APPLYING THE LADDER
    ============================================================ */
 
+/*
+ * Which properties are coordinates of the move on a ladder run.
+ *
+ * Below quaternary this is the player's own choice, untouched — an axis there is
+ * one more independent up/down/neither and nothing more, so there is nothing for
+ * a ladder to grade. At quaternary and up the ladder owns it: axis count is a
+ * digit on the odometer, and a rung has to mean the same thing for everyone
+ * standing on it. The panel's boxes go read-only to match.
+ */
+function ladderCoordAxes(store) {
+  if (!laddersAxes()) return (coordAxes(store) || []).slice();
+  return PROG_AXES.slice(0, prog.axisCount || 0);
+}
+
+/* Same division: chosen below quaternary, the ladder's last digit above it. */
+function ladderMagnitudeCap(store) {
+  if (!laddersAxes()) return (store || progCfg).magnitudeCap === 3 ? 3 : 2;
+  return prog.capLevel ? 3 : 2;
+}
+
 function applyProgression() {
   const levels = spinLevels();
-  prog.spinLevel = Math.min(prog.spinLevel, levels.length - 1);
+  /* The floor is the tier's, not zero: quinary reads the cube against the screen,
+     and with a still cube those are the same frame twice. */
+  prog.spinLevel = Math.min(Math.max(prog.spinLevel, minSpinLevel()), levels.length - 1);
   prog.streamCount = Math.min(prog.streamCount, PROG_STREAMS.length);
+  prog.axisCount = Math.min(Math.max(prog.axisCount || 0, 0), maxAxisCount());
+  prog.capLevel = laddersAxes() && prog.capLevel ? 1 : 0;
   prog.n = Math.max(1, prog.n);
   prog.lureRate = Math.min(LURE_MAX, Math.max(LURE_MIN, prog.lureRate ?? 0.20));
   /* The staircase is allowed to place below the target — a player who is already
@@ -464,29 +540,43 @@ function applyProgression() {
     lureRate: prog.lureRate,
     feedback: progCfg.feedback,
     meta: rcTier >= 4,             // the tier IS the relational-complexity level
+    /*
+     * Quinary is the meta relation asked in both frames at once — see
+     * `relationalComplexity`. Below it the cube frame alone, which is what every
+     * ladder run has always used.
+     */
+    frame: rcTier >= 5 ? 'both' : 'cube',
     /* Free Play only. Each of these changes how hard the task is, and a ladder has to
        mean the same thing at every rung — a fixed symbol map in particular makes the
        glyph stream markedly easier, which is exactly why it is opt-in. */
     gate: 0, retro: 0, varN: 0, fixedGlyphMap: false,
     varPriority: true,
-    /* Chosen rather than laddered. Extra axes widen the space a move lives in
-       without adding an answer, which is what makes quaternary at a high N
-       carry more; but they change what a rung means, so the ladder does not
-       move them on its own. */
-    coordAxes: (progCfg.coordAxes || []).slice(),
-    magnitudeCap: progCfg.magnitudeCap === 3 ? 3 : 2,
+    /* Extra axes widen the space a move lives in without adding an answer, which
+       is what makes quaternary at a high N carry more. Below quaternary that buys
+       nothing a ladder can grade, so the boxes stay the player's; at quaternary it
+       is the last thing left to climb, so the ladder takes them. */
+    coordAxes: ladderCoordAxes(progCfg),
+    magnitudeCap: ladderMagnitudeCap(progCfg),
     pitchLoudness: !!progCfg.pitchLoudness,
     dim: 3,
-    frame: 'cube',
     rotation: prog.spinLevel > 0,
     spin: prog.spinLevel > 0 ? levels[prog.spinLevel] : 60,
     blockLength: tune.blockLength,
   });
 
   if (cfg.streams.glyph === 'relational' && !state.glyphMap) ensureGlyphMap();
-  onConfigChanged();
-  /* Pitch is a coordinate or a stream, never both. */
+  /*
+   * Before `onConfigChanged`, not after — which is the order `applyFree` has
+   * always had and this one has always had backwards.
+   *
+   * `onConfigChanged` builds the deck and repaints the HUD from `cfg.streams`, so
+   * running it first built both from a configuration where a property was still a
+   * coordinate AND a stream: a Tone button on the deck for a stream that was about
+   * to be deleted, and a Load counting it. Harmless while nothing but a checkbox
+   * could make a property an axis; the axis digit means the ladder does it now.
+   */
   applyDimensions(cfg);
+  onConfigChanged();
 }
 
 function applyFree() {
@@ -534,7 +624,7 @@ function setMode(mode) {
   $('freePane').style.display = mode === 'free' ? '' : 'none';
   $('modeHint').textContent = mode === 'progression'
     ? 'One ladder, driven by your accuracy. Speed adapts every block; clearing the target speed unlocks the next difficulty.'
-    : 'Everything unlocked and manual. N still adapts each block; Load scores the setup.';
+    : 'Everything unlocked and manual. Nothing adapts — the task stays exactly as you set it; Load scores the setup.';
   if (mode === 'progression') applyProgression(); else applyFree();
   buildCube(cfg.dim);
   syncSettingsUI();

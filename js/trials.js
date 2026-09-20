@@ -77,9 +77,11 @@ function trialLag() {
   return lo + randInt(hi - lo + 1);
 }
 
-/* Cells reachable from `from` by a single-axis move — meta-relations needs every
-   delta to be cardinal, or "same/opposite/different" has no defined answer for a
-   diagonal move and the task stops being about memory. */
+/* Cells reachable from `from` by a single-axis move. Once a move could run on
+   several axes at once the meta branch stopped needing this — the relation is an
+   angle, and every angle has an answer now that oblique is one of them. What is
+   left is the relational lure, which wants a clean cardinal step so that
+   mis-counting your lag yields a confident wrong answer rather than noise. */
 function cardinalNeighbours(fromIdx) {
   const f = state.cells[fromIdx];
   return state.cells.map((c, i) => ({ c, i })).filter(({ c }) => {
@@ -103,6 +105,10 @@ function cardinalNeighbours(fromIdx) {
  * against a previous move on the same axis it is the only way to state same or
  * opposite — so an axis is not decoration, it is another way to answer
  * "orthogonal" where there were two.
+ *
+ * They are also where most of the oblique relations live, for the same reason:
+ * a wider space has more directions in it that are neither aligned with a given
+ * move nor square to it, and those are now drawn rather than skipped.
  *
  * `from` is the reference trial rather than a cell index, because a move starts
  * from a position on every axis.
@@ -181,21 +187,45 @@ function pickMetaMove(fromIdx, from, A, forbid) {
   }
 
   /*
-   * Bucketed by the relation each move would state, and only the three a button
-   * can express. Oblique moves are dropped rather than shown: no answer says
-   * "neither", and a trial nobody can answer is worse than a narrower draw.
+   * Bucketed by the relation each move would state — all four of them.
+   *
+   * Oblique used to be dropped here, on the grounds that no button says
+   * "neither". That reasoning had it backwards: the answer to a relation no
+   * button names is to press nothing, which every other stream in the app
+   * already asks for. Dropping it restricted the draw to the three special
+   * cases of a move that may now run on any number of axes, and those are by
+   * far the rarer ones — most pairs of composite moves are oblique, so the
+   * generator was throwing away most of the space it had just been given in
+   * order to protect a deck that needed no protecting.
    */
-  const byType = { same: [], opp: [], diff: [] };
+  const byType = { same: [], opp: [], diff: [], obl: [] };
   moves.forEach(m => {
     const rel = metaRelationOf(A, m.vec);
     if (rel) byType[rel].push(m);
   });
 
-  /* "Same" means continuing straight, which a wall blocks about half the time, so
-     uniform-over-available leaves it rare. Over-weight it when it IS reachable to
-     pull the three answers closer together. */
-  const W = { same: 3, opp: 1, diff: 1 };
-  const avail = ['same', 'opp', 'diff'].filter(k => byType[k].length);
+  /*
+   * "Same" means continuing straight, which a wall blocks about half the time, so
+   * uniform-over-available leaves it rare. Over-weight it when it IS reachable to
+   * pull the answers closer together.
+   *
+   * "Opposite" is over-weighted with it, which it was not before. The reason is
+   * the same reason, and it only became the same reason when moves went
+   * composite: same and opposite are each ONE direction out of the whole space,
+   * so a wall blocks them at the same rate, while orthogonal and oblique are
+   * large sets that almost always have a member in bounds. Left at weight 1,
+   * opposite fell to under a tenth of trials — rarer than the answer the weight
+   * was introduced to rescue.
+   *
+   * Oblique gets no extra weight and needs none — it is the biggest bucket once
+   * the space is more than three dimensions wide, and weighting BY TYPE rather
+   * than by move is what keeps it from swallowing the block. Drawing uniformly
+   * over moves would make "press nothing" the answer most of the time, which is
+   * the one failure mode a no-input relation can have: it would pay to stop
+   * playing.
+   */
+  const W = { same: 3, opp: 3, diff: 1, obl: 1 };
+  const avail = ['same', 'opp', 'diff', 'obl'].filter(k => byType[k].length);
   if (!avail.length) return pick(moves);
   let r = Math.random() * avail.reduce((s, k) => s + W[k], 0);
   const type = avail.find(k => (r -= W[k]) < 0) || avail[avail.length - 1];

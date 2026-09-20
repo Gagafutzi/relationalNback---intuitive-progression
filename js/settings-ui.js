@@ -42,7 +42,7 @@ function renderKeybinds() {
     head.innerHTML = `<span style="color:${spec.color}">■</span> ${spec.label}`;
     wrap.appendChild(head);
 
-    ['identity', 'relational', 'relationalScreen'].forEach(mode => {
+    CHANNEL_MODES.forEach(mode => {
       (spec[mode] || []).forEach(c => {
         const row = document.createElement('div');
         row.className = 'kb-row';
@@ -50,6 +50,8 @@ function renderKeybinds() {
           `<span class="kb-glyph" style="color:${c.color || spec.color}">${c.glyph}</span>
            <span class="kb-label">${c.label}${
              mode === 'relationalScreen' ? ' <span style="opacity:.45">screen</span>' :
+             mode === 'metaScreen' ? ' <span style="opacity:.45">vs. previous · screen</span>' :
+             mode === 'meta' ? ' <span style="opacity:.45">vs. previous</span>' :
              mode === 'identity' ? ' <span style="opacity:.45">id</span>' : ''}</span>`;
 
         /* For a channel that's live right now, show the key that ACTUALLY works —
@@ -156,7 +158,14 @@ function renderLadderState() {
     <div><span class="k">Rotation</span><b>${prog.spinLevel === 0 ? 'still' : levels[prog.spinLevel] + 's/turn'}</b>${
       prog.spinLevel > 0 ? ` <span style="opacity:.5">(step ${prog.spinLevel}/${levels.length - 1})</span>` : ''}</div>
     <div><span class="k">Interval</span><b>${(prog.interval / 1000).toFixed(2)}s</b>
-      <span style="opacity:.5">→ ${(tune.targetInterval / 1000).toFixed(2)}s</span></div>
+      <span style="opacity:.5">→ ${(tune.targetInterval / 1000).toFixed(2)}s</span></div>` +
+    (laddersAxes() ? `
+    <div><span class="k">Axes</span><b>${3 + ladderCoordAxes(progCfg).length}</b>${
+      ladderCoordAxes(progCfg).length
+        ? ` <span style="opacity:.5">cube plus ${ladderCoordAxes(progCfg).map(labelFor).join(', ')}</span>`
+        : ' <span style="opacity:.5">the cube alone</span>'}</div>
+    <div><span class="k">Furthest step</span><b>${ladderMagnitudeCap(progCfg)}</b>
+      <span style="opacity:.5">${ladderMagnitudeCap(progCfg) === 3 ? 'four' : 'three'} levels per axis</span></div>` : '') + `
     <div><span class="k">Lure rate</span><b>${Math.round((prog.lureRate ?? 0.2) * 100)}%</b>
       <span style="opacity:.5">adapts on lure trials only</span></div>` +
     (tune.adapt === 'bayes' && stairLog ? `
@@ -166,9 +175,12 @@ function renderLadderState() {
       <span style="opacity:.5">below target · need ${Math.round(STAIR.clearAt * 100)}%</span></div>` : '');
 
   $('rcTier').value = String(rcTier);
-  $('rcHint').textContent = rcTier >= 4
-    ? 'Quaternary binds two relations into one representation — Halford\'s documented adult ceiling. Its own ladder, its own staircase and its own targets, independent of the ternary track.'
-    : 'Ternary binds two positions and the direction relating them. The standard track. Its ladder and its targets are its own — editing them leaves quaternary untouched.';
+  $('rcHint').textContent =
+    rcTier >= 5
+      ? 'Quinary asks the same relation twice — once against the cube, once against the screen — and a turning cube is what stops the second answer being the first one copied out. Rotation never switches off on this tier. Two bindings held at once, not one binding of five things: past the ceiling by sharing capacity rather than by deepening it.'
+    : rcTier >= 4
+      ? 'Quaternary binds two relations into one representation — Halford\'s documented adult ceiling. Its own ladder, its own staircase and its own targets, independent of the ternary track. Its ladder climbs past the last stimulus into the axes of the move itself.'
+      : 'Ternary binds two positions and the direction relating them. The standard track. Its ladder and its targets are its own — editing them leaves quaternary untouched.';
 
   /* Every section whose numbers are stored per tier is stamped with the tier they
      belong to. Without it, the same four panels showing different values depending on
@@ -229,8 +241,32 @@ function syncCoordUI(boxesId, capId, countId, loudId, c) {
 
 function syncSettingsUI() {
   $('feedbackMode').value = progCfg.feedback;
-  syncCoordUI('progCoordAxes', 'progMagnitudeCap', 'progCoordCount',
-              'progPitchLoudness', progCfg);
+  /* At quaternary and up the ladder owns the axes, so the panel shows what the
+     LADDER has rather than what the boxes remember, and goes read-only to say so.
+     Showing the remembered set next to a block that is not using it is the same
+     class of bug as a mode overwriting another mode's settings. */
+  const ladderOwns = laddersAxes();
+  syncCoordUI('progCoordAxes', 'progMagnitudeCap', 'progCoordCount', 'progPitchLoudness',
+              ladderOwns
+                ? { ...progCfg, coordAxes: ladderCoordAxes(progCfg),
+                    magnitudeCap: ladderMagnitudeCap(progCfg) }
+                : progCfg);
+  document.querySelectorAll('#progCoordAxes input[data-coord]')
+    .forEach(b => { b.disabled = ladderOwns; });
+  $('progMagnitudeCap').disabled = ladderOwns;
+  /* The two halves of one rule, and they say opposite things by tier — so neither
+     is written into the page. A rung has to mean the same thing each time you reach
+     it; below quaternary that is served by the ladder never touching these, and at
+     quaternary by the ladder owning them outright. */
+  $('progCoordOwned').textContent = ladderOwns
+    ? 'The ladder is driving these: axis count is the digit above stream count, and ' +
+      'the furthest step is the one above that. Drop to ternary to choose them yourself.'
+    : '';
+  $('progCoordRule').textContent = ladderOwns
+    ? 'A rung has to mean the same thing each time you reach it, so at this tier the ' +
+      'axes are the ladder\'s rather than yours — they are the last thing left to climb.'
+    : 'The ladder never moves these at ternary — a rung has to mean the same thing each ' +
+      'time you reach it. Changing them changes what your recorded speed and N are about.';
   $('feedbackModeF').value = freeCfg.feedback;
   $('adaptMode').value = tune.adapt;
   $('startInterval').value = tune.startInterval / 1000;
@@ -277,6 +313,28 @@ function syncSettingsUI() {
   $('rotationSpeed').value = freeCfg.spin;
   syncCoordUI('coordAxes', 'magnitudeCap', 'coordCount', 'pitchLoudness', freeCfg);
   $('frameMode').value = freeCfg.frame;
+  /*
+   * What the frame means once the judgement is second order, and the one way to
+   * set this up and get nothing for it.
+   *
+   * A rotation preserves angles, so the relation between two moves is the same
+   * number in the cube frame and the screen frame unless the cube turned BETWEEN
+   * them. Meta + both frames + a still cube therefore asks the identical question
+   * twice and scores it twice, which looks like the hardest setting in the app and
+   * is the quaternary one wearing a second deck.
+   */
+  $('frameMetaHint').innerHTML = !freeCfg.meta
+    ? ''
+    : freeCfg.frame !== 'both'
+      ? 'With meta on, this picks which frame the <b>relation between the two moves</b> ' +
+        'is read in — not which frame the move is reported in.'
+      : freeCfg.rotation
+        ? 'Quinary: the relation between the two moves, asked once against the cube and ' +
+          'once against the screen. They differ only by however far the cube turned ' +
+          'between the two moves.'
+        : '<b style="color:#ff922b">Turn rotation on.</b> Angles survive a rotation, so ' +
+          'with a still cube the screen answer is always the cube answer — two decks ' +
+          'asking one question.';
   $('varPriority').checked = !!freeCfg.varPriority;
   $('fixedGlyphMap').checked = !!freeCfg.fixedGlyphMap;
   $('metaOn').checked = !!freeCfg.meta;
