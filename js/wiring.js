@@ -327,10 +327,12 @@ $('cubeSize').oninput = e => {
   $('cubeSizeVal').textContent = e.target.value;
   document.documentElement.style.setProperty('--cube-scale', cfg.cubeScale);
   /* The stage is sized from --cube-size, so the cube has to be rebuilt against the
-     new pixel width or the spaced solve is scaled to the old one. */
+     new pixel width or the spaced solve is scaled to the old one. And since that
+     rebuild is now a real one on a phone too, the stimulus standing on the old
+     lattice has to be painted back onto the new one rather than left as a bare
+     highlight — dragging the slider mid-block must not take the trial with it. */
   buildCube(cfg.dim);
-  const cur = state.history[state.history.length - 1];
-  if (state.running && cur) state.cells[cur.cellIdx].el.classList.add('active');
+  repaintLive();
   saveProgress();
 };
 
@@ -545,19 +547,25 @@ function rebuildForBox() {
   if (!box || Math.abs(box - state.builtSize) < 0.5) return;
 
   buildCube(cfg.dim);
-  /* Re-render rather than just re-flagging the cell: the lattice is new DOM, so
-     colour, glyph, size and quantity are all gone and the slot would come back
-     blank. Skipped while a retro cue is up — the stimulus is meant to be hidden
-     then, and painting it back would hand over the answer. */
+  repaintLive();
+}
+
+/**
+ * Put the trial that is on screen back onto the lattice that just replaced it.
+ *
+ * Re-render rather than just re-flagging the cell: the lattice is new DOM, so
+ * colour, glyph, size and quantity are all gone and the slot would come back
+ * blank. Skipped while a retro cue is up — the stimulus is meant to be hidden
+ * then, and painting it back would hand over the answer.
+ */
+function repaintLive() {
   const cur = state.currentTrial;
-  if (state.running && cur && state.stimShown) {
-    /* The recorded matrix is the one the screen frame is judged against, sampled
-       at onset. Re-rendering must not re-sample it at the angle we happen to be
-       at now. */
-    const m = cur.matrix;
-    renderTrial(cur);
-    cur.matrix = m;
-  }
+  if (!state.running || !cur || !state.stimShown) return;
+  /* The recorded matrix is the one the screen frame is judged against, sampled at
+     onset. Re-rendering must not re-sample it at the angle we happen to be at now. */
+  const m = cur.matrix;
+  renderTrial(cur);
+  cur.matrix = m;
 }
 
 /* Debounced: mobile browsers fire resize continuously as the address bar hides,
@@ -584,5 +592,33 @@ window.addEventListener('resize', rebuildSoon);
  */
 if (typeof ResizeObserver === 'function') {
   new ResizeObserver(rebuildSoon).observe(cubeWrapper);
+}
+
+/**
+ * The dock, measured.
+ *
+ * The other half of the stage's budget is the height the answer keys need, and
+ * there is no constant for it: the deck carries one group per stream in play, it
+ * wraps on a narrow phone, and the n-back cue comes and goes. So it is measured
+ * and published rather than guessed, and `--stage-room` — and through it the
+ * cube — follows it.
+ *
+ * Nothing here loops. The dock's height is set by its own contents; the stage
+ * sits above it in the same column and cannot push it about, so a cube that grows
+ * to fill the room the dock left over does not change the room.
+ */
+const dockEl = document.querySelector('.dock');
+function measureDock() {
+  const h = Math.round(dockEl.getBoundingClientRect().height);
+  /* Zero while the deck is between renders — publishing that would hand the cube
+     the whole screen for a frame. */
+  if (!h) return;
+  const root = document.documentElement;
+  if (Math.abs(h - parseFloat(root.style.getPropertyValue('--dock-h'))) < 0.5) return;
+  root.style.setProperty('--dock-h', h + 'px');
+  /* The cube box moves with it; the wrapper's own observer picks that up. */
+}
+if (typeof ResizeObserver === 'function' && dockEl) {
+  new ResizeObserver(measureDock).observe(dockEl);
 }
 

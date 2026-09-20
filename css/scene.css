@@ -11,12 +11,16 @@
 
 /* The stage reserves the GIZMO's footprint, not the cube's — the arms reach well
    past the lattice, so a stage sized to the cube alone clips the badges. The
-   multiplier lives on the body (see --stage-k) because --cube-size is derived from
-   it on a phone, and a custom property can only read another one from its own
-   element. */
+   multiplier lives on :root (see --stage-k) because --cube-size is derived from it,
+   and a custom property can only read another one from its own element.
+
+   Never taller or wider than the room, though. Past that point the cube has been
+   scaled beyond its fitted size deliberately, and the arms are what give way: a
+   stage that kept growing was taller than the screen, and since the dock sits under
+   it in the same column, it took the answer keys off the bottom with it. */
 .cube-stage {
-  width: calc(var(--cube-size) * var(--stage-k));
-  height: calc(var(--cube-size) * var(--stage-k));
+  width: min(calc(var(--cube-size) * var(--stage-k)), var(--room-w));
+  height: min(calc(var(--cube-size) * var(--stage-k)), var(--room-h));
   display: flex; align-items: center; justify-content: center;
   flex: none; margin: auto auto 6px;
 }

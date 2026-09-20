@@ -176,6 +176,10 @@ function buildCube(dim) {
   const solvedSpin = cfg.rotation && cfg.spinPath !== 'free';
   document.documentElement.classList.toggle('spin-stage', solvedSpin);
   document.documentElement.classList.toggle('tumble-stage', cfg.rotation && !solvedSpin);
+  /* Published for the same reason and at the same moment as those four: the box the
+     lattice asks for is `dim` slots wide, so --cube-size cannot be right until the
+     rule knows how many there are — and `size` is read a few lines down. */
+  document.documentElement.style.setProperty('--cube-dim', dim);
 
   gridCube.innerHTML = '';
   state.cells = [];

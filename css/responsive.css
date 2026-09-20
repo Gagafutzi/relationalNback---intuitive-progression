@@ -9,27 +9,11 @@
 }
 
 @media (max-width: 700px) {
-  /* Sized the other way round from desktop: pick the footprint the phone can give
-     the stage, then divide by --stage-k for the lattice. 32vmin was reading off the
-     375px WIDTH of a portrait phone, so the cube came out at 120px — a quarter of
-     the screen. Width is what binds here; the vh term only steps in on a short
-     viewport, to keep the response deck reachable without scrolling. */
-  :root {
-    /* svh, not dvh: the dynamic viewport height changes every time the address bar
-       slides, and the cube is sized from this. On dvh a scroll gesture resized the
-       box, which forced a rebuild mid-block — restarting the spin and wiping the
-       stimulus off the screen. svh is the height with the chrome shown and does not
-       move. */
-    /* The dock now carries a second row (the run controls) under the answer keys,
-       so the stage gives back the height that row needs rather than pushing the deck
-       off the bottom of a phone. */
-    --stage-budget: min(96vw, 50vh);
-    --cube-size: min(
-      calc(var(--stage-budget) / var(--stage-k) * var(--cube-scale)),
-      /* Hard ceiling: the scale slider may shrink the cube but never push the
-         stage past the width the scene can actually paint. */
-      calc(96vw / var(--stage-k)));
-  }
+  /* Only the chrome differs here. The sizing rule itself is the one in base.css —
+     it already reads the viewport and the dock, so there is nothing left for this
+     breakpoint to work out for itself, and a second formula here was how the two
+     drifted apart in the first place. */
+  :root { --scene-chrome: 96px; }   /* .scene padding 78 + 12, plus the stage's 6 */
 
   /* Wider keys AND wider gutters. 40px keys 5px apart are narrower than the
      fingertip aiming at them, so the neighbour of the intended answer was easy to
@@ -65,9 +49,3 @@
   .glyph-legend { bottom: 8px; left: 8px; font-size: 10px; }
 }
 
-/* dvh so the address bar sliding in cannot push the deck off the bottom. Kept
-   behind @supports: a custom property holding an unknown unit fails at
-   computed-value time, which would leave --cube-size with no value at all. */
-@supports (height: 1svh) {
-  @media (max-width: 700px) { :root { --stage-budget: min(96vw, 50svh); } }
-}

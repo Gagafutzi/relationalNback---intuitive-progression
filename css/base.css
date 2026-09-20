@@ -14,37 +14,97 @@
   --good: #51cf66;
   --bad: #ff6b6b;
   --cube-scale: 1;
+  /* Slots per side, kept in step with cfg.dim by buildCube(). The box the lattice
+     asks for is a NUMBER OF SLOTS, not a fixed width: pinning a 4-cube to the box a
+     3-cube had left it only one place to find the extra layer, which was the slot
+     size — and the slot is the thing every mark inside is drawn against. */
+  --cube-dim: 3;
+  /* What one slot asks for when the room is there. 80px is exactly what a 3-cube
+     has always had at 100%, so the default view does not move. */
+  --slot-size: 80px;
   /* How much wider than the lattice the stage has to be to hold the gizmo arms and
      their badges. Measured, not guessed: badges reach ~1.85 × the lattice across at
      the solved angle, ~2.05 when the lattice is spread. With the gizmo hidden the
      only thing to fit is the projected cube itself, which is far tighter — so the
      lattice can be much bigger for the same footprint. */
   --stage-k: 1.9;
-  --cube-size: calc(min(34vmin, 240px) * var(--cube-scale));
+  /* The same figure with the arms taken out: what the FIGURE ITSELF needs, which is
+     the projected outline of the lattice plus the rails that run its full width.
+     It is always the gizmo-off --stage-k of the same combination, because that is
+     exactly the case where the figure is the only thing the stage has to hold —
+     which is why the pairs below always repeat that rule's number. This is the
+     cube's own ceiling: the arms may clip when the slider is pushed up, the cube
+     may not. */
+  --cube-k: 1.5;
+  /* The dock's height, measured and published by wiring.js. It carries one group
+     per stream in play, so it is a property of the session rather than of the
+     layout and there is no honest constant for it; this value only has to stand in
+     for the first paint, and it errs high so that paint comes out small rather
+     than over the bottom of the screen. */
+  --dock-h: 200px;
+  /* The scene's own padding plus the stage's bottom margin — everything vertical
+     that is not the stage and not the dock. */
+  --scene-chrome: 78px;
+  /* svh, not dvh: the dynamic viewport height changes every time a phone's address
+     bar slides, and the cube is sized from this. On dvh a scroll gesture resized
+     the box, which forced a rebuild mid-block — restarting the spin and wiping the
+     stimulus off the screen. svh is the height with the chrome shown, and it does
+     not move. (Overridden below where the unit is supported.) */
+  --vh-room: 100vh;
+  /* What the scene can actually paint the stage into. Two figures, not one square:
+     the width the viewport gives, and the height left over once the dock has taken
+     its share. They are usually very different, and collapsing them to a square
+     spends the taller one. */
+  --room-w: 96vw;
+  /* Floored, because both terms it subtracts are measured. A dock measured while
+     the viewport has no size yet — a background tab, a pane that has not been laid
+     out — comes back taller than the screen, and without the floor the room goes
+     negative and the cube collapses to nothing. The floor is small enough never to
+     bind on a real viewport; the observers correct the measurement as soon as the
+     page is actually rendered. */
+  --room-h: max(120px, calc(var(--vh-room) - var(--scene-chrome) - var(--dock-h)));
+  --stage-room: min(var(--room-w), var(--room-h));
+  /* The biggest cube that still leaves the gizmo arms their reach. */
+  --cube-fit: calc(var(--stage-room) / var(--stage-k));
+  /* Whichever is smaller — what the lattice asks for, or what fits with the arms —
+     is the cube at 100%. The slider scales THAT, and may carry it past the fitted
+     size up to what the figure itself needs: the arms clip, because a player
+     dragging the cube up is asking for exactly that trade, and the arms are the
+     only thing on the stage that is decoration rather than the task.
+
+     The old rule had the two ceilings backwards. It capped the STAGE at the
+     viewport width, which on a portrait phone lands exactly on the 100% size, so
+     the slider's whole upper half moved nothing at all; and on the desk it capped
+     nothing, so 190% built a stage taller than the screen and took the answer keys
+     off the bottom with it. */
+  --cube-size: min(
+    calc(min(var(--cube-fit), var(--cube-dim) * var(--slot-size)) * var(--cube-scale)),
+    calc(var(--stage-room) / var(--cube-k)));
 }
+@supports (height: 1svh) { :root { --vh-room: 100svh; } }
 /* On :root, not body — --cube-size is declared on :root and a var() there can only
    read a custom property off :root itself. Setting these on body would leave the
    lattice sized against the default 1.9 forever. */
-:root.spread-stage { --stage-k: 2.15; }
-:root.gizmo-off { --stage-k: 1.5; }
-:root.gizmo-off.spread-stage { --stage-k: 1.25; }
+:root.spread-stage { --stage-k: 2.15; --cube-k: 1.25; }
+:root.gizmo-off { --stage-k: 1.5; --cube-k: 1.5; }
+:root.gizmo-off.spread-stage { --stage-k: 1.25; --cube-k: 1.25; }
 /* Spinning needs more room than resting: the solved tilt is steeper than the resting
    view, and the roll turns the silhouette through every angle, so the footprint is
    the circumscribed circle rather than one static outline. Every combination is
    spelled out — a two-class selector has to outrank the one-class rules above it. */
-:root.spin-stage                        { --stage-k: 1.95; }
+:root.spin-stage                        { --stage-k: 1.95; --cube-k: 1.72; }
 /* The free tumble presents the lattice edge-on and corner-on in turn, so its
    footprint is the resting one — it is only the solved path that tilts steeply. */
-:root.tumble-stage                        { --stage-k: 1.80; }
-:root.tumble-stage.spread-stage           { --stage-k: 1.85; }
-:root.tumble-stage.gizmo-off              { --stage-k: 1.75; }
-:root.tumble-stage.gizmo-off.spread-stage { --stage-k: 1.25; }
+:root.tumble-stage                        { --stage-k: 1.80; --cube-k: 1.75; }
+:root.tumble-stage.spread-stage           { --stage-k: 1.85; --cube-k: 1.25; }
+:root.tumble-stage.gizmo-off              { --stage-k: 1.75; --cube-k: 1.75; }
+:root.tumble-stage.gizmo-off.spread-stage { --stage-k: 1.25; --cube-k: 1.25; }
 /* The spread lattice is compact at the solved tilt, so the arms are what set the
    footprint and 2.15 was reserving room nothing used. On a phone the box is
    divided by this, so the slack came straight out of the slot size. */
-:root.spin-stage.spread-stage           { --stage-k: 1.95; }
-:root.spin-stage.gizmo-off              { --stage-k: 1.72; }
-:root.spin-stage.gizmo-off.spread-stage { --stage-k: 1.25; }
+:root.spin-stage.spread-stage           { --stage-k: 1.95; --cube-k: 1.25; }
+:root.spin-stage.gizmo-off              { --stage-k: 1.72; --cube-k: 1.72; }
+:root.spin-stage.gizmo-off.spread-stage { --stage-k: 1.25; --cube-k: 1.25; }
 
 * { box-sizing: border-box; }
 
