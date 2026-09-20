@@ -19,6 +19,17 @@ const APPEAR_KEY = 'rnb.appearance.v1';
    the lit cell, the gizmo badges, the glows — and a light ground would need every one
    of those re-derived rather than re-tinted, so it is a separate job, not a row here. */
 const THEMES = {
+  /* The hub's own palette, and the default. A trainer opened from mindbuild is
+     framed by that page, and two different dark schemes either side of an iframe
+     border read as two applications rather than one.
+
+     Its accent is pale enough that the ink derived for a filled button comes out
+     dark rather than white — luma .70 against the .6 threshold below — which is
+     the same inversion the hub's buttons use. */
+  mindbuild:{ bg:'#080d0b', glow:'#101a15', panel:'#0f1713', panel2:'#0a110e',
+              text:'#c9e0d3', muted:'rgba(201,224,211,.58)', input:'#0b1310',
+              border:'rgba(143,189,164,.42)', borderIn:'rgba(143,189,164,.16)',
+              accent:'#8fbda4' },
   midnight: { bg:'#0b0d10', glow:'#121728', panel:'#141820', panel2:'#0f1218',
               text:'#e6ebff', muted:'rgba(230,235,255,.55)', input:'#0e121a',
               border:'rgba(180,200,255,.45)', borderIn:'rgba(180,200,255,.18)',
@@ -69,7 +80,7 @@ const THEMES = {
               accent:'#a8cf5c' },
 };
 
-const ACCENTS = ['#4d7fd6', '#8ab4ff', '#51cf66', '#ffb74d', '#ff6b6b', '#cc5de8', '#4dd0e1'];
+const ACCENTS = ['#8fbda4', '#4d7fd6', '#8ab4ff', '#51cf66', '#ffb74d', '#ff6b6b', '#cc5de8', '#4dd0e1'];
 
 /* Okabe–Ito: six hues that stay distinguishable under the common colour-vision
    deficiencies. The axis colours are semantic (they match the buttons), so the set
@@ -81,8 +92,11 @@ const AXIS_PALETTES = {
              west:'#e69f00', above:'#cc79a7', below:'#f0e442' },
 };
 
+/* Defaults only: loadAppearance() overwrites these from localStorage, so anyone
+   who has already picked a theme keeps it. Changing the default re-dresses the
+   app for a first visit, not for a returning tester. */
 const appearance = {
-  theme: 'midnight', accent: '#4d7fd6', dim: 68,
+  theme: 'mindbuild', accent: '#8fbda4', dim: 68,
   palette: 'default', flat: false, bgFit: 'cover', bg: null,
 };
 
@@ -143,7 +157,9 @@ const luma = c => { const [r, g, b] = rgbOf(c).map(v => v / 255);
                     return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 
 function applyAppearance() {
-  const t = THEMES[appearance.theme] || THEMES.midnight;
+  /* Falls back to the default rather than to midnight: a stored id that no
+     longer exists should land on whatever the app dresses itself in today. */
+  const t = THEMES[appearance.theme] || THEMES.mindbuild;
   const r = document.documentElement.style;
   r.setProperty('--bg', t.bg);
   r.setProperty('--bg-glow', t.glow);

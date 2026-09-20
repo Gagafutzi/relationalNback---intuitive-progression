@@ -5,7 +5,7 @@
 }
 .deck-group {
   display: flex; flex-direction: column; gap: 7px;
-  padding: 9px 11px 11px; border-radius: 14px;
+  padding: 9px 11px 11px; border-radius: var(--radius);
   /* Plain rgba first: where color-mix is unsupported the whole declaration is
      dropped, and the group would sit directly on the background image. */
   background: rgba(20, 24, 32, .6);
@@ -33,7 +33,7 @@
    the axis palette for free. */
 .rbtn {
   position: relative; min-width: 54px; padding: 10px 11px 18px;
-  color: var(--text); border-radius: 12px; cursor: pointer;
+  color: var(--text); border-radius: var(--radius); cursor: pointer;
   font-size: 15px; line-height: 1.1; text-align: center;
   background: var(--panel);
   background: linear-gradient(180deg,
@@ -72,7 +72,7 @@
 /* A key cap on a key, rather than loose small print under the glyph. */
 .rbtn .kbd {
   position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%);
-  min-width: 15px; padding: 1px 4px; border-radius: 4px;
+  min-width: 15px; padding: 1px 4px; border-radius: var(--radius);
   font-size: 8.5px; letter-spacing: .04em; line-height: 1.35;
   font-family: ui-monospace, monospace;
   color: var(--muted); background: rgba(0, 0, 0, .3);

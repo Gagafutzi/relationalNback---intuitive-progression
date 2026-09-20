@@ -6,7 +6,7 @@
 .modal.open { display: flex; }
 .modal-box {
   background: var(--panel); border: 1px solid var(--border-outer);
-  border-radius: 14px; padding: 24px; max-width: 480px; width: 100%;
+  border-radius: var(--radius); padding: 24px; max-width: 480px; width: 100%;
   max-height: 88vh; max-height: 88dvh; overflow-y: auto;
 }
 .modal-box h2 { margin: 0 0 6px; font-size: 20px; }
@@ -16,13 +16,13 @@
   background: rgba(77, 127, 214, .34);
   background: color-mix(in srgb, var(--accent, #4d7fd6) 34%, transparent);
   border: 1px solid var(--accent, #4d7fd6); color: var(--text);
-  border-radius: 8px; cursor: pointer;
+  border-radius: var(--radius); cursor: pointer;
 }
 
 .glyph-map { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 8px; }
 .glyph-map .gm-cell {
   padding: 14px 10px; border: 1px solid var(--border-inner);
-  border-radius: 10px; text-align: center; background: var(--panel-2);
+  border-radius: var(--radius); text-align: center; background: var(--panel-2);
 }
 .glyph-map .gm-cell .set { font-size: 22px; font-weight: 700; }
 .glyph-map .gm-cell .items { font-size: 12px; color: var(--muted); margin-top: 4px; }
@@ -30,17 +30,17 @@
 .bars { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; }
 .bar-row { display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
 .bar-row .nm { width: 96px; flex: none; }
-.bar-row .track { flex: 1; height: 9px; background: rgba(255,255,255,.08); border-radius: 5px; overflow: hidden; }
+.bar-row .track { flex: 1; height: 9px; background: rgba(255,255,255,.08); border-radius: var(--radius); overflow: hidden; }
 /* display:block matters — these are spans, and width/height are ignored on
    non-replaced inline elements, which renders every bar empty. */
-.bar-row .fill { display: block; height: 100%; border-radius: 5px; }
+.bar-row .fill { display: block; height: 100%; border-radius: var(--radius); }
 .bar-row .val { width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
 .bar-detail { margin: -3px 0 5px 105px; font-size: 11px; color: var(--muted); }
 .verdict { text-align: center; font-size: 15px; margin: 14px 0 2px; }
 .verdict.up { color: var(--good); }
 .verdict.down { color: var(--bad); }
 .milestone-banner {
-  margin-top: 10px; padding: 12px; border-radius: 10px; text-align: center;
+  margin-top: 10px; padding: 12px; border-radius: var(--radius); text-align: center;
   background: rgba(81, 207, 102, .12); border: 1px solid rgba(81, 207, 102, .45);
 }
 .milestone-banner .t { font-size: 15px; color: var(--good); font-weight: 600; }
@@ -73,7 +73,7 @@
   margin: 10px 0 4px;
 }
 .prog-summary > div {
-  padding: 10px 12px; border-radius: 10px;
+  padding: 10px 12px; border-radius: var(--radius);
   background: var(--panel-2); border: 1px solid var(--border-inner);
 }
 .prog-summary .k {
@@ -99,7 +99,7 @@
 .chart .rule-lab { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .chart-empty {
   padding: 22px; text-align: center; font-size: 12.5px; color: var(--muted);
-  border: 1px dashed var(--border-inner); border-radius: 10px;
+  border: 1px dashed var(--border-inner); border-radius: var(--radius);
 }
 
 .ch-legend {
@@ -107,10 +107,10 @@
   font-size: 11.5px; color: var(--muted);
 }
 .ch-legend i {
-  display: inline-block; width: 10px; height: 3px; border-radius: 2px;
+  display: inline-block; width: 10px; height: 3px; border-radius: var(--radius);
   margin-right: 6px; vertical-align: middle;
 }
-.ch-legend i.band-key { background: rgba(138, 180, 255, .5); height: 9px; border-radius: 2px; }
+.ch-legend i.band-key { background: rgba(138, 180, 255, .5); height: 9px; border-radius: var(--radius); }
 .ch-note { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: 8px 0 0; }
 .modal-box.wide .ch-note b { color: var(--text); }
 
@@ -120,7 +120,7 @@
 .auto-next { display: none; margin-top: 14px; }
 .auto-next.show { display: block; }
 .auto-next .an-track {
-  height: 4px; border-radius: 3px; overflow: hidden;
+  height: 4px; border-radius: var(--radius); overflow: hidden;
   background: rgba(255, 255, 255, .09);
 }
 .auto-next .an-fill {

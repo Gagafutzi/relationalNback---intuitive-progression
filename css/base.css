@@ -13,6 +13,10 @@
   --input-bg: #0e121a;
   --good: #51cf66;
   --bad: #ff6b6b;
+  /* Nothing here is rounded. The hub this is launched from is square, and a
+     trainer that rounds its own corners reads as a different application in a
+     frame. The token stays so the rules using it read as shape decisions. */
+  --radius: 0;
   --cube-scale: 1;
   /* How much wider than the lattice the stage has to be to hold the gizmo arms and
      their badges. Measured, not guessed: badges reach ~1.85 × the lattice across at
@@ -52,7 +56,11 @@ body {
   margin: 0;
   background: radial-gradient(circle at 50% 0%, var(--bg-glow, #121728), var(--bg));
   color: var(--text);
-  font-family: system-ui, -apple-system, sans-serif;
+  /* One monospace family, matching the hub: every monospace worth having, in
+     the order a machine is likely to have them, ending at the generic that
+     always exists. Still no webfont, so it renders the same on a plane. */
+  font-family: ui-monospace, "JetBrains Mono", "IBM Plex Mono", "SF Mono",
+               SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", monospace;
   /* dvh, not vh: a phone's vh is the height with the address bar RETRACTED, so a
      100vh body with overflow:hidden puts its last ~60px permanently off-screen. */
   height: 100vh;

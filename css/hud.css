@@ -18,7 +18,7 @@
 }
 .progress-track {
   height: 5px; background: rgba(255,255,255,.09);
-  border-radius: 3px; overflow: hidden;
+  border-radius: var(--radius); overflow: hidden;
 }
 .progress-fill {
   display: block; height: 100%; width: 0%; transition: width .35s;
