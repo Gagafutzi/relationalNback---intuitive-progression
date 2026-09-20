@@ -197,6 +197,7 @@ const state = {
      block down does not also record it as abandoned. */
   ending: false,
   builtSize: 0,           // cube box the lattice was last laid out for, in px
+  drawing: null,          // last solveDrawing(): arm lengths, badge size, footprint
   spinKey: '',            // identity of the running spin, so a rebuild need not restart it
   stimShown: false,       // is a stimulus on screen right now (vs cleared for a retro cue)
   tickAt: 0,              // when the stimulus last swapped, for the late-press grace
@@ -221,6 +222,7 @@ let progress = null;
 
 const $ = id => document.getElementById(id);
 const gridCube = $('gridCube'), cubeWrapper = $('cubeWrapper'), gizmoEl = $('gizmo');
+const cubeStage = $('cubeStage'), sceneEl = document.querySelector('.scene');
 const deckEl = $('deck'), modalEl = $('modal'), modalBox = $('modalBox');
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();

@@ -163,6 +163,188 @@ function solveSpinView(dim) {
   return (spinViewCache[dim] = best);
 }
 
+/* ---- Fitting the drawing to the box it is given ----
+ *
+ * The stage has to reserve the footprint of the whole DRAWING — lattice, arrows
+ * and letter badges together — because the badges reach well past the cube and a
+ * stage sized to the cube alone clips them. That multiplier used to be a table of
+ * hand-measured constants in CSS, one per combination of layout, rotation and
+ * gizmo, and every one of them carried slack: a number nobody could tighten
+ * without re-measuring by eye. On a phone the slack came straight out of the
+ * lattice, because there the box is fixed and the cube is the box divided by the
+ * multiplier.
+ *
+ * So it is solved instead. Everything drawn is at a known point in cube space, the
+ * viewing angles are known (and for a turning cube, sampled over the whole turn),
+ * and the projection is the same one the rest of this file already uses. Project
+ * the corners of the lattice and the four corners of every badge, take the widest
+ * and tallest the set ever gets, and that IS the footprint — no reserve, no guess.
+ *
+ * Two things the old constants could not do fall out of it for free: the badges
+ * are placed just clear of the lattice rather than at a fixed generous radius, and
+ * the footprint is returned as a width and a height separately, so a stage that is
+ * wider than it is tall can be filled in both directions.
+ */
+
+/* Matches .scene's `perspective`. A cube face swung toward the viewer is drawn
+   larger than one swung away, by as much as a fifth at these sizes, so a footprint
+   computed orthographically comes out too small exactly where it matters. */
+const PERSP = 1400;
+
+/* rotateX(a) rotateY(b) applied to a cube-space point, matching the CSS order. */
+function rotPoint(p, a, b) {
+  const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+  const x1 = p[0] * cb + p[2] * sb;
+  const z1 = -p[0] * sb + p[2] * cb;
+  return [x1, p[1] * ca - z1 * sa, p[1] * sa + z1 * ca];
+}
+
+/* Where a cube-space point lands on screen, and how much the perspective divide
+   magnifies anything drawn there — a badge at that depth is scaled by the same `s`. */
+function screenPoint(p, a, b) {
+  const q = rotPoint(p, a, b);
+  const s = PERSP / Math.max(PERSP - q[2], PERSP * 0.2);
+  return { x: q[0] * s, y: q[1] * s, s };
+}
+
+/* Length on screen of a unit step along `v`. Orthographic on purpose: this is how
+   much an axis is foreshortened, not where it ends up. */
+function screenDirLen(v, a, b) {
+  const q = rotPoint(v, a, b);
+  return Math.hypot(q[0], q[1]);
+}
+
+/* Every attitude the cube is held at, as (pitch, yaw) pairs.
+   `rolled` marks the solved spin, whose outer rotateZ turns the finished picture in
+   its own plane — so its footprint is a circle, not the box of any one frame. */
+function viewSamples(dim) {
+  const D = Math.PI / 180;
+  const solvedSpin = cfg.rotation && cfg.spinPath !== 'free';
+  if (solvedSpin) {
+    const sv = solveSpinView(dim), list = [];
+    for (let ay = 0; ay < 360; ay += 4) list.push([sv.ax * D, ay * D]);
+    return { list, rolled: true, tumble: false };
+  }
+  if (cfg.rotation) {
+    /* The free tumble sweeps pitch and yaw together, one turn of each. */
+    const list = [];
+    for (let t = 0; t < 1; t += 1 / 72) list.push([(-30 + 360 * t) * D, 360 * t * D]);
+    return { list, rolled: false, tumble: true };
+  }
+  const sv = (cfg.layout || 'dense') === 'spaced'
+    ? solveStaticView(dim)
+    : { ax: -24, ay: -28 };            // the resting transform in scene.css
+  return { list: [[sv.ax * D, sv.ay * D]], rolled: false, tumble: false };
+}
+
+/* Lattice pitch, cell edge and half-extent for a cube box of `size` px. Pulled out
+   of buildCube so the footprint can be solved without building anything. */
+function latticeMetrics(dim, size) {
+  const layout = cfg.layout || 'dense';
+  const solvedSpin = cfg.rotation && cfg.spinPath !== 'free';
+  const off = (dim - 1) / 2;
+  let step = size / dim, cellSize = step;
+  if (layout === 'spaced') {
+    const v = solvedSpin ? solveSpinView(dim) : solveStaticView(dim);
+    const span = (cfg.rotation && !solvedSpin) ? (dim - 1) * Math.sqrt(3)
+                                               : Math.max(v.w, v.h);
+    step = size / span;
+    cellSize = Math.min(step * SPREAD_CELL, v.sep * step * MAX_CELL_PER_GAP);
+  }
+  return { step, cellSize, half: off * step + cellSize / 2 };
+}
+
+/* The whole drawing, solved: how long each arm has to be, how big a badge to draw,
+   and the width and height the result needs, as multiples of `size`. */
+function solveDrawing(dim, size) {
+  const m = latticeMetrics(dim, size);
+  const views = viewSamples(dim);
+  const S = m.half;
+
+  const corners = [];
+  for (const x of [-S, S]) for (const y of [-S, S]) for (const z of [-S, S])
+    corners.push([x, y, z]);
+
+  let latR = 0, hx = 0, hy = 0;
+  for (const [a, b] of views.list) for (const c of corners) {
+    const p = screenPoint(c, a, b);
+    latR = Math.max(latR, Math.hypot(p.x, p.y));
+    hx = Math.max(hx, Math.abs(p.x));
+    hy = Math.max(hy, Math.abs(p.y));
+  }
+
+  const HEAD = size * 0.10;
+  /* Proportional, with a floor that keeps the letter legible on a small cube. A
+     fixed 26px badge was a fifth of the whole footprint once the cube was phone
+     sized, and it is the footprint that decides how big the cube may be. */
+  const BADGE = Math.round(Math.min(28, Math.max(16, size * 0.105)));
+  /* Where a badge has to sit: just outside the furthest the lattice ever reaches,
+     in any direction, plus a gap so the two never touch. The old fixed 0.68 × size
+     was well beyond that in the directions where the lattice is narrow. */
+  const clear = latR + Math.max(7, size * 0.05);
+
+  const L = {};
+  AXES.forEach(ax => {
+    if (views.tumble) {
+      /* Under a free tumble the same rod swings side-on and reaches its full length
+         across the screen, so lengthening it against foreshortening throws the badge
+         clean off the stage. The arm is the clearance radius and no more. */
+      L[ax.id] = clear;
+      return;
+    }
+    /* A foreshortened axis has to reach further in cube space to land at the same
+       screen radius, and the figure that matters is its WORST moment of the turn —
+       otherwise the badges sink into the lattice halfway through every revolution. */
+    let worst = Infinity;
+    for (const [a, b] of views.list)
+      worst = Math.min(worst, screenDirLen(ax.vec, a, b));
+    L[ax.id] = Math.min(size * 2.1, clear / Math.max(worst, 0.18));
+  });
+
+  if (cfg.gizmo !== 'off') {
+    let R = latR;
+    for (const [a, b] of views.list) AXES.forEach(ax => {
+      const d = L[ax.id] + HEAD + BADGE / 2;            // badge centre, along the arm
+      const p = screenPoint([ax.vec[0] * d, ax.vec[1] * d, ax.vec[2] * d], a, b);
+      /* The badge is turned back upright, so it is an axis-aligned square on screen,
+         scaled by the perspective at its own depth. */
+      const pad = BADGE * 0.5 * p.s;
+      hx = Math.max(hx, Math.abs(p.x) + pad);
+      hy = Math.max(hy, Math.abs(p.y) + pad);
+      R = Math.max(R, Math.hypot(p.x, p.y) + pad * Math.SQRT2);
+    });
+    if (views.rolled) hx = hy = R;
+  } else if (views.rolled) {
+    hx = hy = latR;
+  }
+
+  return { ...m, L, HEAD, BADGE, kx: 2 * hx / size, ky: 2 * hy / size };
+}
+
+/* Fit mode: the stage is handed the space the header and the dock leave over and
+   the cube is solved from it, rather than the cube being guessed from the viewport
+   and the stage sized around it. Used wherever the screen is small enough that a
+   guess would waste space that the player needs — every phone, and any short window.
+ 
+   Two passes because the badge has a minimum size in px, so the footprint is not
+   quite proportional to the cube; one round of feedback settles it. */
+function fitStage() {
+  const box = cubeStage.getBoundingClientRect();
+  const w = box.width, h = box.height;
+  if (!w || !h) return;
+  const scale = parseFloat(getComputedStyle(document.documentElement)
+    .getPropertyValue('--cube-scale')) || 1;
+  let size = Math.min(w, h) / 1.7;
+  for (let i = 0; i < 2; i++) {
+    const d = solveDrawing(cfg.dim, size);
+    size = Math.min(w / d.kx, h / d.ky);
+  }
+  /* Rounded, so the resize observer this feeds cannot chase a fractional pixel
+     back and forth between two builds. */
+  size = Math.max(90, Math.round(size * Math.min(scale, 1)));
+  document.documentElement.style.setProperty('--cube-size', size + 'px');
+}
+
 function buildCube(dim) {
   const layout = cfg.layout || 'dense';
   /* Set BEFORE the lattice is measured. On a phone the stage footprint is what the
@@ -177,16 +359,28 @@ function buildCube(dim) {
   document.documentElement.classList.toggle('spin-stage', solvedSpin);
   document.documentElement.classList.toggle('tumble-stage', cfg.rotation && !solvedSpin);
 
+  /* Solved whenever the cube spins, layout aside: the gizmo arms are aimed at it too. */
+  spinView = solvedSpin ? solveSpinView(dim) : null;
+
+  /* In fit mode the cube is solved from the box the stage was handed, so that has to
+     happen before the lattice reads its own width — and after the classes above,
+     which are what the footprint is solved against. */
+  if (document.documentElement.classList.contains('fit-stage')) fitStage();
+
   gridCube.innerHTML = '';
   state.cells = [];
   const size = gridCube.clientWidth || 240;
   const off = (dim - 1) / 2;
 
-  let step = size / dim;
-  let cellSize = step;
+  /* One solve for the whole drawing: the lattice takes its pitch and cell edge from
+     it, buildGizmo takes its arm lengths, and the stage takes the footprint. */
+  const drawing = solveDrawing(dim, size);
+  drawing.builtFor = size;
+  state.drawing = drawing;
+  document.documentElement.style.setProperty('--stage-kx', drawing.kx.toFixed(4));
+  document.documentElement.style.setProperty('--stage-ky', drawing.ky.toFixed(4));
 
-  /* Solved whenever the cube spins, layout aside: the gizmo arms are aimed at it too. */
-  spinView = solvedSpin ? solveSpinView(dim) : null;
+  const step = drawing.step, cellSize = drawing.cellSize;
 
   if (layout === 'spaced') {
     /* Spread the lattice out and size the cells from the solved separation, so no two
@@ -199,12 +393,10 @@ function buildCube(dim) {
        its long diagonal across the screen — the static outline is not what has to fit.
        The 3D diameter is an exact bound that holds at every angle, so the figure keeps
        a constant size instead of swelling past its box on the way round, which is what
-       the original did. */
-    const span = (cfg.rotation && !solvedSpin)
-      ? (dim - 1) * Math.sqrt(3)
-      : Math.max(v.w, v.h);
-    step = size / span;
-    /* Sized against the lattice PITCH, not against the tightest projected gap. Tying
+       the original did. (Both figures come from latticeMetrics now, so the cube the
+       footprint was solved against and the cube that gets built are the same one.)
+
+       Sized against the lattice PITCH, not against the tightest projected gap. Tying
        the cell to the gap made it collapse whenever the view got tight — a turning
        cube shrank its slots to half the size a still one has, to buy a guarantee of
        no overlap at all that nobody asked for. SPREAD_CELL is exactly what the old
@@ -217,7 +409,6 @@ function buildCube(dim) {
        apart (0.24 on a 4-cube), which the cap below keeps a real fraction of the cell
        — so every slot always shows an offset of its own. On the free tumble the
        centres do meet, which is that option's whole nature. */
-    cellSize = Math.min(step * SPREAD_CELL, v.sep * step * MAX_CELL_PER_GAP);
     /* Cleared whenever the cube moves. buildGizmo lengthens each arm by the inverse of
        its foreshortening at this angle, which is only meaningful if the angle is
        actually held: under a free tumble the same rod swings side-on and reaches its
@@ -422,41 +613,14 @@ function applyCellVis() {
 function buildGizmo() {
   gizmoEl.innerHTML = '';
   const cubeSize = gridCube.clientWidth || 240;
-  const HEAD = cubeSize * 0.10, BADGE = 26;
-
-  /* How far one cube unit travels on screen along each axis at the solved static
-     view. The angle that best separates the slots foreshortens the depth axis to
-     roughly half of X, which drops the A/B badges right on top of the lattice —
-     so each arm is lengthened in inverse proportion to its own foreshortening. */
-  let proj = null, reach = 0.68, cap = 1.45;
-  if (spinView) {
-    /* Yaw carries X and Z each through their flattest moment, |sin pitch|, while the
-       vertical axis is held at |cos pitch| for the whole turn. Solving against those
-       worst cases is what stops the A/B badges sinking into the lattice halfway
-       through every revolution — at a 72° tilt the vertical axis is squashed to a
-       third, so its arm has to reach three times as far in cube space to land at the
-       same screen radius. */
-    const p = spinView.ax * Math.PI / 180;
-    const flat = Math.abs(Math.sin(p)), steep = Math.abs(Math.cos(p));
-    proj = { x: flat, y: steep, z: flat };
-    /* The lattice is compact on screen at this tilt, so a shorter radius already
-       clears it — and the cap has to allow the reach the squashed axis needs. */
-    reach = 0.66; cap = 2.10;
-  } else if (staticView) {
-    const a = staticView.ax * Math.PI / 180, b = staticView.ay * Math.PI / 180;
-    const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
-    proj = { x: Math.hypot(cb, sa * sb), y: Math.abs(ca), z: Math.hypot(sb, sa * cb) };
-  }
-  const armLength = ax => {
-    if (!proj) return cubeSize * 0.62;
-    const k = ax.vec[0] ? 'x' : ax.vec[1] ? 'y' : 'z';
-    /* Puts every badge at the same screen radius, clear of the lattice's half-extent.
-       A foreshortened axis reaches further in cube space to get there. */
-    return Math.min(cubeSize * cap, (cubeSize * reach) / Math.max(proj[k], 0.18));
-  };
+  /* Arm lengths, head and badge all come from the same solve that sized the stage,
+     so what is drawn and what was reserved for it can never disagree. */
+  const drawing = (state.drawing && state.drawing.builtFor === cubeSize)
+    ? state.drawing : solveDrawing(cfg.dim, cubeSize);
+  const HEAD = drawing.HEAD, BADGE = drawing.BADGE;
 
   AXES.forEach(ax => {
-    const L = armLength(ax);
+    const L = drawing.L[ax.id];
     const arm = document.createElement('div');
     arm.className = 'arm';
     arm.dataset.axis = ax.id;

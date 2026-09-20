@@ -541,6 +541,11 @@ $('pauseResume').onclick = resumeFromPause;
  * resize and laying out a page is not one.
  */
 function rebuildForBox() {
+  /* In fit mode the box is not what the cube currently is, it is what the stage
+     can give it — so ask for the fit first and compare against that. Otherwise a
+     stage that grew (the hint line going away, say) would never be noticed,
+     because the cube it holds has not changed size yet. */
+  if (document.documentElement.classList.contains('fit-stage')) fitStage();
   const box = parseFloat(getComputedStyle(cubeWrapper).width);
   if (!box || Math.abs(box - state.builtSize) < 0.5) return;
 
@@ -560,15 +565,58 @@ function rebuildForBox() {
   }
 }
 
+/**
+ * Fit mode, and the height the header strip actually takes.
+ *
+ * Two things the cube's size depends on that no media query can express. The
+ * first is whether the cube should be fitted to the stage at all — that is a
+ * property of the screen, so matchMedia decides it, but it has to reach CSS and
+ * JS as the same fact, which a class on :root is and two separate media queries
+ * are not. The second is how tall the HUD strip is: it wraps to two or three
+ * rows depending on the mode and the numbers in it, and the scene has to be
+ * padded clear of exactly that much and no more, or the phone loses a band of
+ * cube to a gap nothing is in.
+ */
+const FIT_Q = window.matchMedia('(max-width: 700px), (max-height: 620px)');
+
+function applyFitMode() {
+  const fit = FIT_Q.matches;
+  document.documentElement.classList.toggle('fit-stage', fit);
+  /* Cleared rather than left behind: off a phone the cube comes from CSS again,
+     and an inline value set while fitted would outrank it forever. */
+  if (!fit) document.documentElement.style.removeProperty('--cube-size');
+}
+
+function measureHud() {
+  const hud = document.querySelector('.hud');
+  const btn = document.querySelector('.settings-btn');
+  if (!hud) return;
+  const h = Math.max(hud.offsetHeight, btn ? btn.offsetHeight : 0);
+  document.documentElement.style.setProperty('--hud-h', Math.ceil(h + 10) + 'px');
+}
+
 /* Debounced: mobile browsers fire resize continuously as the address bar hides,
    and each rebuild drops the on-screen stimulus. */
 let resizeTimer = null;
 const rebuildSoon = () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(rebuildForBox, 160);
+  resizeTimer = setTimeout(() => { applyFitMode(); measureHud(); rebuildForBox(); }, 160);
 };
 
 window.addEventListener('resize', rebuildSoon);
+window.addEventListener('orientationchange', rebuildSoon);
+if (FIT_Q.addEventListener) FIT_Q.addEventListener('change', rebuildSoon);
+
+/* The strip changes height without the window changing size — a mode switch, a
+   block ending, the hint line appearing. Watching it is the only way to keep the
+   scene's padding honest. */
+if (typeof ResizeObserver === 'function') {
+  const hud = document.querySelector('.hud');
+  if (hud) new ResizeObserver(rebuildSoon).observe(hud);
+}
+
+applyFitMode();
+measureHud();
 
 /**
  * The box itself, watched.
@@ -584,5 +632,9 @@ window.addEventListener('resize', rebuildSoon);
  */
 if (typeof ResizeObserver === 'function') {
   new ResizeObserver(rebuildSoon).observe(cubeWrapper);
+  /* And the stage itself, which is the box the fit divides. It moves for reasons
+     the cube knows nothing about: a deck that grew a row of keys, the header strip
+     wrapping, a phone turning on its side. */
+  if (cubeStage) new ResizeObserver(rebuildSoon).observe(cubeStage);
 }
 

@@ -15,11 +15,23 @@
    it on a phone, and a custom property can only read another one from its own
    element. */
 .cube-stage {
-  width: calc(var(--cube-size) * var(--stage-k));
-  height: calc(var(--cube-size) * var(--stage-k));
+  width: calc(var(--cube-size) * var(--stage-kx));
+  height: calc(var(--cube-size) * var(--stage-ky));
   display: flex; align-items: center; justify-content: center;
   flex: none; margin: auto auto 6px;
 }
+
+/* ---- Fitted stage ----
+   The other way round from the rule above: rather than guessing the cube from the
+   viewport and sizing the stage around it, the stage takes whatever the header and
+   the dock leave over and fitStage() divides that box by the solved footprint. Used
+   wherever a guess would cost the player room they need — every phone, and any
+   window too short to waste any. Nothing is reserved that nothing uses, so there is
+   no dead band above the cube or below the buttons. */
+:root.fit-stage .cube-stage {
+  width: 100%; height: auto; min-height: 0; flex: 1 1 0; margin: 0;
+}
+:root.fit-stage .dock { margin-bottom: 0; }
 
 .cube-wrapper {
   width: var(--cube-size); height: var(--cube-size); transform-style: preserve-3d;
