@@ -508,9 +508,11 @@
     </div>
     <div class="setting-group">
       <label>Cube size: <span id="cubeSizeVal">100</span>%</label>
-      <input type="range" id="cubeSize" min="60" max="190" step="5" value="100" />
+      <input type="range" id="cubeSize" min="60" max="400" step="5" value="100" />
       <div class="hint">Spaced layout scales its spread to match, so a bigger cube means
-        bigger gaps rather than just bigger cells.</div>
+        bigger gaps rather than just bigger cells. Nothing clamps this: past the width of
+        the screen the lattice simply runs off the edges, and the size you ask for is the
+        size you get.</div>
     </div>
     </div>
   </details>

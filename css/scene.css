@@ -6,7 +6,8 @@
 .scene {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: flex-start; perspective: 1400px;
-  padding: 54px 0 18px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 54px 0 18px; overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* The stage reserves the GIZMO's footprint, not the cube's — the arms reach well
@@ -14,14 +15,30 @@
    multiplier lives on the body (see --stage-k) because --cube-size is derived from
    it on a phone, and a custom property can only read another one from its own
    element. */
+/* What is capped here is the stage's BOX, never the cube in it. The size
+   setting goes to 400% and nothing clamps it; the box is only the room the
+   gizmo's arms want, and it is what the answer keys sit under — let it grow
+   with a 400% cube and the deck ends up somewhere a thumb cannot reach, which
+   is a worse trade than a cropped arm.
+
+   So the cube overflows the box, centred. `margin: auto` resolves to 0 on a box
+   that overflows, which would pin the cube's left edge to the screen and throw
+   the whole spill to the right, so the horizontal centring is handed to
+   alignment and only the vertical auto margin is kept. The scene's overflow-x
+   is named because overflow-y:auto makes the other axis `auto` too, and a
+   sideways scrollbar under a cube deliberately larger than the window is noise
+   — the overflow cannot be scrolled back into view anyway. */
 .cube-stage {
   width: calc(var(--cube-size) * var(--stage-k));
   height: calc(var(--cube-size) * var(--stage-k));
+  max-width: 96vw; max-height: 96vw;
   display: flex; align-items: center; justify-content: center;
-  flex: none; margin: auto auto 6px;
+  flex: none; margin: auto 0 6px; align-self: center;
 }
-
 .cube-wrapper {
+  /* flex:none, or the cap above would come out of the cube rather than out of
+     the margin: a flex item shrinks to fit its container by default. */
+  flex: none;
   width: var(--cube-size); height: var(--cube-size); transform-style: preserve-3d;
   transform: rotateX(-24deg) rotateY(-28deg);
   transform-origin: center center; pointer-events: none;

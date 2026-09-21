@@ -50,18 +50,6 @@
 :root.spin-stage.gizmo-off              { --stage-k: 1.72; }
 :root.spin-stage.gizmo-off.spread-stage { --stage-k: 1.25; }
 
-/* The same footprints with the gizmo taken out of them: what the LATTICE ALONE
-   covers, whether or not the arms are being drawn. The arms are decoration and
-   may be cropped; a slot that leaves the screen cannot be answered, so this is
-   the figure a phone's hard ceiling is taken from (see responsive.css). The
-   numbers are the gizmo-off column above, which is what they already measure. */
-:root                          { --lattice-k: 1.5; }
-:root.spread-stage             { --lattice-k: 1.25; }
-:root.spin-stage               { --lattice-k: 1.72; }
-:root.spin-stage.spread-stage  { --lattice-k: 1.25; }
-:root.tumble-stage             { --lattice-k: 1.75; }
-:root.tumble-stage.spread-stage{ --lattice-k: 1.25; }
-
 * { box-sizing: border-box; }
 
 body {
