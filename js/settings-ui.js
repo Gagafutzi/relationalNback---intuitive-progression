@@ -168,6 +168,14 @@ function renderLadderState() {
       <span style="opacity:.5">${ladderMagnitudeCap(progCfg) === 3 ? 'four' : 'three'} levels per axis</span></div>` : '') + `
     <div><span class="k">Lure rate</span><b>${Math.round((prog.lureRate ?? 0.2) * 100)}%</b>
       <span style="opacity:.5">adapts on lure trials only</span></div>` +
+    /* Only once the tone stream is actually in play, and not once the ladder has
+       converted it into an axis of the move: before the one the pool is a number
+       about a stream nobody has met, and after the other it is the wrong pool —
+       a coordinate draws from COORD_POOLS, which this never touches. */
+    (active.some(s2 => s2.key === 'pitch') &&
+     ladderCoordAxes(progCfg).indexOf('pitch') < 0 ? `
+    <div><span class="k">Tone pool</span><b>${toneCount({ toneCount: prog.tones })}</b>
+      <span style="opacity:.5">notes, ${toneStepSemitones(toneCount({ toneCount: prog.tones }))} semitones apart · adapts on the tone stream only</span></div>` : '') +
     (tune.adapt === 'bayes' && stairLog ? `
     <div><span class="k">Threshold</span><b>${(stairThresholdMs() / 1000).toFixed(2)}s</b>
       <span style="opacity:.5">90% CI ${stairCI(0.9).map(v => (v / 1000).toFixed(2)).join('–')}s</span></div>
@@ -312,6 +320,15 @@ function syncSettingsUI() {
   $('rotationOn').checked = freeCfg.rotation;
   $('rotationSpeed').value = freeCfg.spin;
   syncCoordUI('coordAxes', 'magnitudeCap', 'coordCount', 'pitchLoudness', freeCfg);
+  const tc = toneCount(freeCfg);
+  $('toneCount').value = tc;
+  $('toneCountVal').textContent = tc;
+  /* The step, not just the count: "nine notes" means nothing on its own, and
+     "4.5 semitones apart" is the number that says how hard the stream now is. */
+  $('toneStepVal').textContent =
+    `· ${toneStepSemitones(tc)} semitones apart · ` +
+    `${poolFor('pitch', { ...freeCfg, coordAxes: [] })[0]}–` +
+    `${poolFor('pitch', { ...freeCfg, coordAxes: [] }).slice(-1)[0]} Hz`;
   $('frameMode').value = freeCfg.frame;
   /*
    * What the frame means once the judgement is second order, and the one way to
@@ -351,6 +368,8 @@ function syncSettingsUI() {
   $('lureVal').textContent = Math.round(freeCfg.lureRate * 100);
   $('gizmoMode').value = cfg.gizmo;
   $('cellVis').value = cfg.cellVis;
+  $('cellFill').value = cfg.cellFill || 'solid';
+  $('slotReadout').value = cfg.slotReadout || 'off';
   $('cubeLayout').value = cfg.layout;
   $('layoutHint').textContent = LAYOUT_HINT[cfg.layout] || '';
   $('dailyGoal').value = cfg.dailyGoal || 0;
@@ -487,6 +506,8 @@ function importJSON(text) {
   if (progress.display) {
     cfg.gizmo = progress.display.gizmo || cfg.gizmo;
     cfg.cellVis = progress.display.cellVis || cfg.cellVis;
+    cfg.cellFill = progress.display.cellFill || cfg.cellFill;
+    cfg.slotReadout = progress.display.slotReadout || cfg.slotReadout;
     cfg.spinPath = progress.display.spinPath || cfg.spinPath;
     cfg.voiceSet = progress.display.voiceSet || cfg.voiceSet;
   }

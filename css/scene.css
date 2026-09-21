@@ -132,6 +132,7 @@
 }
 .vis-contrast .cell.active .cell-face,
 .vis-guides   .cell.active .cell-face,
+.vis-rails    .cell.active .cell-face,
 .vis-solo     .cell.active .cell-face {
   background: var(--cell-active-solid, #7ad7ff);
   border-color: var(--cell-active-edge, #f2fbff);
@@ -139,14 +140,68 @@
   color: var(--cell-ink, #06202e);
 }
 /* Hidden, not display:none — the cells must keep their layout boxes. */
-.vis-solo .cell { visibility: hidden; }
-.vis-solo .cell.active { visibility: visible; }
+.vis-solo .cell, .vis-rails .cell { visibility: hidden; }
+.vis-solo .cell.active, .vis-rails .cell.active { visibility: visible; }
+
+/* ---------- OUTLINE CELLS ----------
+   An orthogonal axis to slot visibility: whichever cells are drawn, draw them as
+   edges rather than as surfaces.
+
+   A lattice is 27 boxes of six faces, and in perspective those translucent faces
+   stack — most of the picture is fill nobody is reading. Stripping it leaves the
+   wireframe, which carries the same lattice with a fraction of the ink, and the
+   lit slot becomes the only bright thing on screen rather than the brightest of
+   many.
+
+   The lit slot's edge takes --cell-active-solid rather than the lighter edge
+   colour, because that variable is what the colour stream repaints: with the fill
+   gone, the outline has to be what carries the hue, or the colour judgement
+   silently loses its stimulus. */
+.fill-outline .cell-face { background: none !important; }
+.fill-outline .cell.active .cell-face {
+  border-width: 2px;
+  border-color: var(--cell-active-solid, #7ad7ff);
+  /* Kept, and small: with no fill the slot has to be findable in one glance, and
+     a halo is the cheapest thing on screen that does that. */
+  box-shadow: 0 0 10px 1px var(--cell-glow, rgba(122, 215, 255, .6));
+  color: var(--cell-active-edge, #f2fbff);
+}
+
+/* ---------- SLOT READOUT ----------
+   The slot's own coordinates, printed on its faces. Sized inline from the cell
+   the lattice was actually built at — a fixed size is either unreadable on a
+   spaced 4-cube or spilling out of it. */
+.cell-face .rd {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .06em; line-height: 1.15; white-space: nowrap;
+  font-weight: 700;
+  /* The readout is printed on whatever the slot happens to be: the accent fill,
+     a colour-stream hue, or nothing at all in outline mode. A soft dark halo
+     carries light ink over the bright fills and disappears under dark ink on
+     them, which is cheaper than deriving a second contrast decision per slot. */
+  text-shadow: 0 0 3px rgba(0, 0, 0, .55);
+  /* Under the glyph and the quantity row rather than over them: the readout is
+     about the slot, the streams are about the stimulus inside it. */
+  margin-top: 1px;
+}
+.cell-face .rd.pips { letter-spacing: .01em; line-height: 1.05; }
+
+/* A cell is six outward-facing planes, so a label written on it is written six
+   times — and the three on the far side arrive mirrored, through a cell that an
+   outline draws as transparent. Hidden backfaces cut that to the three planes
+   actually facing you, none of them reversed; the silhouette is unchanged, since
+   the three faces toward the viewer already close the box.
+
+   Only while a readout is on. Without one there is nothing to read off the far
+   side, and the stacked translucent faces are how the lattice has always looked. */
+.has-readout .cell-face { backface-visibility: hidden; }
 
 .cube-frame {
   position: absolute; inset: 0; transform-style: preserve-3d;
   pointer-events: none; display: none;
 }
-.vis-contrast .cube-frame, .vis-guides .cube-frame, .vis-solo .cube-frame { display: block; }
+.vis-contrast .cube-frame, .vis-guides .cube-frame,
+.vis-rails .cube-frame, .vis-solo .cube-frame { display: block; }
 .frame-face {
   position: absolute; inset: 0;
   border: 1px solid var(--frame-line, rgba(180, 200, 255, .30));
@@ -156,7 +211,7 @@
    gizmo arms they point at. Two crossed planes each, so they never vanish edge-on. */
 .guides { position: absolute; inset: 0; transform-style: preserve-3d;
           pointer-events: none; display: none; }
-.vis-guides .guides { display: block; }
+.vis-guides .guides, .vis-rails .guides { display: block; }
 /* Thicker and brighter than the 2px gizmo shafts, which share this palette —
    otherwise the rails read as more gizmo arms rather than as slot indicators. */
 .rail {

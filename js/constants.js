@@ -77,7 +77,11 @@ function coordAxes(c) {
 function poolFor(k, c) {
   c = c || cfg;
   if (coordAxes(c).indexOf(k) >= 0) return COORD_POOLS[k][magnitudeCap(c)];
-  return { pitch: PITCHES, color: COLORS, size: SIZES, quantity: COUNTS }[k];
+  /* The tone pool is the one that is sized by a setting rather than written
+     down, so it is built here rather than named. Every other stream pool is a
+     constant. */
+  if (k === 'pitch') return tonePool(toneCount(c));
+  return { color: COLORS, size: SIZES, quantity: COUNTS }[k];
 }
 
 /** The two channel ids this axis answers with: [positive, negative]. */
@@ -113,20 +117,78 @@ const AXIS_ORIENT = {
 };
 
 /* Stimulus pools. Every pool is ORDERED so a relational judgement is well defined. */
-/*
- * Three tones, an octave apart.
+
+/* ---------- The tone pool ----------
  *
- * Three rather than four because as a *coordinate* the pool is a short axis, not
- * a pool of stimuli: three positions leave displacements of one and two, which
- * is the whole range a magnitude ever needs on it, and every step is a wide
- * enough interval that "higher" arrives without listening for it.
+ * The same three octaves however many notes are in it, cut into equal steps.
  *
- * An octave, not the fourths and fifths this used to be. A step has to read as
- * one step, and a mixture of intervals makes the same displacement sound
- * different depending where on the axis it happened — which is the property a
- * coordinate cannot afford.
+ * As a *stream* the tones are a pool of stimuli, and how many of them there are
+ * is the whole of the difficulty: four notes an octave apart are told apart
+ * without listening, twelve a minor third apart have to be placed. So the count
+ * is a setting rather than a constant — and in Progression it is not even that,
+ * it is earned (see `toneRatchet`).
+ *
+ * The SPAN is what is held fixed, not the step. Widening the range instead of
+ * dividing it more finely would eventually ask for tones nobody's speakers
+ * reproduce and nobody's ears place, and the point of the axis is discrimination
+ * inside a range you can hear, not range.
+ *
+ * Steps are equal in RATIO, because pitch discrimination is one. Exactly equal,
+ * not rounded to the nearest semitone: a step has to read as one step wherever on
+ * the pool it happens — the same property a coordinate axis needs, for the same
+ * reason — and snapping to a chromatic scale would make the steps alternate
+ * between four and five semitones at nine notes, which is a quarter more interval
+ * on every other step. Notes sound in isolation here, one per trial, so there is
+ * nothing for them to be in tune WITH except the step before them, which is the
+ * thing being held even.
+ *
+ * A *coordinate* pool is a different object with different requirements — few
+ * levels, maximally far apart — and stays in COORD_POOLS above, untouched by
+ * any of this.
  */
-const PITCHES = [220, 440, 880];                            // A3 A4 A5, low → high
+const TONE_BASE = 220;        // A3, the bottom of the span
+const TONE_SEMITONES = 36;    // three octaves, so the top is A6 at 1760 Hz
+/*
+ * Four is where a fresh player starts: octaves, which is as far apart as two
+ * notes inside one span can be. Twelve is three semitones a step — a minor
+ * third, still a musical interval and still placeable, and past it the pool
+ * stops being a scale you can hold and becomes a pitch-matching test.
+ *
+ * Three exists only so that a record written before this was a setting restores
+ * onto the pool it was actually played with.
+ */
+const TONE_MIN = 3, TONE_MAX = 12, TONE_DEFAULT = 4;
+
+/** The count, clamped, for a config that may predate the setting. */
+const toneCount = c => {
+  const n = Math.round(((c || cfg).toneCount) || TONE_DEFAULT);
+  return Math.min(TONE_MAX, Math.max(TONE_MIN, n));
+};
+
+/* Memoised: the pool is read on every trial and on every judgement, and a pool
+   is fully determined by its count. */
+const tonePools = {};
+function tonePool(n) {
+  n = Math.min(TONE_MAX, Math.max(TONE_MIN, Math.round(n) || TONE_DEFAULT));
+  if (tonePools[n]) return tonePools[n];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    /* Rounded to a tenth of a hertz, which is a thousandth of a semitone at the
+       bottom of the span and less above it — tidy to print, and far below
+       anything a step is measured in. */
+    const semis = TONE_SEMITONES * i / (n - 1);
+    out.push(Math.round(TONE_BASE * Math.pow(2, semis / 12) * 10) / 10);
+  }
+  return (tonePools[n] = out);
+}
+
+/* The pool a fresh profile plays with: A3 A4 A5 A6, low → high. Named because
+   the tools reach for it, and because "the default pool" is a thing worth being
+   able to say. */
+const PITCHES = tonePool(TONE_DEFAULT);
+
+/** How far apart two neighbouring tones are, in semitones, for the hints. */
+const toneStepSemitones = n => Math.round(TONE_SEMITONES / (Math.max(2, n) - 1) * 10) / 10;
 
 /*
  * How much louder the bottom of the pool is than the top, when the option is on.
@@ -147,8 +209,9 @@ function pitchLevel(i, c) {
   c = c || cfg;
   const pool = poolFor('pitch', c);
   if (!c.pitchLoudness || i == null || pool.length < 2) return 1;
-  /* 1 at the top of the pool, `RANGE` at the bottom. */
-  const t = 1 - i / (pool.length - 1);
+  /* 1 at the top of the pool, `RANGE` at the bottom. Clamped, because the pool
+     can narrow under a trial that was drawn against a wider one. */
+  const t = 1 - Math.min(i, pool.length - 1) / (pool.length - 1);
   return 1 + t * (PITCH_LOUDNESS_RANGE - 1);
 }
 /* Timbre voices. Every set is FOUR voices ordered dull → bright, because the deck
@@ -217,7 +280,7 @@ const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
 /* Stamped into every block and into the export. Testers who pick the file up at
    different times will be on different snapshots, and without this you cannot tell
    which build produced which numbers. */
-const BUILD = '2026-08-25.18';
+const BUILD = '2026-09-21.1';
 
 /* ---- Relational complexity (Halford) ----
    Difficulty defined by how many variables are bound in one representation.

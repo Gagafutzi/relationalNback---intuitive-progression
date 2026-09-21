@@ -61,7 +61,7 @@ progress = loadProgress();
    a clean default rather than the previous profile's. */
 function resetInMemoryState() {
   prog = { streamCount:1, n:1, spinLevel:0, interval:5000, lureRate:0.20,
-           axisCount:0, capLevel:0 };
+           axisCount:0, capLevel:0, tones:TONE_DEFAULT };
   Object.keys(tiers).forEach(k => delete tiers[k]);
   rcTier = 3;
   stairLog = null;
@@ -73,7 +73,7 @@ function resetInMemoryState() {
   Object.assign(tune, TUNE_DEFAULTS);
   Object.assign(freeCfg, {
     n:2, streams:{ position:'relational' }, dim:3, rotation:false, spin:60,
-    coordAxes:[], magnitudeCap:2, pitchLoudness:false,
+    coordAxes:[], magnitudeCap:2, pitchLoudness:false, toneCount:TONE_DEFAULT,
     frame:'cube', interval:2500, blockLength:20, feedback:'reveal',
     lureRate:0.20, meta:false, gate:0, retro:0, varN:0,
     varPriority:true, fixedGlyphMap:false,
@@ -148,6 +148,8 @@ function loadProgress() {
     if (p.glyphMap) state.glyphMap = p.glyphMap;
     if (p.display) { cfg.gizmo = p.display.gizmo || cfg.gizmo;
                      cfg.cellVis = p.display.cellVis || cfg.cellVis;
+                     cfg.cellFill = p.display.cellFill || cfg.cellFill;
+                     cfg.slotReadout = p.display.slotReadout || cfg.slotReadout;
                      cfg.layout = p.display.layout || cfg.layout;
                      cfg.spinPath = p.display.spinPath || cfg.spinPath;
                      cfg.voiceSet = p.display.voiceSet || cfg.voiceSet;
@@ -256,7 +258,9 @@ function saveProgress() {
   progress.keyBinds = keyBinds;
   progress.actionBinds = actionBinds;
   progress.progCfg = progCfg;
-  progress.display = { gizmo: cfg.gizmo, cellVis: cfg.cellVis, layout: cfg.layout,
+  progress.display = { gizmo: cfg.gizmo, cellVis: cfg.cellVis,
+                       cellFill: cfg.cellFill, slotReadout: cfg.slotReadout,
+                       layout: cfg.layout,
                        spinPath: cfg.spinPath, voiceSet: cfg.voiceSet,
                        letterVoice: cfg.letterVoice,
                        cubeScale: cfg.cubeScale,

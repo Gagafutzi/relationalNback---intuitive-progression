@@ -373,6 +373,20 @@
           lattice three cells wide has nowhere to put a longer one.</div>
       </div>
       <div class="setting-group">
+        <label>Tone pool: <span id="toneCountVal">4</span> notes
+          <span id="toneStepVal" style="opacity:.55"></span></label>
+        <input type="range" id="toneCount" min="3" max="12" step="1" value="4" />
+        <div class="hint">How many notes the <b>Tone</b> stream draws from. The
+          span is always the same three octaves (A3–A6), so more notes means
+          finer steps rather than higher ones: four are an octave apart and told
+          apart without listening, twelve are a minor third apart and have to be
+          placed. Steps are equal in ratio, so a step sounds like one step wherever
+          on the scale it happens. Moving this changes what a Tone score is about.
+          <b>Progression sets it for you</b> — the pool gains a note after a
+          block you read the tones well on and loses one after a block you did not,
+          starting at four.</div>
+      </div>
+      <div class="setting-group">
         <label class="row"><input type="checkbox" id="pitchLoudness"> Deeper tones louder</label>
         <div class="hint">A second cue running the same way as the first: down is
           lower <em>and</em> louder. Redundant on purpose &mdash; two cues agreeing
@@ -417,9 +431,40 @@
         <option value="lattice">Lattice — every cell drawn</option>
         <option value="contrast">Contrast — inactive cells faded</option>
         <option value="guides">Guides — + axis rails through the slot</option>
+        <option value="rails">Solo + axis rails — the rails, no lattice</option>
         <option value="solo">Solo — only the lit cell</option>
       </select>
       <div class="hint" id="cellVisHint"></div>
+    </div>
+    <div class="setting-group">
+      <label>Cell fill</label>
+      <select id="cellFill">
+        <option value="solid">Solid — faces filled</option>
+        <option value="outline">Outline only — no fill anywhere</option>
+      </select>
+      <div class="hint">A cell is six translucent faces, and in perspective they
+        stack: most of what is on screen is fill nobody reads. <b>Outline only</b>
+        keeps the edges and drops every fill, including the lit slot's — which
+        becomes a bright wire box instead of a bright surface. The colour stream
+        still reads: with the face gone, the outline takes the hue.</div>
+    </div>
+    <div class="setting-group">
+      <label>Position readout on the slot</label>
+      <select id="slotReadout">
+        <option value="off">Off</option>
+        <option value="letters">Axis letters — W/E, N/S, B/A</option>
+        <option value="numbers">Numbers — rank on each axis</option>
+        <option value="pips">Pips — one row per axis</option>
+      </select>
+      <div class="hint">Prints the lit slot's own coordinates on it, so the
+        position is <em>read</em> rather than worked out from where the cell
+        landed in the projection — the middle slots of a dense cube sit close
+        enough together that telling them apart is a perception task rather than a
+        memory one. Cheaper than the rails, which answer the same complaint by
+        drawing three lines through the lattice.
+        <b>An assist, and recorded as one</b>: it is stored with the block, like
+        the move trace.</div>
+      <div class="hint" id="slotReadoutHint"></div>
     </div>
     <div class="setting-group">
       <label>Letter voice</label>

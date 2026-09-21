@@ -271,6 +271,20 @@ document.querySelectorAll('#progCoordAxes input[data-coord]').forEach(box => {
 $('progMagnitudeCap').onchange = e => { progCfg.magnitudeCap = Number(e.target.value); applyProgression(); updateHUD(); saveProgress(); };
 $('progPitchLoudness').onchange = e => { progCfg.pitchLoudness = e.target.checked; applyProgression(); saveProgress(); };
 $('pitchLoudness').onchange = e => { freeCfg.pitchLoudness = e.target.checked; applyFree(); saveProgress(); };
+/* `oninput` for the label, `onchange` for the audition: a drag across the range
+   would otherwise start nine overlapping scales. */
+$('toneCount').oninput = e => {
+  freeCfg.toneCount = +e.target.value;
+  applyFree(); syncSettingsUI(); updateHUD();
+};
+$('toneCount').onchange = e => {
+  saveProgress();
+  /* Play the pool bottom to top, so how far apart the notes now are is a thing
+     you hear rather than a number you are told. Quick enough that the whole
+     scale is over before the next fiddle with the slider. */
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  poolFor('pitch').forEach((_, i) => setTimeout(() => playTone({ pitch: i }), i * 150));
+};
 $('frameMode').onchange     = e => { freeCfg.frame = e.target.value; applyFree(); syncSettingsUI(); updateHUD(); saveProgress(); };
 $('feedbackModeF').onchange = e => { freeCfg.feedback = e.target.value; cfg.feedback = e.target.value; renderGlyphLegend(); saveProgress(); };
 /* --- display (shared by both modes) --- */
@@ -300,6 +314,17 @@ $('spinPath').onchange  = e => {
   onConfigChanged(true); syncSettingsUI(); updateHUD(); saveProgress();
 };
 $('cellVis').onchange   = e => { cfg.cellVis = e.target.value; applyCellVis(); saveProgress(); };
+$('cellFill').onchange  = e => { cfg.cellFill = e.target.value; applyCellVis(); saveProgress(); };
+$('slotReadout').onchange = e => {
+  cfg.slotReadout = e.target.value;
+  applyCellVis();
+  /* Repaint the slot already on screen rather than waiting for the next trial:
+     a display control that does nothing until something else happens reads as a
+     broken one. Deliberately not a re-render — that would replay the trial's
+     sound. */
+  refreshReadout();
+  saveProgress();
+};
 $('dailyGoal').oninput = e => {
   cfg.dailyGoal = Math.max(0, +e.target.value || 0);
   renderDailyTimer(); saveProgress();

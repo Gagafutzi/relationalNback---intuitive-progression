@@ -380,6 +380,93 @@ function sampleTrial() {
   return t;
 }
 
+/* ---------- Reading the slot off the slot ----------
+ *
+ * Where the stimulus is, printed on it.
+ *
+ * A cube lattice in perspective projects the middle slots close together, and
+ * telling two of them apart is then a perception problem: you look, you work out
+ * which layer it is in, and only then do you have the thing the trial was
+ * actually asking you to remember. The rails (`cellVis: 'guides'`) answer this by
+ * drawing three lines through the slot, which works and costs the whole lattice
+ * in clutter. This answers it by writing the coordinates on the lit face instead
+ * — the same information, no extra geometry, and it reads at a glance rather
+ * than after a look.
+ *
+ * Three forms, because what is glanceable is personal:
+ *   letters — the axis names the response buttons already use (W/E, N/S, B/A),
+ *             which is the form that needs no translating at answer time;
+ *   numbers — rank on each axis, 1 upwards, in the order W→E, N→S, B→A;
+ *   pips    — one row per axis with the slot's own position filled in, which is
+ *             a picture rather than a word and survives being read sideways.
+ *
+ * Written on every face, like the glyph, so whichever side of the cube is toward
+ * you carries it — and the faces turned away are hidden in CSS while a readout is
+ * on (see `.has-readout`), or the far side would show through an outlined cell
+ * mirrored.
+ */
+const READOUT_AXES = [
+  { neg: 'W', pos: 'E', key: 'x' },
+  { neg: 'N', pos: 'S', key: 'y' },
+  { neg: 'B', pos: 'A', key: 'z' },
+];
+
+/* Hair space between the groups: a normal space at this size reads as a gap
+   between three separate labels rather than one coordinate. */
+const READOUT_SEP = '\u2009';
+
+function readoutHTML(cellIdx, cellW) {
+  const mode = cfg.slotReadout;
+  if (!mode || mode === 'off') return '';
+  const c = state.cells[cellIdx];
+  if (!c) return '';
+  const dim = cfg.dim, off = (dim - 1) / 2;
+  /* Sized off the cell it is printed on, divided by roughly how many characters
+     wide the form is, and clamped: a 4-cube's slots are small enough to need the
+     floor, and a scaled-up 3-cube big enough to need the ceiling. */
+  const px = n => Math.max(5, Math.min(24, (cellW || 60) / n));
+
+  if (mode === 'pips') {
+    const rows = READOUT_AXES.map(ax => {
+      let row = '';
+      for (let i = 0; i < dim; i++) row += (i === c[ax.key] ? '\u25cf' : '\u25cb');
+      return row;
+    });
+    return `<span class="rd pips" style="font-size:${px(dim * 1.25)}px">` +
+           rows.join('<br>') + '</span>';
+  }
+
+  const parts = READOUT_AXES.map(ax => {
+    if (mode === 'numbers') return String(c[ax.key] + 1);
+    /* Signed distance from the centre of the lattice, which is what "where is it
+       compared to the middle" means — and on an even-sided cube there is no
+       centre slot, so the step count is rounded away from the half. */
+    const d = c[ax.key] - off;
+    if (!d) return '\u2013';
+    const mag = Math.round(Math.abs(d));
+    return (d < 0 ? ax.neg : ax.pos) + (mag > 1 ? mag : '');
+  });
+  return `<span class="rd" style="font-size:${px(mode === 'numbers' ? 6 : 7.5)}px">` +
+         parts.join(READOUT_SEP) + '</span>';
+}
+
+/* Repaint the readout on the slot already lit, without replaying its sound.
+   Changing the setting mid-block otherwise shows nothing until the next trial,
+   which reads as a control that does not work. */
+function refreshReadout() {
+  const t = state.currentTrial;
+  if (!state.stimShown || !t) return;
+  const cell = state.cells[t.cellIdx];
+  if (!cell) return;
+  const cellW = parseFloat(cell.el.style.width) || 0;
+  const html = readoutHTML(t.cellIdx, cellW);
+  cell.el.querySelectorAll('.cell-face').forEach(f => {
+    const old = f.querySelector('.rd');
+    if (old) old.remove();
+    if (html) f.insertAdjacentHTML('beforeend', html);
+  });
+}
+
 function renderTrial(t) {
   clearCells();
   showLagCue(t);
@@ -415,9 +502,14 @@ function renderTrial(t) {
   if (!glyphChar && t.quantity == null && t.size != null)
     html = `<span class="g" style="font-size:${fontSize}px">●</span>`;
 
+  /* The built cell width rather than the lattice pitch: in the spaced layout a
+     cell is a fraction of its pitch, and sizing the readout off the pitch would
+     print it straight over the edges. */
+  const readout = readoutHTML(t.cellIdx, parseFloat(cell.el.style.width) || cellPx);
+
   faces.forEach(f => {
     if (t.color != null) litColour(f, poolFor('color')[t.color]);
-    f.innerHTML = html;
+    f.innerHTML = html + readout;
   });
 
   /* A letter carries the trial's audio on its own; the tone is only for the streams
@@ -642,7 +734,13 @@ function playTone(t) {
   }
   tail.connect(audioCtx.destination);
 
-  const osc = buildVoice(audioCtx, v, t.pitch != null ? poolFor('pitch')[t.pitch] : 330, gain, now);
+  /* Clamped into the pool rather than indexed straight into it: the tone count is
+     a live setting, and a trial sampled against a wider pool can still be on
+     screen when it narrows. An index past the end would hand the oscillator an
+     undefined frequency, which is silence with a console error behind it. */
+  const pool = poolFor('pitch');
+  const freq = t.pitch != null ? pool[Math.min(t.pitch, pool.length - 1)] : 330;
+  const osc = buildVoice(audioCtx, v, freq, gain, now);
   osc.stop(now + 0.32);
 }
 

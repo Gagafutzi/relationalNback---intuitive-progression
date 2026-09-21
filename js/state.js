@@ -62,6 +62,15 @@ const cfg = {
    * to place can have the help either way.
    */
   pitchLoudness: false,
+  /*
+   * How many notes the Tone stream draws from, across a fixed three octaves.
+   *
+   * Four to start — octaves, as far apart as notes in one span can be — and up
+   * to twelve, a minor third a step. In Progression it is not set by hand at
+   * all: `toneRatchet` widens the pool off the tone stream's own accuracy, the
+   * way the lure rate widens off lure trials. See the tone pool in constants.js.
+   */
+  toneCount: TONE_DEFAULT,
   rotation: false,
   spinPath: 'solved',     // 'solved' = non-degenerate turntable + roll, 'free' = original tumble
   voiceSet: 'waves',      // which four timbres the timbre stream draws from
@@ -72,6 +81,28 @@ const cfg = {
   blockLength: 20,
   gizmo: 'full',
   cellVis: 'lattice',
+  /*
+   * 'solid' fills the lit slot; 'outline' draws nothing but its edges, and
+   * strips the lattice's faint fills with it.
+   *
+   * A fill is six coloured surfaces per cell, and in a lattice seen in
+   * perspective those surfaces are most of what is on screen. The outline says
+   * the same thing with twelve lines, so the one lit slot is the only solid
+   * thing in the picture. The colour stream still reads: the edge takes the hue
+   * the face would have had.
+   */
+  cellFill: 'solid',
+  /*
+   * Print the lit slot's own coordinates on it, so the position is READ rather
+   * than deduced from where the cell sits in a projection. 'off', 'letters'
+   * (the axis names the buttons use), 'numbers' (rank on each axis) or 'pips'.
+   *
+   * Recorded with the block, because it is an assist: the middle slots of a
+   * dense cube project close enough together that telling them apart is a
+   * perception task rather than a memory one, and this removes that task
+   * instead of making it easier.
+   */
+  slotReadout: 'off',
   layout: 'dense',
   cubeScale: 1,
   dailyGoal: 20,
@@ -114,6 +145,9 @@ const progCfg = {
 const freeCfg = {
   n: 2, streams: { position: 'relational' }, dim: 3,
   coordAxes: [], magnitudeCap: 2, pitchLoudness: false, rotation: false,
+  /* Free Play's is a setting like every other one here; Progression's lives on
+     the ladder, where it is earned rather than chosen. */
+  toneCount: TONE_DEFAULT,
   spin: 60, frame: 'cube', interval: 2500, blockLength: 20, feedback: 'reveal',
   lureRate: 0.20, meta: false, gate: 0, retro: 0, varN: 0,
   /* varPriority was missing here while cfg defaulted it on, so Free Play silently
@@ -142,7 +176,7 @@ const tune = { ...TUNE_DEFAULTS };
    ladder as it was, so a record written before they existed restores onto a rung
    that still means what it meant. */
 let prog = { streamCount: 1, n: 1, spinLevel: 0, interval: 5000, lureRate: 0.20,
-             axisCount: 0, capLevel: 0 };
+             axisCount: 0, capLevel: 0, tones: TONE_DEFAULT };
 
 /* Each relational-complexity tier keeps its own ladder, its own staircase and its
    own tunables, so quaternary is a parallel track rather than something gated behind
@@ -155,7 +189,7 @@ const tiers = {};
 function tierState(rc) {
   return tiers[rc] || (tiers[rc] = {
     prog: { streamCount: 1, n: 1, spinLevel: 0, interval: 5000, lureRate: 0.20,
-            axisCount: 0, capLevel: 0 },
+            axisCount: 0, capLevel: 0, tones: TONE_DEFAULT },
     stair: null,
     /* A tier first visited mid-session inherits the settings you are already using,
        so the first switch carries your speeds across instead of dropping you on the
@@ -174,7 +208,7 @@ function switchTier(rc) {
   /* Defaults for a tier stored before these digits existed, applied on the way OUT
      of the store rather than on the way in, so a record is never rewritten by the
      act of looking at it. */
-  prog = { axisCount: 0, capLevel: 0, ...nx.prog };
+  prog = { axisCount: 0, capLevel: 0, tones: TONE_DEFAULT, ...nx.prog };
   Object.assign(tune, nx.tune);
   stairLog = nx.stair ? nx.stair.slice() : null;
   if (!stairLog) stairInit(tune.startInterval);
