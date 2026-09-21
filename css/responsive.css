@@ -24,12 +24,31 @@
        so the stage gives back the height that row needs rather than pushing the deck
        off the bottom of a phone. */
     --stage-budget: min(96vw, 50vh);
+    /* Hard ceiling: the width the LATTICE paints, not the width the stage
+       reserves. `96vw / --stage-k` charged the ceiling for the gizmo's margin
+       as well as the budget, and on a portrait phone the budget IS 96vw — so
+       the two came out the same number and every step of the size slider above
+       100% landed on the ceiling with nothing to show for it. That is the "will
+       not advance above a certain size" this was reported as. Against
+       --lattice-k the slider has somewhere to go, and what it spends on the way
+       is the arms' margin: they crop, the lattice does not. */
     --cube-size: min(
       calc(var(--stage-budget) / var(--stage-k) * var(--cube-scale)),
-      /* Hard ceiling: the scale slider may shrink the cube but never push the
-         stage past the width the scene can actually paint. */
-      calc(96vw / var(--stage-k)));
+      calc(96vw / var(--lattice-k)));
   }
+
+  /* The stage's footprint is the gizmo's, so past 100% it is asking for more
+     room than the screen has. Capped at the screen instead: the lattice stays
+     centred and it is the arms that run off the edges. Without the cap the
+     scene — overflow-y:auto, which makes overflow-x `auto` too — would scroll
+     sideways, and a centred flex item that overflows cannot be scrolled back
+     into view anyway. */
+  .scene { overflow-x: hidden; }
+  /* flex:none on the wrapper, or the cap would take its width out of the cube
+     instead of out of the margin: a flex item shrinks to its container by
+     default, and the whole point of the cap is that the cube does not. */
+  .cube-stage { max-width: 96vw; max-height: 96vw; }
+  .cube-wrapper { flex: none; }
 
   /* Wider keys AND wider gutters. 40px keys 5px apart are narrower than the
      fingertip aiming at them, so the neighbour of the intended answer was easy to
