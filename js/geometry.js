@@ -403,21 +403,51 @@ function positionGuides(cellIdx) {
   });
 }
 
+const CELL_VIS_MODES = ['lattice', 'contrast', 'guides', 'rails', 'solo'];
+
 const CELL_VIS_HINT = {
   lattice:  'Every cell drawn faintly. Most spatial context, hardest to read at a glance.',
   contrast: 'Inactive cells nearly invisible; the lit slot is opaque and glows.',
   guides:   'Adds three coloured rails through the lit slot, one per axis — read its position straight off them.',
+  /*
+   * The rails without the lattice they were drawn over.
+   *
+   * `guides` keeps every cell on screen — twenty-seven boxes, six faces each —
+   * and adds three rails on top, so the one piece of information the rails carry
+   * arrives inside the densest picture the app draws. This is the same three
+   * rails and nothing else: where the slot sits on each axis, against the frame
+   * that says where the middle is.
+   */
+  rails:    'The lit cell, the cube outline and the three axis rails — no lattice. The rails without the surfaces they used to be drawn over.',
   solo:     'Only the lit cell and the cube outline. Clearest, but you supply the lattice from memory.',
 };
 
 function applyCellVis() {
-  ['lattice','contrast','guides','solo'].forEach(v =>
+  CELL_VIS_MODES.forEach(v =>
     gridCube.classList.toggle('vis-' + v, cfg.cellVis === v));
+  /* Fill is its own axis: any of the modes above can be drawn as outlines. */
+  gridCube.classList.toggle('fill-outline', cfg.cellFill === 'outline');
+  /* Only the faces toward you carry the readout — see .has-readout. */
+  gridCube.classList.toggle('has-readout',
+    !!cfg.slotReadout && cfg.slotReadout !== 'off');
   /* Sync the control here too, so cube, hint and select can never disagree. */
   const sel = $('cellVis'), h = $('cellVisHint');
   if (sel) sel.value = cfg.cellVis;
   if (h) h.textContent = CELL_VIS_HINT[cfg.cellVis] || '';
+  const fs = $('cellFill');
+  if (fs) fs.value = cfg.cellFill || 'solid';
+  const rs = $('slotReadout');
+  if (rs) rs.value = cfg.slotReadout || 'off';
+  const rh = $('slotReadoutHint');
+  if (rh) rh.textContent = READOUT_HINT[cfg.slotReadout] || READOUT_HINT.off;
 }
+
+const READOUT_HINT = {
+  off:     'Nothing printed on the slot. Where it is, is where you see it.',
+  letters: 'The axis names the buttons use — W/E, N/S, B/A — one per axis, a dash for an axis the slot sits centred on. Read rather than deduced, and in the words you answer in.',
+  numbers: 'Rank on each axis, counting from 1, in the order W→E, N→S, B→A. The most compact of the three.',
+  pips:    'One row per axis — W→E, N→S, B→A — with the slot\'s own position filled in. A picture rather than a word, so it survives being read at a glance or upside down.',
+};
 
 function buildGizmo() {
   gizmoEl.innerHTML = '';

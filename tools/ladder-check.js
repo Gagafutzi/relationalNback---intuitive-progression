@@ -418,13 +418,76 @@ ok('deeper is louder when it is asked for',
    g4('pitchLevel(0)') > g4('pitchLevel(1)') && g4('pitchLevel(1)') > g4('pitchLevel(2)'),
    `levels ${[0, 1, 2].map(i => g4(`pitchLevel(${i})`).toFixed(2)).join(', ')}`);
 ok('and the top of the pool is left where it was',
-   g4('pitchLevel(PITCHES.length - 1)') === 1,
+   g4("pitchLevel(poolFor('pitch').length - 1)") === 1,
    'the option makes every tone louder rather than tilting them');
 
 vm.runInContext('cfg.pitchLoudness = false;', geo);
 ok('off, every tone is the level it always was',
    [0, 1, 2].every(i => g4(`pitchLevel(${i})`) === 1),
    'the option is doing something while switched off');
+
+
+/* ------------------------------------------------------------------ *
+ * The tone pool                                                       *
+ * ------------------------------------------------------------------ *
+ *
+ * How many notes the tone STREAM draws from is a setting, and in Progression an
+ * earned one. What has to hold however wide it gets: the span is fixed, so more
+ * notes is finer steps rather than higher ones; the steps stay equal, so a step
+ * reads as one step wherever on the scale it happens; and the coordinate pool —
+ * a different object with different requirements — is untouched by any of it.
+ */
+vm.runInContext("cfg.coordAxes = [];", geo);
+
+ok('a fresh profile gets four notes',
+   g4('TONE_DEFAULT') === 4 && g4("poolFor('pitch', {}).length") === 4,
+   'the pool nobody has chosen is not the one the ladder starts from');
+
+ok('and they are octaves',
+   (function () {
+     const p4 = g4("poolFor('pitch', { toneCount: 4 })");
+     return p4.every((f, i) => i === 0 || Math.abs(f / p4[i - 1] - 2) < 0.01);
+   })(),
+   'the starting pool is not as far apart as one span allows');
+
+ok('the count is what the setting says',
+   [3, 4, 7, 9, 12].every(n => g4(`poolFor('pitch', { toneCount: ${n} }).length`) === n),
+   'the tone count does not reach the pool');
+
+ok('and it is clamped at both ends',
+   g4("poolFor('pitch', { toneCount: 99 }).length") === g4('TONE_MAX') &&
+   g4("poolFor('pitch', { toneCount: 1 }).length") === g4('TONE_MIN'),
+   'a hand-edited or corrupt count produces a pool nobody can play');
+
+/* The span is what is held fixed. Dividing a range more finely is a
+   discrimination task; extending it is an audibility one, and past a point it is
+   neither — it is a test of the speakers. */
+ok('every pool spans the same three octaves',
+   [3, 4, 7, 12].every(n => {
+     const p = g4(`poolFor('pitch', { toneCount: ${n} })`);
+     return Math.abs(p[0] - 220) < 0.5 && Math.abs(p[p.length - 1] - 1760) < 1;
+   }),
+   'a wider pool is reaching for notes rather than dividing the ones it has');
+
+/* Equal in ratio, because pitch discrimination is one — the same property the
+   coordinate pools are checked for above, and for the same reason. Exactly equal,
+   at every count: snapping the notes to a chromatic scale would buy tuning nobody
+   can hear (the notes sound one per trial, alone) and pay for it in steps that
+   alternate four and five semitones. */
+[3, 4, 5, 7, 9, 10, 12].forEach(n => {
+  const p = g4(`poolFor('pitch', { toneCount: ${n} })`);
+  const ratios = [];
+  for (let i = 1; i < p.length; i++) ratios.push(p[i] / p[i - 1]);
+  ok(`${n} notes step evenly`,
+     Math.max(...ratios) / Math.min(...ratios) < 1.001,
+     `steps ${ratios.map(x => x.toFixed(4)).join(', ')}`);
+});
+
+/* A coordinate axis is a different object: few levels, maximally far apart. The
+   stream setting must not reach it. */
+ok('the coordinate pool is untouched by the stream setting',
+   g4("poolFor('pitch', { coordAxes: ['pitch'], magnitudeCap: 2, toneCount: 12 }).length") === 3,
+   'the tone count is resizing the axis pool, which is sized for a different job');
 
 
 /* ------------------------------------------------------------------ *
@@ -900,6 +963,99 @@ ok('both panes sync through the one helper',
    (sui.match(/syncCoordUI\(/g) || []).length >= 3,
    'a second copy of the sync is how the two modes drift apart');
 
+ok('a fresh profile starts on the default tone pool',
+   /toneCount:\s*TONE_DEFAULT/.test(clears('freeCfg')) &&
+   /tones:\s*TONE_DEFAULT/.test(resetBody),
+   'a new profile would inherit the last one\'s tone pool, in both modes');
+
+
+/* ------------------------------------------------------------------ *
+ * Reading the slot, and drawing less of it                           *
+ * ------------------------------------------------------------------ *
+ *
+ * Three display options answering one complaint: the lattice is mostly surfaces
+ * nobody reads, and the slot's position has to be deduced from a projection
+ * rather than read. Source scans, because there is no DOM here — each names the
+ * control, the class or the handler that has to exist for the option to do
+ * anything at all.
+ */
+const geoSrc = fs.readFileSync(path.join(ROOT, 'js/geometry.js'), 'utf8');
+const scene = fs.readFileSync(path.join(ROOT, 'css/scene.css'), 'utf8');
+const tri = fs.readFileSync(path.join(ROOT, 'js/trials.js'), 'utf8');
+
+/* geometry.js is half DOM, so only the tables are lifted out of it — the real
+   ones, read from the file the browser loads, rather than a copy kept here. */
+const vis = vm.createContext({ console, Math, Object, JSON });
+['const CELL_VIS_MODES', 'const CELL_VIS_HINT', 'const READOUT_HINT'].forEach(decl => {
+  const at = geoSrc.indexOf(decl);
+  if (at < 0) return;
+  const ends = ['];\n', '};\n'].map(e => geoSrc.indexOf(e, at)).filter(i => i > 0);
+  vm.runInContext(geoSrc.slice(at, Math.min(...ends) + 2), vis);
+});
+const g5 = k => vm.runInContext(k, vis);
+
+/* The rails without the lattice they used to be drawn over. */
+ok('the rails can be had without the lattice',
+   /value="rails"/.test(html) && /rails:/.test(geoSrc) &&
+   /'rails'/.test(geoSrc),
+   'the option is offered, hinted or applied, but not all three');
+ok('and that mode hides the cells while keeping the rails and the frame',
+   /\.vis-rails \.cell\b/.test(scene) &&
+   /\.vis-rails \.guides/.test(scene) &&
+   /\.vis-rails \.cube-frame/.test(scene),
+   'a rails block would come out as either a full lattice or a bare cell');
+ok('every visibility mode the select offers is one the cube applies',
+   (function () {
+     const at = html.indexOf('id="cellVis"');
+     const sel = html.slice(at, html.indexOf('</select>', at));
+     const offered = (sel.match(/value="(\w+)"/g) || []).map(m => m.replace(/.*"(\w+)"/, '$1'));
+     const applied = g5('CELL_VIS_MODES');
+     return offered.length === applied.length &&
+            offered.every(v => applied.indexOf(v) >= 0);
+   })(),
+   'a slot-visibility option that names a class nothing toggles');
+ok('and every one of them has a hint',
+   g5('CELL_VIS_MODES').every(v => g5(`!!CELL_VIS_HINT['${v}']`)),
+   'a mode with no hint is a mode nobody can tell from its neighbour');
+
+/* Outline cells: an axis of its own, so it composes with every visibility mode
+   rather than being a fifth one. */
+ok('fill is its own axis rather than another visibility mode',
+   /fill-outline/.test(geoSrc) && /cellFill/.test(geoSrc) &&
+   g5('CELL_VIS_MODES').indexOf('outline') < 0,
+   'outline was folded into slot visibility, so it cannot compose with it');
+ok('and the outline takes the colour the fill would have had',
+   /\.fill-outline \.cell\.active \.cell-face[^}]*--cell-active-solid/.test(scene),
+   'with the face gone the colour stream loses its stimulus');
+ok('an outline cell draws no fill at all',
+   /\.fill-outline \.cell-face\s*\{[^}]*background:\s*none\s*!important/.test(scene),
+   'the lattice keeps its faint fills, which is most of the ink on screen');
+
+/* The readout: the slot's coordinates, printed on the slot. */
+['off', 'letters', 'numbers', 'pips'].forEach(m => {
+  ok(`the readout offers ${m}`,
+     html.indexOf(`value="${m}"`) >= 0 && !!g5(`READOUT_HINT['${m}']`),
+     'an option with no hint behind it');
+});
+ok('the readout is wired to a handler',
+   /\$\('slotReadout'\)\.onchange/.test(wir),
+   'the control renders and does nothing');
+ok('and repaints the slot already on screen without replaying it',
+   /refreshReadout/.test(wir) && /function refreshReadout/.test(tri) &&
+   !/renderTrial\(/.test(body(tri, 'refreshReadout')),
+   'changing it mid-block either does nothing until the next trial, or replays this one\'s sound');
+ok('the readout names all three axes',
+   /READOUT_AXES/.test(tri) && (tri.match(/neg: '[WNB]'/g) || []).length === 3,
+   'a coordinate with an axis missing is not a coordinate');
+
+/* Both are assists on the same judgement as the move trace, so a score earned
+   with them is not the same score — and the record has to say so. */
+['cellFill', 'slotReadout', 'toneCount'].forEach(f => {
+  ok(`${f} is stamped into the block record`,
+     new RegExp(`${f}:`).test(body(blk, 'blockRecord')),
+     'a block that cannot be told from one played without it');
+});
+
 
 /* ------------------------------------------------------------------ *
  * The quaternary ladder's two new digits                             *
@@ -1082,6 +1238,18 @@ ok('and is worth more again under a second-order judgement',
    'an axis counted the same whether or not anything asked about orthogonality');
 ok('a longer step on the axes costs more than a shorter one',
    load({ coordAxes: ['pitch'], magnitudeCap: 3 }) > load({ coordAxes: ['pitch'] }));
+/* More notes is harder on both questions the tone stream can ask — "the same
+   note" has more neighbours to be confused with, and "higher or lower" is a
+   smaller interval to hear — so Load has to know about it, or Free Play could
+   hand itself a twelve-note pool for free. */
+ok('a finer tone pool is worth more Load',
+   load({ streams: { position: 'relational', pitch: 'identity' }, toneCount: 12 }) >
+   load({ streams: { position: 'relational', pitch: 'identity' }, toneCount: 4 }),
+   'the tone count moved the task without moving the score of the setup');
+ok('and only while the tones are a stream',
+   load({ streams: { position: 'relational' }, toneCount: 12 }) ===
+   load({ streams: { position: 'relational' }, toneCount: 4 }),
+   'Load charged for a pool nothing draws from');
 ok('a reference frame is worth nothing while position is not relational',
    load({ streams: { position: 'identity' }, frame: 'both' }) ===
    load({ streams: { position: 'identity' }, frame: 'cube' }),

@@ -222,9 +222,19 @@ function blockRecord(completed, scored) {
       interval: cfg.interval, blockLength: cfg.blockLength, rotation: cfg.rotation,
       spin: cfg.spin, feedback: cfg.feedback, lureRate: cfg.lureRate,
       meta: cfg.meta, gate: cfg.gate, retro: cfg.retro, varN: cfg.varN,
+      /* How finely the tones were cut. Four notes an octave apart and twelve a
+         minor third apart are not the same stream, and the difference is
+         invisible in the settings snapshot without this. */
+      toneCount: toneCount(cfg),
       /* An assist, so a score earned with it on is not the same score. */
       moveTrace: !!cfg.moveTrace,
       cellVis: cfg.cellVis,
+      /* Both are assists on the same judgement as `moveTrace`: an outline draws
+         the slot without six coloured surfaces, and a readout hands you the
+         coordinates a dense projection makes you work out. A score earned with
+         either is not the same score. */
+      cellFill: cfg.cellFill,
+      slotReadout: cfg.slotReadout,
       gizmo: cfg.gizmo,
       /* Layout belongs here, not with the cosmetics: flat panels remove the depth
          ambiguity entirely, so the same score means something different. */
@@ -295,6 +305,9 @@ function endBlock() {
       lureNote = `Lure rate ${prog.lureRate > before ? '↑' : '↓'} ` +
                  `${Math.round(prog.lureRate * 100)}% (resisted ${Math.round(ls * 100)}%)`;
   }
+
+  /* ---- Tone precision, adapted on the tone stream's own evidence ---- */
+  const toneNote = cfg.mode === 'progression' ? toneRatchet() : '';
 
   if (cfg.mode === 'progression' && tune.adapt === 'bayes') {
     /* ---- Bayesian staircase ---- */
@@ -400,6 +413,8 @@ function endBlock() {
 
   if (lureNote) detail += (detail ? '<br>' : '') +
     `<span style="color:#ff922b">${lureNote}</span>`;
+  if (toneNote) detail += (detail ? '<br>' : '') +
+    `<span style="color:#7ee0d0">${toneNote}</span>`;
   showReport(score, verdict, headline, detail, milestone, load);
   syncSettingsUI();
   updateHUD();
@@ -422,6 +437,15 @@ function computeLoad() {
     else if (cfg.streams[k] === 'relational') load += 9;
   });
   if (cfg.dim === 4) load += 12;
+  /*
+   * A finer tone pool, on the stream that has to place it. Every note added
+   * narrows the step, so both questions the stream can ask get harder: "the same
+   * note" has more neighbours to be confused with, and "higher or lower" is a
+   * smaller interval to hear. Charged from the starting pool rather than from
+   * zero — four notes is the task as it ships, not a bonus.
+   */
+  if (cfg.streams.pitch && cfg.streams.pitch !== 'off')
+    load += 2 * (toneCount(cfg) - TONE_DEFAULT);
   /* Capped: unbounded, this term dwarfs every other axis and lets Free Play inflate
      Load with a silly interval instead of actual difficulty. */
   load += Math.min(30, Math.max(0, 12 * (2500 / cfg.interval - 1)));
@@ -486,6 +510,60 @@ function computeLoad() {
 }
 
 /* ============================================================
+   12a. TONE PRECISION
+   ============================================================ */
+
+/*
+ * Widen the tone pool when the tones are being read, narrow it when they are not.
+ *
+ * The request this answers is "start with four and add more as you progress",
+ * and the honest reading of *progress* here is the tone stream's own accuracy
+ * rather than the odometer: a player who is three milestones up because their
+ * spatial memory is good has earned nothing on pitch, and a pool that grew for
+ * them would be a difficulty they never cleared.
+ *
+ * So it is a ratchet on the tone stream's evidence alone, exactly as the lure
+ * rate is a ratchet on lure trials alone — one axis, one source of evidence, and
+ * neither of them touching the interval the staircase is placing. The band is
+ * the ladder's own: clear what would speed you up and the pool gains a note;
+ * fall to what would ease you off and it loses one.
+ *
+ * Never while the tones are a COORDINATE of the move: that pool is a short axis
+ * with its own reasons to be short (see COORD_POOLS), the judgement lands in the
+ * position bucket, and there is no tone score to read.
+ */
+/* Below this a block has not asked enough about the tones to move the pool.
+   A full block with the tone stream on clears it easily; a block stopped after a
+   few trials does not. */
+const TONE_MIN_JUDGMENTS = 8;
+
+function toneRatchet() {
+  const mode = cfg.streams.pitch;
+  if (!mode || mode === 'off') return '';
+  const t = state.tally.pitch;
+  /* A handful of judgments is noise, and this moves a setting that changes what
+     every later block is about. */
+  if (!t || t.total < TONE_MIN_JUDGMENTS) return '';
+
+  const score = streamScore(t);
+  const before = toneCount(cfg);
+  let now = before;
+  if (score >= advanceAt()) now = Math.min(TONE_MAX, before + 1);
+  /* The floor is the starting pool rather than TONE_MIN: three notes exists so
+     that a record written before the count was a setting restores onto the pool
+     it was played with, not as somewhere a run can fall to. */
+  else if (score <= demoteAt()) now = Math.max(TONE_DEFAULT, before - 1);
+  if (now === before) return '';
+
+  prog.tones = now;
+  cfg.toneCount = now;
+  const step = toneStepSemitones(now);
+  return `Tones ${now > before ? '\u2191' : '\u2193'} ${now} notes ` +
+         `(${step} semitone${step === 1 ? '' : 's'} apart) · ` +
+         `scored ${Math.round(score * 100)}% on tone`;
+}
+
+/* ============================================================
    13. APPLYING THE LADDER
    ============================================================ */
 
@@ -519,6 +597,9 @@ function applyProgression() {
   prog.capLevel = laddersAxes() && prog.capLevel ? 1 : 0;
   prog.n = Math.max(1, prog.n);
   prog.lureRate = Math.min(LURE_MAX, Math.max(LURE_MIN, prog.lureRate ?? 0.20));
+  /* `toneCount` clamps and defaults in one place, so a ladder restored from a
+     record that predates the digit starts where a fresh one does. */
+  prog.tones = Math.max(TONE_DEFAULT, toneCount({ toneCount: prog.tones }));
   /* The staircase is allowed to place below the target — a player who is already
      past it should not be held back while the posterior catches up. */
   const floor = tune.adapt === 'bayes'
@@ -558,6 +639,9 @@ function applyProgression() {
     coordAxes: ladderCoordAxes(progCfg),
     magnitudeCap: ladderMagnitudeCap(progCfg),
     pitchLoudness: !!progCfg.pitchLoudness,
+    /* Earned, not chosen — see `toneRatchet`. Clamped on the way out so a record
+       written before the digit existed lands on the starting pool. */
+    toneCount: prog.tones,
     dim: 3,
     rotation: prog.spinLevel > 0,
     spin: prog.spinLevel > 0 ? levels[prog.spinLevel] : 60,
@@ -601,6 +685,7 @@ function applyFree() {
     coordAxes: (freeCfg.coordAxes || []).slice(),
     magnitudeCap: freeCfg.magnitudeCap === 3 ? 3 : 2,
     pitchLoudness: !!freeCfg.pitchLoudness,
+    toneCount: toneCount(freeCfg),
     frame: freeCfg.frame,
     rotation: freeCfg.rotation,
     spin: freeCfg.spin,
