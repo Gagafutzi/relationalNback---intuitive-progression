@@ -706,8 +706,19 @@ ok('and a single-axis one reads as the one axis',
  * a move past the cap is a displacement the player was told could not happen.
  */
 const trialsSrc = fs.readFileSync(path.join(ROOT, 'js/trials.js'), 'utf8');
-const pmAt = trialsSrc.indexOf('function pickMetaMove');
-vm.runInContext(trialsSrc.slice(pmAt, trialsSrc.indexOf('\n}\n', pmAt) + 2), geo);
+/*
+ * Lifted a function at a time rather than by loading the file, which wants a
+ * DOM. `pickMetaMove` defers the choice of relation to `pickMetaType`, so both
+ * have to come across — and a lift that quietly missed one showed up as a
+ * ReferenceError from the draw rather than as a missing name, which is why this
+ * throws on a name it cannot find instead of returning an empty slice.
+ */
+const lift = name => {
+  const at = trialsSrc.indexOf('function ' + name);
+  if (at < 0) throw new Error(`ladder-check: ${name} not found in trials.js`);
+  return trialsSrc.slice(at, trialsSrc.indexOf('\n}\n', at) + 2);
+};
+vm.runInContext(lift('pickMetaMove') + lift('pickMetaType'), geo);
 /* The two helpers it reaches for, which live in files with a DOM behind them. */
 vm.runInContext(`
   var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };

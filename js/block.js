@@ -109,6 +109,7 @@ function startBlock() {
   state.history = []; state.chain = []; state.judgments = []; state.presses.clear();
   state.trial = 0; state.scored = 0; state.tally = {};
   state.lureTally = null; state.currentTrial = null; state.cued = true;
+  state.metaDrawn = null;
   state.presses_log = []; state.stimAt = 0;
   state.tickAt = 0; state.lastSnap = null; clearTimeout(state.buzzTimer);
   state.paused = false; state.interrupted = false; state.ending = false;

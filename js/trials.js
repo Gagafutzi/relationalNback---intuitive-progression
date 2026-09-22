@@ -204,32 +204,45 @@ function pickMetaMove(fromIdx, from, A, forbid) {
     if (rel) byType[rel].push(m);
   });
 
-  /*
-   * "Same" means continuing straight, which a wall blocks about half the time, so
-   * uniform-over-available leaves it rare. Over-weight it when it IS reachable to
-   * pull the answers closer together.
-   *
-   * "Opposite" is over-weighted with it, which it was not before. The reason is
-   * the same reason, and it only became the same reason when moves went
-   * composite: same and opposite are each ONE direction out of the whole space,
-   * so a wall blocks them at the same rate, while orthogonal and oblique are
-   * large sets that almost always have a member in bounds. Left at weight 1,
-   * opposite fell to under a tenth of trials — rarer than the answer the weight
-   * was introduced to rescue.
-   *
-   * Oblique gets no extra weight and needs none — it is the biggest bucket once
-   * the space is more than three dimensions wide, and weighting BY TYPE rather
-   * than by move is what keeps it from swallowing the block. Drawing uniformly
-   * over moves would make "press nothing" the answer most of the time, which is
-   * the one failure mode a no-input relation can have: it would pay to stop
-   * playing.
-   */
-  const W = { same: 3, opp: 3, diff: 1, obl: 1 };
   const avail = ['same', 'opp', 'diff', 'obl'].filter(k => byType[k].length);
   if (!avail.length) return pick(moves);
-  let r = Math.random() * avail.reduce((s, k) => s + W[k], 0);
-  const type = avail.find(k => (r -= W[k]) < 0) || avail[avail.length - 1];
-  return pick(byType[type]);
+  return pick(byType[pickMetaType(avail)]);
+}
+
+/*
+ * Which relation to aim for next, among the ones this position can state.
+ *
+ * Proportional to how far each type is BEHIND `META_SHARE`, rather than to a
+ * fixed weight. The weights this replaces could not deliver a share, because a
+ * weight is spent whether or not the type it names was on offer: `same` means
+ * continuing straight and a wall blocks it two trials in three, so its mass
+ * went to whatever was reachable instead — mostly `opp`, which is reachable
+ * from everywhere, always, since the cube can always turn round and go back.
+ *
+ * A deficit cannot be spent while its type is blocked. It accumulates instead,
+ * and the relation is taken the moment a wall stops being in the way, which is
+ * the correction a scarce relation actually needs.
+ *
+ * `META_FLOOR` keeps a type that is already ahead of its share in the draw, so
+ * this stays a sampler and not a schedule — nothing here is ever due, and a
+ * block cannot be read off by counting what has not come up yet.
+ *
+ * The tally is the block's, cleared by `startBlock`, because the histogram the
+ * score is corrected against is the block's too: `chanceOf` reads the answer
+ * pattern this draw produces, so the two have to be counting the same trials.
+ */
+function pickMetaType(avail) {
+  const seen = state.metaDrawn ||
+    (state.metaDrawn = { same: 0, opp: 0, diff: 0, obl: 0 });
+  const drawn = seen.same + seen.opp + seen.diff + seen.obl;
+  /* `drawn + 1` counts the trial being drawn now, so the first of a block has a
+     deficit to work with rather than four zeroes and a coin toss. */
+  const w = avail.map(k =>
+    Math.max(META_FLOOR, META_SHARE[k] * (drawn + 1) - seen[k]));
+  let r = Math.random() * w.reduce((s, v) => s + v, 0);
+  const type = avail[w.findIndex(v => (r -= v) < 0)] ?? avail[avail.length - 1];
+  seen[type]++;
+  return type;
 }
 
 function sampleTrial() {

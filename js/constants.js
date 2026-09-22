@@ -343,6 +343,41 @@ const LURE_MIN_TRIALS = 4;                // don't adapt the rate on 1–2 noisy
 const RETRO_MIN_RESPONSE = 700;           // ms left to answer after the cue appears
 const RETRO_MIN_INTERVAL = 1300;          // below this a retro trial can't be answered
 
+/*
+ * The share of trials each meta-relation should be the answer on.
+ *
+ * A weight over the AVAILABLE types cannot deliver a share, which is what the
+ * `{ same: 3, opp: 3, diff: 1, obl: 1 }` this replaces was trying to do.
+ * Measured over a stationary walk on a 3-cube, how often a relation is even
+ * reachable from where the cube stands: opposite 100% of trials, oblique 100%,
+ * orthogonal 97% — and `same`, which means continuing straight, 33%, because a
+ * wall is in the way on two trials in three. A weight spread over what is left
+ * then redistributes same's mass proportionally, and opposite, carrying the
+ * same weight, collects most of it. That is how raising `same` to 3 produced
+ * opposite on 53% of trials while `same`, the answer the raise was for, stayed
+ * at 13%.
+ *
+ * An even split is what `pickMetaType` aims at, by drawing against what the
+ * block still owes rather than against a fixed weight. Over a long run it lands
+ * exactly; over one block of twenty it does not, and cannot — taking `same`
+ * whenever it is offered walks the cube further into the wall that blocks it
+ * next time, so its own availability falls as the deficit is repaid, and
+ * sixteen scored trials is too short a block to finish repaying. Measured over
+ * four thousand blocks at the defaults:
+ *
+ *     before   same 12.4%   opp 52.0%   diff 17.4%   obl 18.1%
+ *     after    same 18.1%   opp 27.2%   diff 27.3%   obl 27.4%
+ *
+ * The target stays even rather than being bent to the 18/27 the lattice
+ * actually yields, because the shortfall is the 3-cube's and not the draw's —
+ * a 4-cube offers `same` on half of trials and gets closer on its own, and
+ * bending the target would hide that.
+ */
+const META_SHARE = { same: 0.25, opp: 0.25, diff: 0.25, obl: 0.25 };
+/* Every available relation keeps some chance on every trial, so a block can
+   never be read by counting which answer is overdue. */
+const META_FLOOR = 0.05;
+
 /* ---------- Stream registry ----------
    Each stream declares its channels (= response buttons) for each mode. */
 const STREAMS = {

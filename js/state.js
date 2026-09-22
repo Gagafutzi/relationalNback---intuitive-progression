@@ -221,6 +221,7 @@ const state = {
   judgments: [], presses: new Set(),
   trial: 0, scored: 0, tally: {},
   lureTally: null,        // {ok,total,empty} restricted to lure trials
+  metaDrawn: null,        // meta-relations drawn so far this block, for pickMetaType
   cued: true,             // false while a retro-cue trial is still hiding its cue
   cueTimer: null,
   stimAt: 0,              // when the response window opened, for reaction times
