@@ -340,6 +340,8 @@ const TARGET_RATE = 0.28;  // forced identity matches
 const EPS         = 0.20;  // "no movement on this axis" threshold, unit-normalised
 const LURE_MIN = 0.10, LURE_MAX = 0.50;   // beyond ~0.5 the lure becomes the norm
 const LURE_MIN_TRIALS = 4;                // don't adapt the rate on 1–2 noisy trials
+/* How long the axes are shown at the top of a block when the gizmo is off. */
+const DIRECTION_INTRO_MS = 3000;
 const RETRO_MIN_RESPONSE = 700;           // ms left to answer after the cue appears
 const RETRO_MIN_INTERVAL = 1300;          // below this a retro trial can't be answered
 

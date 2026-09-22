@@ -222,6 +222,8 @@ const state = {
   trial: 0, scored: 0, tally: {},
   lureTally: null,        // {ok,total,empty} restricted to lure trials
   metaDrawn: null,        // meta-relations drawn so far this block, for pickMetaType
+  introTimer: null,       // the axes shown at the top of a block, when the gizmo is off
+  gizmoReach: 0,          // furthest badge from the cube centre, in px
   cued: true,             // false while a retro-cue trial is still hiding its cue
   cueTimer: null,
   stimAt: 0,              // when the response window opened, for reaction times

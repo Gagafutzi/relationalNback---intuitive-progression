@@ -485,8 +485,13 @@ function buildGizmo() {
     return Math.min(cubeSize * cap, (cubeSize * reach) / Math.max(proj[k], 0.18));
   };
 
+  /* How far the furthest badge ends up from the centre. The intro needs it to
+     scale the arms into a stage that was sized without them — see
+     `showDirectionIntro`. */
+  state.gizmoReach = 0;
   AXES.forEach(ax => {
     const L = armLength(ax);
+    state.gizmoReach = Math.max(state.gizmoReach, L + HEAD + BADGE);
     const arm = document.createElement('div');
     arm.className = 'arm';
     arm.dataset.axis = ax.id;
@@ -536,10 +541,81 @@ function invertOrient(id) {
 }
 
 function applyGizmoMode() {
-  gizmoEl.classList.toggle('hidden', cfg.gizmo === 'off');
+  /* An intro in progress outranks the setting, so a rebuild mid-intro — a
+     resize, say — does not take the axes away halfway through. */
+  const intro = gizmoEl.classList.contains('intro');
+  gizmoEl.classList.toggle('hidden', cfg.gizmo === 'off' && !intro);
   gizmoEl.classList.toggle('letters-only', cfg.gizmo === 'letters');
   /* Redundant when buildCube set it a moment ago, but this runs on its own too. */
   document.documentElement.classList.toggle('gizmo-off', cfg.gizmo === 'off');
+}
+
+/*
+ * A look at the axes at the top of a block, for a player who has turned the
+ * gizmo off.
+ *
+ * Off is the one mode that needs it: the other two leave the letters on screen
+ * all block.
+ *
+ * It runs BEFORE the first trial rather than over it, because in hard mode
+ * there is nowhere outside the cube for the badges to go. `--stage-k` falls
+ * from 1.9 to 1.5 exactly because there are no arms to leave room for, so the
+ * lattice fills the stage and the ring left around it is thinner than a badge.
+ * The badges therefore land on the cube, and the only way to read them is
+ * through it — which is fine while nothing is lit, and would be unreadable
+ * over a trial. So the lattice is faded for the duration and the block starts
+ * when it lifts.
+ *
+ * Returns whether it engaged, because the caller has to know whether to start
+ * the trials now or when it is done.
+ */
+function showDirectionIntro() {
+  hideDirectionIntro();
+  if (cfg.gizmo !== 'off') return false;
+  const stage = gizmoEl.closest('.cube-stage');
+  if (!stage) return false;
+  document.documentElement.classList.add('dir-intro');
+  gizmoEl.style.setProperty('--gizmo-intro', '1');
+  gizmoEl.classList.add('intro');
+  applyGizmoMode();
+
+  /*
+   * Measured on the page, not derived from the arm lengths.
+   *
+   * An arm's length is in its own local frame and the gizmo is then turned in
+   * three dimensions, so a foreshortened arm covers far less of the screen than
+   * it is long. Scaling against the length shrank the badges to a third of
+   * where they belonged and buried them inside the lattice. The badges' own
+   * boxes are the thing that has to fit, so they are what gets measured — and
+   * at the resting angle they usually already fit, so k comes back 1 and
+   * nothing is scaled at all.
+   */
+  const sb = stage.getBoundingClientRect();
+  const cx = sb.left + sb.width / 2, cy = sb.top + sb.height / 2;
+  let need = 0;
+  gizmoEl.querySelectorAll('.badge').forEach(b => {
+    const r = b.getBoundingClientRect();
+    need = Math.max(need, Math.abs(r.left - cx), Math.abs(r.right - cx),
+                          Math.abs(r.top - cy), Math.abs(r.bottom - cy));
+  });
+  const room = Math.min(sb.width, sb.height) / 2;
+  /* A little inside the edge rather than exactly on it: a badge flush with the
+     stage reads as cut off even when every pixel of it is there. */
+  if (need > room * 0.94) {
+    gizmoEl.style.setProperty('--gizmo-intro', (room * 0.94 / need).toFixed(3));
+  }
+  return true;
+}
+
+/* The keyframes end at zero, so the class coming off is not a thing you see. */
+function hideDirectionIntro() {
+  clearTimeout(state.introTimer);
+  state.introTimer = null;
+  if (!gizmoEl) return;
+  document.documentElement.classList.remove('dir-intro');
+  gizmoEl.classList.remove('intro');
+  gizmoEl.style.removeProperty('--gizmo-intro');
+  applyGizmoMode();
 }
 
 function flashArm(axisId) {

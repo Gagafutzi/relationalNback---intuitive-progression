@@ -4,6 +4,19 @@
   transform-style: preserve-3d; pointer-events: none;
 }
 .gizmo.hidden { display: none; }
+/* The opening look at the axes in hard mode.
+   
+   No fade on this element, deliberately. `opacity` below 1 is a grouping
+   property: it forces a preserve-3d subtree flat, and the two depth arms then
+   project to nothing and both badges land on the cube's centre — the axis that
+   most needs saying is the one that disappears. Same reason the scale is
+   scale3d and not scale. What fades instead is the lattice, whose faces are
+   leaves and have no 3D under them to lose. */
+.gizmo.intro {
+  transform: scale3d(var(--gizmo-intro, 1), var(--gizmo-intro, 1), var(--gizmo-intro, 1));
+}
+:root.dir-intro .cell-face { opacity: .12; }
+.cell-face { transition: opacity .3s; }
 .arm { position: absolute; transform-style: preserve-3d; }
 .shaft {
   position: absolute; height: 2px; top: -1px; left: 0;

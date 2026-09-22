@@ -137,6 +137,20 @@ function startBlock() {
 
   keepAwake();
   updateHUD();
+  /* The axes first, if they are off and there is no other way to see them. The
+     clock starts with the trials, not with the look at the cube. */
+  if (showDirectionIntro()) {
+    state.introTimer = setTimeout(() => {
+      hideDirectionIntro();
+      if (state.running) beginTrials();
+    }, DIRECTION_INTRO_MS);
+  } else {
+    beginTrials();
+  }
+}
+
+function beginTrials() {
+  state.sessionStart = Date.now();
   tick();
   state.timer = setInterval(tick, cfg.interval);
 }
@@ -164,6 +178,7 @@ function stopBlock(silent) {
   clearCells();
   hideLagCue();
   hideMoveArrow();
+  hideDirectionIntro();
   /*
    * Active time, not elapsed time.
    *
