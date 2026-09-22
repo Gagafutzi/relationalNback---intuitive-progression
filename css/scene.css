@@ -34,6 +34,9 @@
   max-width: 96vw; max-height: 96vw;
   display: flex; align-items: center; justify-content: center;
   flex: none; margin: auto 0 6px; align-self: center;
+  /* Anchors the lag ghost. Everything else in here is inside .cube-wrapper,
+     which is transformed and so was already its own containing block. */
+  position: relative;
 }
 .cube-wrapper {
   /* flex:none, or the cap above would come out of the cube rather than out of
@@ -239,32 +242,63 @@
 
 
 /* ---------- VARIABLE-N CUE ----------
-   The lag this trial is asking for. It is an instruction rather than a status
-   readout, so it sits in the line of sight between the cube and the answer keys and
-   is loud enough to be taken in without a deliberate look. The flash replays on
-   every trial, including one that drew the same lag again — otherwise a repeat is
-   indistinguishable from last trial's cue simply still being there. */
-.nback-cue {
-  display: none; align-items: baseline; gap: 3px;
-  padding: 5px 14px 6px; border-radius: var(--radius);
-  background: rgba(77, 127, 214, .16);
-  background: color-mix(in srgb, var(--accent, #4d7fd6) 16%, transparent);
-  border: 1px solid var(--accent, #4d7fd6);
-  border-color: color-mix(in srgb, var(--accent, #4d7fd6) 55%, transparent);
-  -webkit-backdrop-filter: blur(9px); backdrop-filter: blur(9px);
+   The lag this trial is asking for, drawn large behind the lattice.
+
+   It is an instruction rather than a status readout, and the eye is already on
+   the cube — so it goes where the eye is rather than in a badge beside it,
+   which cost a saccade per trial to read one digit. Big enough to be taken in
+   without a deliberate look, faint enough that the lit slot in front of it is
+   still the loudest thing on the stage.
+
+   Sized off --cube-size so it tracks the lattice through the size setting
+   instead of staying put while the cube grows around it, and deliberately
+   LARGER than the cube. A numeral that fits inside it is a numeral the lit slot
+   can sit on top of: in the sparse slot-visibility modes the only thing drawn
+   is one cell, and at 0.62 of the cube a centred cell hid almost all of a `1`.
+   Past about 1.1 the strokes clear a cell in both directions, so the digit
+   survives the worst case — the centre slot lit, directly in front of it.
+
+   Grey is derived from the theme's own text colour rather than fixed: every
+   theme here sets --text, and a hardcoded grey would drift out of the one the
+   player picked.
+
+   Drawn in FRONT of the lattice, with a dark halo, at a low alpha. Behind it
+   was tried first and cannot be made to work at one alpha: the number competes
+   with whatever is drawn over it, and how much that is changes with the slot
+   visibility and the cube size. A 3-cube lattice ate 24% entirely and needed
+   55%; a 4-cube, at sixty-four cells, ate 55% as well. Raising it far enough
+   for the 4-cube then shouted in the sparse modes, where nothing is drawn but
+   one cell.
+
+   In front, none of that applies — but a flat grey has no edge against a busy
+   translucent lattice, and 30% was still unreadable on a 4-cube. The halo
+   supplies the edge, which is what lets the alpha come back down to 40%: low
+   enough that the lattice reads straight through the strokes and the lit slot
+   stays the brightest thing on the stage.
+
+   The flash replays on every trial, including one that drew the same lag again
+   — otherwise a repeat is indistinguishable from last trial's cue simply still
+   being there. Opacity runs to 1 rather than past it, because the alpha that
+   makes this recessive is in the colour, not in the element. */
+.lag-ghost {
+  display: none;
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  /* Over .cube-wrapper, which is transformed and so makes its own stacking
+     context at z-index auto. */
+  z-index: 2;
+  font-size: calc(var(--cube-size) * 1.15);
+  font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: rgba(214, 220, 232, .38);
+  color: color-mix(in srgb, var(--text, #e6ebff) 40%, transparent);
+  text-shadow: 0 0 14px rgba(0, 0, 0, .85), 0 0 4px rgba(0, 0, 0, .7);
+  pointer-events: none; user-select: none; -webkit-user-select: none;
 }
-.nback-cue.show { display: flex; animation: lag-cue .34s ease-out; }
-.nback-cue b {
-  font-size: 20px; font-weight: 700; line-height: 1;
-  color: var(--hi, #8ab4ff); font-variant-numeric: tabular-nums;
-}
-.nback-cue span {
-  font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--muted);
-}
-@keyframes lag-cue {
-  from { transform: scale(.9); opacity: .35; }
-  to   { transform: scale(1);  opacity: 1; }
+.lag-ghost.show { display: block; animation: lag-ghost .34s ease-out; }
+@keyframes lag-ghost {
+  from { transform: translate(-50%, -50%) scale(.94); opacity: .3; }
+  to   { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
 }
 
 /* ---------- MOVE ARROW ----------

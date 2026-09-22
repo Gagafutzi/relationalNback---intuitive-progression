@@ -571,15 +571,15 @@ function litColour(face, hex) {
    The restart of the flash animation is what makes a repeated lag read as a fresh
    instruction rather than as last trial's cue still sitting there. */
 function showLagCue(t) {
-  const el = $('nbackCue');
+  const el = $('lagGhost');
   if (!cfg.varN || t.n == null) { el.classList.remove('show'); return; }
-  $('nbackCueN').textContent = t.n;
+  el.textContent = t.n;
   el.classList.remove('show');
   void el.offsetWidth;                 // reflow, or the animation never replays
   el.classList.add('show');
 }
 
-const hideLagCue = () => $('nbackCue').classList.remove('show');
+const hideLagCue = () => $('lagGhost').classList.remove('show');
 
 function clearCells() {
   state.stimShown = false;

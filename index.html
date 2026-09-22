@@ -690,6 +690,11 @@
 
 <main class="scene">
   <div class="cube-stage">
+    <!-- Which lag this trial is asking for, drawn over the lattice. The eye is
+         already on the cube; a cue beside it is a second place to look, and one
+         digit is not worth a saccade a trial. Faint enough to read the lattice
+         and the lit slot straight through it — see .lag-ghost. -->
+    <div class="lag-ghost" id="lagGhost">2</div>
     <div class="cube-wrapper" id="cubeWrapper" style="--spin-speed:60s">
       <div class="grid-cube" id="gridCube"></div>
       <div class="gizmo" id="gizmo"></div>
@@ -698,9 +703,6 @@
   <!-- The answer keys and the run controls are one cluster, not two things that
        happen to be near the bottom. They live and centre together. -->
   <div class="dock">
-    <!-- Which lag this trial is asking for. Sits between the cube and the keys
-         because that is the path the eye already takes. -->
-    <div class="nback-cue" id="nbackCue"><b id="nbackCueN">2</b><span>-back</span></div>
     <div class="deck" id="deck"></div>
     <div class="controls">
       <button id="startBtn" class="primary">Start block</button>
