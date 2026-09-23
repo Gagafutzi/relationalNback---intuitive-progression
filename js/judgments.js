@@ -41,24 +41,6 @@ function cardinalIds() {
 }
 const cardinalId = c => c ? cardinalIds()[c[0]][c[1] > 0 ? 1 : 0] : null;
 
-/**
- * The move as a vector — every axis it happened on, not the one it happened on.
- *
- * A move on several axes at once was previously nameless: `cardinalOf` returns
- * null unless exactly one component is non-zero, and the meta relation was
- * built on that, so "orthogonal" could only ever mean "a different axis". With
- * a vector it means what it says — a zero dot product — and there are far more
- * ways to satisfy it, which is the whole reason to allow composite moves.
- */
-function moveVectorOf(a, b) {
-  const ca = state.cells[a.cellIdx], cb = state.cells[b.cellIdx];
-  const d = [cb.x - ca.x, cb.y - ca.y, cb.z - ca.z];
-  /* One component per coordinate axis, in the order they were chosen — the same
-     order `CARDINAL_IDS` names them in, or a move would be reported as a step on
-     somebody else's property. */
-  coordAxes().forEach(k => d.push((b[k] ?? 0) - (a[k] ?? 0)));
-  return d;
-}
 
 /**
  * The same move as the eye saw it: projected into the screen frame, then
@@ -88,43 +70,7 @@ function screenVectorOf(a, b) {
   return v.map(c => c > EPS ? 1 : c < -EPS ? -1 : 0);
 }
 
-const dot = (A, B) => A.reduce((s, v, i) => s + v * (B[i] || 0), 0);
-const norm = A => Math.sqrt(dot(A, A));
 
-/**
- * How one move stands to another: parallel, antiparallel, orthogonal, or
- * oblique — none of the three.
- *
- * Oblique is a relation, not a gap. Single-axis moves never produced one — two
- * axis-aligned vectors are always parallel, antiparallel or perpendicular — so
- * for as long as a move was one axis the three answers were exhaustive.
- * Composite moves break that: (1,0,0) and (1,1,0) sit at 45°, which is a
- * perfectly definite thing for two moves to do and was being thrown away.
- *
- * It is returned as `'obl'` rather than suppressed, and answered by pressing
- * nothing. That is the point of it: the selection pressure on this mode was
- * always "only draw what a button can say", which quietly restricted the space
- * to the special cases. A relation with no button widens the space at no
- * response cost — and it is the one answer the deck cannot prompt you toward,
- * so it has to be derived rather than recognised.
- *
- * `null` now means only that there is no relation to state at all: a missing
- * move, or one that went nowhere.
- */
-function metaRelationOf(A, B) {
-  if (!A || !B) return null;
-  const na = norm(A), nb = norm(B);
-  if (!na || !nb) return null;
-
-  const d = dot(A, B);
-  if (d === 0) return 'diff';
-
-  /* Cosine rather than a component test, because either vector may be composite. */
-  const cos = d / (na * nb);
-  if (cos > 1 - 1e-9) return 'same';
-  if (cos < -1 + 1e-9) return 'opp';
-  return 'obl';
-}
 
 /** Every axis a move happened on, named — so a diagonal can be spelled out. */
 function moveNames(v) {

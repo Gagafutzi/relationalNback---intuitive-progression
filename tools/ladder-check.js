@@ -261,6 +261,33 @@ vm.runInContext(`
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'js/judgments.js'), 'utf8')
   .replace(/^"use strict";/, ''), geo);
 
+/*
+ * The sampler, required rather than carved out of a file.
+ *
+ * This used to read `js/trials.js` and slice `pickMetaMove` out of it by string
+ * index, up to the first line that was exactly `}`. That worked until the draw
+ * grew a second function beside it, which the slice did not reach — and the
+ * failure surfaced as a ReferenceError from inside the draw, seven hundred
+ * lines from the cause. `js/model.js` is the sampler as a file that can be
+ * asked for its functions, and `createSampler` takes the world, so the context
+ * built above is handed to it whole.
+ */
+const createSampler = require(path.join(ROOT, 'js/model.js'));
+/* Read out of the context by name, for the same reason boot.js writes them out:
+   a `const` in a script is not a property of the object the script ran against,
+   so `geo.dimCount` is undefined however plainly constants.js declares it. */
+const SAMPLER_ENV = ['cfg', 'state', 'STREAM_KEYS', 'TARGET_RATE', 'META_SHARE',
+  'META_FLOOR', 'PANS', 'LETTER_KEYS', 'GLYPH_SET_KEYS', 'dimCount',
+  'magnitudeCap', 'coordAxes', 'poolFor', 'voiceSet'];
+const M = createSampler(Object.fromEntries(SAMPLER_ENV.map(n =>
+  [n, vm.runInContext(`typeof ${n} === 'undefined' ? undefined : ${n}`, geo)])));
+
+/* The sampler's functions go into the context, which is what `boot.js` does to
+   the page for the same reason: everything already written against these names
+   — the checks below, and `cardinalOf` in judgments.js, which calls
+   `moveVectorOf` and no longer has it in its own file — keeps working. */
+Object.assign(geo, M);
+
 const g4 = k => vm.runInContext(k, geo);
 
 /*
@@ -705,48 +732,30 @@ ok('and a single-axis one reads as the one axis',
  * level outside its pool renders as an undefined colour or a missing tone, and
  * a move past the cap is a displacement the player was told could not happen.
  */
-const trialsSrc = fs.readFileSync(path.join(ROOT, 'js/trials.js'), 'utf8');
-/*
- * Lifted a function at a time rather than by loading the file, which wants a
- * DOM. `pickMetaMove` defers the choice of relation to `pickMetaType`, so both
- * have to come across — and a lift that quietly missed one showed up as a
- * ReferenceError from the draw rather than as a missing name, which is why this
- * throws on a name it cannot find instead of returning an empty slice.
- */
-const lift = name => {
-  const at = trialsSrc.indexOf('function ' + name);
-  if (at < 0) throw new Error(`ladder-check: ${name} not found in trials.js`);
-  return trialsSrc.slice(at, trialsSrc.indexOf('\n}\n', at) + 2);
-};
-vm.runInContext(lift('pickMetaMove') + lift('pickMetaType'), geo);
-/* The two helpers it reaches for, which live in files with a DOM behind them. */
-vm.runInContext(`
-  var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
-  var randInt = function (n) { return Math.floor(Math.random() * n); };
-`, geo);
-
+/* Run in the host now that the sampler is a required module, rather than as a
+   string evaluated inside the context. The context is still where the config
+   and the lattice live, so those are read off it. */
 [['pitch'], ['pitch', 'color', 'size', 'quantity']].forEach(list => {
   [2, 3].forEach(cap => {
-    vm.runInContext(`cfg.coordAxes = ${JSON.stringify(list)}; cfg.magnitudeCap = ${cap};`, geo);
-    const bad = g4(`(function () {
-      var axes = ${JSON.stringify(list)}, out = [];
-      for (var t = 0; t < ${list.length > 1 ? 25 : 200}; t++) {
-        var from = { cellIdx: idx(1,1,1) };
-        axes.forEach(function (k) { from[k] = 1; });
-        var A = [1, 0, 0].concat(axes.map(function () { return 0; }));
-        var m = pickMetaMove(from.cellIdx, from, A, -1);
-        if (!m) { out.push('drew nothing'); break; }
-        axes.forEach(function (k) {
-          var v = m.levels[k];
-          if (v == null || v < 0 || v >= poolFor(k).length) out.push(k + ' level ' + v);
-        });
-        var c = state.cells[m.cellIdx];
-        [c.x, c.y, c.z].forEach(function (q) { if (q < 0 || q > 2) out.push('off lattice'); });
-      }
-      return out.slice(0, 3);
-    })()`);
+    geo.cfg.coordAxes = list;
+    geo.cfg.magnitudeCap = cap;
+    const bad = [];
+    const draws = list.length > 1 ? 25 : 200;
+    for (let t = 0; t < draws && bad.length < 3; t++) {
+      const from = { cellIdx: geo.idx(1, 1, 1) };
+      list.forEach(k => { from[k] = 1; });
+      const A = [1, 0, 0].concat(list.map(() => 0));
+      const m = M.pickMetaMove(from.cellIdx, from, A, -1);
+      if (!m) { bad.push('drew nothing'); break; }
+      list.forEach(k => {
+        const v = m.levels[k];
+        if (v == null || v < 0 || v >= geo.poolFor(k).length) bad.push(k + ' level ' + v);
+      });
+      const c = geo.state.cells[m.cellIdx];
+      [c.x, c.y, c.z].forEach(q => { if (q < 0 || q > 2) bad.push('off lattice'); });
+    }
     ok(`every drawn move is in bounds — ${list.length} extra at cap ${cap}`,
-       bad.length === 0, bad.join('; '));
+       bad.length === 0, bad.slice(0, 3).join('; '));
   });
 });
 

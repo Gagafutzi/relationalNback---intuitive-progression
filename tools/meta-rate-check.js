@@ -17,15 +17,20 @@
  * `buildJudgments` does, from the pair, not read off the draw — so a generator
  * that aimed at a share it then failed to state would still fail here.
  *
- * `judgments.js` is loaded beside `trials.js` so the relation rule under test
- * is the app's own. The existing no-repeat check leaves `pair` unset, which
- * makes `A` null and returns before any of this runs.
+ * The sampler is required, not sandboxed. It used to be loaded into a `vm`
+ * context with a page of stubs standing in for the browser; `js/model.js` is the
+ * same code with its world handed to it instead, so the relation rule under test
+ * is the app's own and there is nothing here to drift from it.
  *
  *   node tools/meta-rate-check.js
  */
 
-const fs = require('fs'), vm = require('vm'), path = require('path');
+const path = require('path');
 const ROOT = path.join(__dirname, '..');
+const createSampler = require(path.join(ROOT, 'js/model.js'));
+/* The same numbers the app runs on, read from where the app keeps them. */
+const META_SHARE = { same: 0.25, opp: 0.25, diff: 0.25, obl: 0.25 };
+const META_FLOOR = 0.05;
 
 let bad = 0;
 const ok = (name, cond, extra = '') => {
@@ -44,36 +49,23 @@ function cells(dim) {
 const REL = ['same', 'opp', 'diff', 'obl'];
 
 function run({ n = 2, dim = 3, coords = [], trials = 80000, blockLength = 20 }) {
-  const ctx = vm.createContext({ console, Math, Array, Object, JSON, Set });
-  vm.runInContext(`
-    var cfg = { n: ${n}, meta: true, lureRate: 0, gating: false, varN: 0, retro: 0,
-                magnitudeCap: 2, coordAxes: ${JSON.stringify(coords)},
-                streams: { position: 'relational' } };
-    var state = { cells: ${JSON.stringify(cells(dim))}, chain: [], metaDrawn: null };
-    var STREAM_KEYS = ['position','pitch','timbre','pan','color','size','quantity','letter'];
-    var PITCHES = [0,0,0], PANS = [0,0,0], COLORS = [0,0,0],
-        SIZES = [0,0,0], COUNTS = [0,0,0], LETTER_KEYS = [0,0,0,0];
-    function voiceSet() { return { voices: [0,0,0] }; }
-    function coordAxes() { return cfg.coordAxes; }
-    function magnitudeCap() { return 2; }
-    function dimCount() { return 3 + cfg.coordAxes.length; }
-    function poolFor(k) {
-      return { pitch: PITCHES, pan: PANS, color: COLORS, size: SIZES,
-               quantity: COUNTS, letter: LETTER_KEYS }[k] || [0,0,0];
-    }
-    /* Only the two the meta branch reaches; the pole ids are never rendered here. */
-    var STREAMS = {};
-    function coordPoles() { return [null, null]; }
-    var TARGET_RATE = 0.28, EPS = 0.20;
-    var META_SHARE = { same: 0.25, opp: 0.25, diff: 0.25, obl: 0.25 };
-    var META_FLOOR = 0.05;
-    function cardinalOf() { return null; }
-    function positionGuides() {}
-  `, ctx);
-
-  for (const f of ['js/judgments.js', 'js/trials.js']) {
-    vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx);
-  }
+  const cfg = {
+    n, meta: true, lureRate: 0, gating: false, varN: 0, retro: 0,
+    magnitudeCap: 2, coordAxes: coords, streams: { position: 'relational' },
+  };
+  const state = { cells: cells(dim), chain: [], metaDrawn: null };
+  const POOL = [0, 0, 0];
+  const M = createSampler({
+    cfg, state,
+    STREAM_KEYS: ['position', 'pitch', 'timbre', 'pan', 'color', 'size', 'quantity', 'letter'],
+    TARGET_RATE: 0.28, META_SHARE, META_FLOOR,
+    PANS: POOL, LETTER_KEYS: [0, 0, 0, 0], GLYPH_SET_KEYS: [],
+    dimCount: () => 3 + coords.length,
+    magnitudeCap: () => 2,
+    coordAxes: () => coords,
+    poolFor: () => POOL,
+    voiceSet: () => ({ voices: POOL }),
+  });
 
   const counts = { same: 0, opp: 0, diff: 0, obl: 0 };
   let asked = 0;
@@ -81,25 +73,21 @@ function run({ n = 2, dim = 3, coords = [], trials = 80000, blockLength = 20 }) 
     /* Blocks, not one long chain. `startBlock` clears the chain and the deficit
        together, and the deficit repays itself over a run far longer than twenty
        trials — so a continuous chain measures a rate the player never sees. */
-    if (i % blockLength === 0) {
-      vm.runInContext('state.chain = []; state.metaDrawn = null;', ctx);
-    }
+    if (i % blockLength === 0) { state.chain = []; state.metaDrawn = null; }
     /*
      * Sample, then wire the pair up exactly as `block.js` does — the partner is
      * the n-back item and `metaPrev` is that item's own pair, so the relation
      * measured here is between the same two moves the deck asks about.
      */
-    const rel = vm.runInContext(`(function () {
-      var t = sampleTrial();
-      var C = state.chain;
-      var partner = C[C.length - t.n];
-      t.pair = partner ? [partner, t] : null;
-      C.push(t);
-      var prev = t.pair && t.pair[0].pair;
-      if (!prev) return null;
-      return metaRelationOf(moveVectorOf(prev[0], prev[1]),
-                            moveVectorOf(t.pair[0], t.pair[1]));
-    })()`, ctx);
+    const t = M.sampleTrial();
+    const C = state.chain;
+    const partner = C[C.length - t.n];
+    t.pair = partner ? [partner, t] : null;
+    C.push(t);
+    const prev = t.pair && t.pair[0].pair;
+    if (!prev) continue;
+    const rel = M.metaRelationOf(M.moveVectorOf(prev[0], prev[1]),
+                                 M.moveVectorOf(t.pair[0], t.pair[1]));
     if (rel) { counts[rel]++; asked++; }
   }
   return { counts, asked };

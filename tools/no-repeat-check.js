@@ -10,12 +10,14 @@
  * The one place it must still be allowed is lag one, where the previous trial
  * *is* the n-back item and a position match is a repeat by definition.
  *
- * `trials.js` is loaded in a sandbox with the few globals it reaches for, so
- * this runs without a browser:  node tools/no-repeat-check.js
+ * The sampler is required rather than sandboxed — `js/model.js` takes its world
+ * as an argument, so this runs without a browser:
+ *   node tools/no-repeat-check.js
  */
 
-const fs = require('fs'), vm = require('vm'), path = require('path');
+const path = require('path');
 const ROOT = path.join(__dirname, '..');
+const createSampler = require(path.join(ROOT, 'js/model.js'));
 
 let bad = 0;
 const ok = (name, cond, extra = '') => {
@@ -33,39 +35,34 @@ function cells() {
 }
 
 function run({ n, streams, meta = false, trials = 4000, lureRate = 0.25 }) {
-  const ctx = vm.createContext({ console, Math, Array, Object, JSON });
-  vm.runInContext(`
-    var cfg = { n: ${n}, meta: ${meta}, lureRate: ${lureRate}, gating: false,
-                streams: ${JSON.stringify(streams)} };
-    var state = { cells: ${JSON.stringify(cells())}, chain: [] };
-    var STREAM_KEYS = ['position','pitch','timbre','pan','color','size','quantity','letter'];
-    /* The feature pools the sampler indexes into. Sizes only — nothing here
-       reads their contents. */
-    var PITCHES = [0,0,0,0], PANS = [0,0,0], COLORS = [0,0,0,0],
-        SIZES = [0,0,0], COUNTS = [0,0,0], LETTER_KEYS = [0,0,0,0];
-    function voiceSet() { return { voices: [0,0,0] }; }
-    /* No coordinate axes here — this file is about the cube standing still, and
-       a property that is a coordinate is drawn by a different branch. The pool
-       lookup still has to answer, since the feature draws go through it. */
-    function coordAxes() { return []; }
-    function magnitudeCap() { return 2; }
-    function dimCount() { return 3; }
-    function poolFor(k) {
-      return { pitch: PITCHES, pan: PANS, color: COLORS, size: SIZES,
-               quantity: COUNTS, letter: LETTER_KEYS }[k] || [0,0,0];
-    }
-    var TARGET_RATE = 0.28;
-    function cardinalOf() { return null; }
-    function positionGuides() {}
-  `, ctx);
-
-  // `randInt` and `pick` are defined by the file itself.
-  vm.runInContext(fs.readFileSync(path.join(ROOT, 'js/trials.js'), 'utf8'), ctx);
+  const cfg = { n, meta, lureRate, gating: false, varN: 0, retro: 0,
+                magnitudeCap: 2, coordAxes: [], streams };
+  const state = { cells: cells(), chain: [], metaDrawn: null };
+  const POOL = [0, 0, 0, 0];
+  /*
+   * Pool sizes only — nothing here reads their contents. No coordinate axes:
+   * this file is about the cube standing still, and a property that is a
+   * coordinate is drawn by a different branch.
+   */
+  const M = createSampler({
+    cfg, state,
+    STREAM_KEYS: ['position', 'pitch', 'timbre', 'pan', 'color', 'size', 'quantity', 'letter'],
+    TARGET_RATE: 0.28,
+    META_SHARE: { same: 0.25, opp: 0.25, diff: 0.25, obl: 0.25 },
+    META_FLOOR: 0.05,
+    PANS: [0, 0, 0], LETTER_KEYS: POOL, GLYPH_SET_KEYS: [],
+    dimCount: () => 3,
+    magnitudeCap: () => 2,
+    coordAxes: () => [],
+    poolFor: () => POOL,
+    voiceSet: () => ({ voices: [0, 0, 0] }),
+  });
 
   let repeats = 0, matches = 0;
   for (let i = 0; i < trials; i++) {
-    const t = vm.runInContext('(function(){ var t = sampleTrial(); state.chain.push(t); return t; })()', ctx);
-    const chain = vm.runInContext('state.chain', ctx);
+    const t = M.sampleTrial();
+    state.chain.push(t);
+    const chain = state.chain;
     const prev = chain[chain.length - 2];
     const nb = chain.length > n ? chain[chain.length - 1 - n] : null;
     if (prev && t.cellIdx === prev.cellIdx) repeats++;
