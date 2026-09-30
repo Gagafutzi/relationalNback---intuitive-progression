@@ -1,15 +1,26 @@
 /* ---------- SETTINGS ---------- */
-.settings-btn {
+/* The ⚙ and the Discord invite share one fixed corner, so the invite follows the
+   button's width instead of guessing it. */
+.top-left {
   position: fixed; top: 14px; left: 14px; z-index: 30;
+  display: flex; gap: 8px; align-items: stretch;
+}
+.settings-btn, .discord-btn {
+  font: inherit; font-size: 13.33px; line-height: normal;
   background: var(--panel); border: 1px solid var(--border-outer);
   color: var(--text); padding: 8px 12px; border-radius: var(--radius); cursor: pointer;
   transition: opacity .2s ease, transform .2s ease;
 }
 .settings-btn:hover { border-color: var(--accent, #4d7fd6); }
+/* Discord's blurple on the text only; the pill stays the theme's. */
+.discord-btn { display: inline-flex; align-items: center; gap: 6px; color: #9aa7ff; text-decoration: none; font-weight: 600; }
+.discord-logo { width: 16px; height: 16px; flex: none; }
+.discord-btn:hover { border-color: #5865f2; color: #c1c8ff; }
 /* The button lives exactly where the open panel puts its own header, so it used to
    sit on top of the first control. It gets out of the way instead of fighting for
    the space with z-index. */
-body.settings-open .settings-btn {
+body.settings-open .settings-btn,
+body.settings-open .discord-btn {
   opacity: 0; pointer-events: none; transform: translateX(-8px);
 }
 

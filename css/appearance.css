@@ -29,7 +29,8 @@ body.has-bg .hud, body.has-bg .glyph-legend {
 /* The dock and the deck carry their own blur; only the floating ⚙ still needs one
    added. Blurring each control button individually now double-frosts the pill they
    sit in and smears its edge. */
-body.has-bg .settings-btn {
+body.has-bg .settings-btn,
+body.has-bg .discord-btn {
   -webkit-backdrop-filter: blur(7px);
   backdrop-filter: blur(7px);
 }

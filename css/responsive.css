@@ -47,7 +47,7 @@
   /* The HUD becomes a wrapping header strip. As a 210px floating column it sat on
      top of the cube on anything narrower than a tablet. */
   .hud {
-    top: 8px; right: 8px; left: 56px; min-width: 0; font-size: 11px;
+    top: 8px; right: 8px; left: 96px; min-width: 0; font-size: 11px;
     display: flex; flex-wrap: wrap; justify-content: flex-end;
     align-items: baseline; column-gap: 11px; row-gap: 2px;
   }
@@ -61,7 +61,10 @@
      between blocks anyway. */
   body.running .hud .next { display: none; }
 
-  .settings-btn { top: 8px; left: 8px; padding: 7px 9px; font-size: 12px; }
+  .top-left { top: 8px; left: 8px; gap: 6px; }
+  /* Icons only on a phone: the HUD strip starts right after them. */
+  .settings-btn, .discord-btn { padding: 7px 9px; font-size: 12px; }
+  .top-left .btn-label { display: none; }
   .scene { padding: 78px 4px 12px; }
   .dock { gap: 9px; }
   .controls { padding: 5px; }
