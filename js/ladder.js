@@ -194,10 +194,14 @@ function stairObserve(x, k, n) {
 }
 
 /* Place the next block where the fitted curve predicts pTarget — i.e. at the
-   threshold itself, which is what the grid parameter already is. */
+   threshold itself, which is what the grid parameter already is — but never
+   faster than the target. It used to go down to three quarters of it, so a
+   good run left you training faster than the speed you had asked for. Holding
+   the target still clears milestones: scoring well there is what moves the
+   posterior's mass below it. */
 function stairNextInterval() {
   const ms = Math.pow(10, stairMeanT());
-  const lo = Math.max(700, tune.targetInterval * 0.75);
+  const lo = tune.targetInterval;
   return Math.round(Math.min(tune.maxInterval, Math.max(lo, ms)) / 10) * 10;
 }
 

@@ -616,10 +616,9 @@ function applyProgression() {
   /* `toneCount` clamps and defaults in one place, so a ladder restored from a
      record that predates the digit starts where a fresh one does. */
   prog.tones = Math.max(TONE_DEFAULT, toneCount({ toneCount: prog.tones }));
-  /* The staircase is allowed to place below the target — a player who is already
-     past it should not be held back while the posterior catches up. */
-  const floor = tune.adapt === 'bayes'
-    ? Math.max(600, tune.targetInterval * 0.75) : tune.targetInterval;
+  /* The target is the floor in both modes: the trial never runs faster than the
+     speed asked for, whatever the staircase thinks you could take. */
+  const floor = tune.targetInterval;
   prog.interval = Math.min(Math.max(prog.interval, floor), tune.maxInterval);
 
   const streams = {};
