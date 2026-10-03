@@ -370,6 +370,8 @@ function syncSettingsUI() {
   $('cellVis').value = cfg.cellVis;
   $('cellFill').value = cfg.cellFill || 'solid';
   $('slotReadout').value = cfg.slotReadout || 'off';
+  $('padLayout').value = cfg.pad || 'auto';
+  renderPadHint();
   $('cubeLayout').value = cfg.layout;
   $('layoutHint').textContent = LAYOUT_HINT[cfg.layout] || '';
   $('dailyGoal').value = cfg.dailyGoal || 0;
@@ -508,6 +510,7 @@ function importJSON(text) {
     cfg.cellVis = progress.display.cellVis || cfg.cellVis;
     cfg.cellFill = progress.display.cellFill || cfg.cellFill;
     cfg.slotReadout = progress.display.slotReadout || cfg.slotReadout;
+    cfg.pad = progress.display.pad || cfg.pad;
     cfg.spinPath = progress.display.spinPath || cfg.spinPath;
     cfg.voiceSet = progress.display.voiceSet || cfg.voiceSet;
   }

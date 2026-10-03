@@ -251,6 +251,10 @@ function blockRecord(completed, scored) {
          either is not the same score. */
       cellFill: cfg.cellFill,
       slotReadout: cfg.slotReadout,
+      /* The layout as it resolved, not the setting: under Auto the setting does
+         not say which one was under the thumb. A corner answers a diagonal in
+         one tap where the row takes two, which moves the reaction times. */
+      pad: padLayout(),
       gizmo: cfg.gizmo,
       /* Layout belongs here, not with the cosmetics: flat panels remove the depth
          ambiguity entirely, so the same score means something different. */

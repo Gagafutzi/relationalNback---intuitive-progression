@@ -91,3 +91,49 @@
   box-shadow: 0 0 0 1px var(--bad), 0 0 18px -3px rgba(255, 107, 107, .8);
 }
 .rbtn.reveal { box-shadow: inset 0 0 0 2px var(--btn-color, #fff); }
+
+/* ---------- COMPASS PAD ----------
+   The keys where they point: a 3×3 of the four points and the four corners between
+   them, with every remaining pair of opposites standing beside it as a column.
+   --pad-key is the one size everything is cut from, so the media queries only ever
+   have to say how big a key is. */
+.deck-group .btns.pad {
+  --pad-key: 54px; --pad-gap: 6px;
+  gap: var(--pad-gap); align-items: stretch; justify-content: center;
+  flex-wrap: wrap;
+}
+.pad .compass {
+  display: grid; gap: var(--pad-gap);
+  grid-template-columns: repeat(3, var(--pad-key));
+  grid-template-rows: repeat(3, var(--pad-key));
+}
+/* Positive end on top, each half the compass's height: a column is one axis,
+   and a bigger target than a square for the price of the same width. The
+   min-height only matters once a narrow screen wraps a column onto a line of its
+   own, where there is no compass beside it to stretch against. */
+.pad .pole-col {
+  display: flex; flex-direction: column; gap: var(--pad-gap);
+  width: var(--pad-key);
+}
+.pad .pole-col .rbtn { flex: 1; min-height: calc(var(--pad-key) * 1.2); }
+/* The grid sizes the key; the touch-screen floor on .rbtn would only push it out
+   of its cell. */
+.pad .rbtn {
+  min-width: 0; min-height: 0; padding: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.pad .rbtn .glyph { font-size: calc(var(--pad-key) * .34); }
+/* The corners are two answers at once and the points one, so the points stay the
+   louder keys: a corner sits back on the panel, and only its letters take colour. */
+.pad .corner {
+  background: var(--panel-2);
+  background: color-mix(in srgb, var(--panel-2) 86%, transparent);
+}
+.pad .corner.spelled .glyph { font-size: calc(var(--pad-key) * .27); letter-spacing: .03em; }
+/* The move that did not happen, which nothing answers. A mark rather than a hole,
+   so the grid still reads as a compass with a middle. */
+.pad-hub { display: flex; align-items: center; justify-content: center; }
+.pad-hub::before {
+  content: ''; width: 5px; height: 5px;
+  background: var(--border-outer); opacity: .6;
+}

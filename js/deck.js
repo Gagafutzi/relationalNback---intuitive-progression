@@ -73,11 +73,153 @@ const KEY_NAMES = {
 };
 const keyLabel = k => !k ? '—' : KEY_NAMES[k] || k.toUpperCase();
 
+/* ---- The compass pad ----
+   The same keys laid out where they point: north above, west to the left, and a
+   corner between each pair of neighbours.
+
+   The corners are the reason for it. A move runs on every axis at once, and each
+   axis is its own question, so a move north-west is answered by pressing North AND
+   West. On a keyboard that is two fingers coming down together; on a phone it was
+   two taps in a row with one thumb, each a reach across a row of six keys that
+   gave no hint which one was which way. A corner is that pair as one target, in
+   the place the move went.
+
+   Only the groups with all four of a compass's points get one. Whatever else the
+   group carries — Above/Below, near/far, the poles of a coordinate axis, a rank —
+   is a pair of opposites, and stands beside the compass as a column with its
+   positive end on top. */
+const COMPASS = {
+  /* `letters`: spell the corner out of the two letters it joins, each in its own
+     axis colour — NW, as the slot readout and the gizmo spell it. */
+  position:  { n:'north', s:'south', e:'east', w:'west', letters: true },
+  position2: { n:'s-north', s:'s-south', e:'s-east', w:'s-west' },
+  glyph:     { n:'glyph-north', s:'glyph-south', e:'glyph-east', w:'glyph-west' },
+};
+const DIAGONAL_ARROWS = { nw:'↖', ne:'↗', sw:'↙', se:'↘' };
+
+/* A coarse primary pointer is a finger, and a finger is what the compass is for. A
+   touch laptop reports a fine primary pointer and keeps the row its keyboard
+   matches. */
+const coarsePointer = typeof matchMedia === 'function' ? matchMedia('(pointer: coarse)') : null;
+
+function padLayout() {
+  if (cfg.pad === 'row' || cfg.pad === 'compass') return cfg.pad;
+  return coarsePointer && coarsePointer.matches ? 'compass' : 'row';
+}
+
+/* A tablet that gains or loses its keyboard changes what Auto means. */
+if (coarsePointer && coarsePointer.addEventListener)
+  coarsePointer.addEventListener('change', () => {
+    if (cfg.pad === 'auto' || !cfg.pad) { buildDeck(); renderPadHint(); }
+  });
+
+const PAD_HINT = {
+  row:     'One key per direction, in a row — the layout the keyboard binds match.',
+  compass: 'Directions where they point, with a corner for each diagonal: one tap answers both of its axes.',
+};
+function renderPadHint() {
+  const el = $('padLayoutHint');
+  if (!el) return;
+  const now = padLayout();
+  el.textContent = (cfg.pad === 'auto' || !cfg.pad)
+    ? `Auto picked ${now === 'compass' ? 'the compass' : 'the row'} for this screen. ` + PAD_HINT[now]
+    : PAD_HINT[now];
+}
+
+/* Press-on-pointerdown, with the visual travel a phone actually gets. Shared by a
+   single key and a corner so the two can never drift apart in how a tap lands. */
+function wireKey(b, act) {
+  /* pointerdown, not click: on touch a click is only dispatched when the finger
+     LIFTS, plus whatever the browser spends deciding the tap was not the first
+     half of a double-tap. That delay pushed answers given near the end of an
+     interval across the boundary, where they were graded against the next
+     trial. preventDefault suppresses the compatibility click that would
+     otherwise arrive a second time. */
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    b.classList.add('down');
+    act();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev =>
+    b.addEventListener(ev, () => b.classList.remove('down')));
+  /* detail === 0 means the click came from Enter/Space on a focused button, not
+     from a pointer — the only clicks left to honour. */
+  b.addEventListener('click', e => { if (e.detail === 0) act(); });
+}
+
+function makeKey(c, g, key) {
+  const b = document.createElement('button');
+  b.className = 'rbtn';
+  b.dataset.channel = c.id;
+  b.style.setProperty('--btn-color', c.color || g.color);
+  b.title = `${g.label}: ${c.label}`;
+  b.innerHTML = `<span class="glyph">${c.glyph}</span>` +
+                `<span class="kbd">${keyLabel(key)}</span>`;
+  wireKey(b, () => press(c.id));
+  return b;
+}
+
+/* A corner: two channels from one tap. No key cap — the keyboard already presses
+   both by pressing both. Untinted, so the four points stay the loudest keys on the
+   pad; the letters carry the axis colours instead. */
+function makeCorner(chs, glyph, g) {
+  const ids = chs.map(c => c.id);
+  const b = document.createElement('button');
+  b.className = 'rbtn corner' + (/<span/.test(glyph) ? ' spelled' : '');
+  b.dataset.combo = ids.join(' ');
+  b.title = `${g.label}: ${chs.map(c => c.label).join(' + ')}`;
+  b.setAttribute('aria-label', b.title);
+  b.innerHTML = `<span class="glyph">${glyph}</span>`;
+  wireKey(b, () => pressCorner(ids, b));
+  return b;
+}
+
+function buildCompass(g, spec, byId, keyFor) {
+  const pad = document.createElement('div');
+  pad.className = 'btns pad';
+  const grid = document.createElement('div');
+  grid.className = 'compass';
+
+  const corner = (v, h) => {
+    const A = byId[spec[v]], B = byId[spec[h]];
+    const glyph = spec.letters
+      ? [A, B].map(c => `<span style="color:${c.color || g.color}">${c.glyph}</span>`).join('')
+      : DIAGONAL_ARROWS[v + h];
+    return makeCorner([A, B], glyph, g);
+  };
+  /* The middle is the move that did not happen, which nothing answers. */
+  const hub = document.createElement('div');
+  hub.className = 'pad-hub';
+  hub.setAttribute('aria-hidden', 'true');
+
+  [corner('n', 'w'), keyFor(byId[spec.n]), corner('n', 'e'),
+   keyFor(byId[spec.w]), hub,              keyFor(byId[spec.e]),
+   corner('s', 'w'), keyFor(byId[spec.s]), corner('s', 'e')]
+    .forEach(el => grid.appendChild(el));
+  pad.appendChild(grid);
+
+  const points = new Set([spec.n, spec.s, spec.e, spec.w]);
+  const rest = g.channels.filter(c => !points.has(c.id));
+  for (let i = 0; i < rest.length; i += 2) {
+    const col = document.createElement('div');
+    col.className = 'pole-col';
+    rest.slice(i, i + 2).forEach(c => col.appendChild(keyFor(c)));
+    pad.appendChild(col);
+  }
+  /* How many key-widths the pad is across. buildDeck adds these up. */
+  pad.dataset.cols = 3 + Math.ceil(rest.length / 2);
+  return pad;
+}
+
 function buildDeck() {
   deckEl.innerHTML = '';
   state.keyIndex = {};
   const groups = deckGroups();
   const keys = assignKeys(groups);
+  const compass = padLayout() === 'compass';
+  /* On the root, because the cube is sized there: a pad three keys tall takes
+     height the stage has to give back. */
+  document.documentElement.classList.toggle('pad-compass', compass);
 
   groups.forEach(g => {
     const group = document.createElement('div');
@@ -89,40 +231,31 @@ function buildDeck() {
     title.textContent = g.label;
     group.appendChild(title);
 
-    const btns = document.createElement('div');
-    btns.className = 'btns';
-    g.channels.forEach(c => {
+    const keyFor = c => {
       const key = keys.get(c.id);
       state.keyIndex[key] = c.id;
-
-      const b = document.createElement('button');
-      b.className = 'rbtn';
-      b.dataset.channel = c.id;
-      b.style.setProperty('--btn-color', c.color || g.color);
-      b.title = `${g.label}: ${c.label}`;
-      b.innerHTML = `<span class="glyph">${c.glyph}</span>` +
-                    `<span class="kbd">${keyLabel(key)}</span>`;
-      /* pointerdown, not click: on touch a click is only dispatched when the finger
-         LIFTS, plus whatever the browser spends deciding the tap was not the first
-         half of a double-tap. That delay pushed answers given near the end of an
-         interval across the boundary, where they were graded against the next
-         trial. preventDefault suppresses the compatibility click that would
-         otherwise arrive a second time. */
-      b.addEventListener('pointerdown', e => {
-        e.preventDefault();
-        b.classList.add('down');
-        press(c.id);
-      });
-      ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev =>
-        b.addEventListener(ev, () => b.classList.remove('down')));
-      /* detail === 0 means the click came from Enter/Space on a focused button, not
-         from a pointer — the only clicks left to honour. */
-      b.addEventListener('click', e => { if (e.detail === 0) press(c.id); });
-      btns.appendChild(b);
-    });
-    group.appendChild(btns);
+      return makeKey(c, g, key);
+    };
+    const byId = Object.fromEntries(g.channels.map(c => [c.id, c]));
+    const spec = compass && COMPASS[g.key];
+    /* The meta deck shares the position group's key, and has no points at all. */
+    if (spec && [spec.n, spec.s, spec.e, spec.w].every(id => byId[id])) {
+      group.appendChild(buildCompass(g, spec, byId, keyFor));
+    } else {
+      const btns = document.createElement('div');
+      btns.className = 'btns';
+      g.channels.forEach(c => btns.appendChild(keyFor(c)));
+      group.appendChild(btns);
+    }
     deckEl.appendChild(group);
   });
+  /* Key-widths across every pad on the deck, so the stylesheet can share the
+     screen's width out among them: one compass with the coordinate axes standing
+     beside it, or both frames' compasses side by side, rather than each pad sized
+     as if it had the screen to itself and the deck stacking them off the bottom. */
+  const cols = [...deckEl.querySelectorAll('.pad')].reduce((s, p) => s + +p.dataset.cols, 0);
+  if (cols) deckEl.style.setProperty('--pad-cols', cols);
+  else deckEl.style.removeProperty('--pad-cols');
 }
 
 /* Highlight the cued deck group and name it in the HUD. The cue has to be visible
@@ -181,10 +314,11 @@ function traceMove(trial) {
   names.forEach(flashArm);
 }
 
-function pressFeedback(channelId, ok, trial) {
+/* `quiet` holds the error sound back for a caller that will make one itself. */
+function pressFeedback(channelId, ok, trial, quiet) {
   const btn = deckEl.querySelector(`[data-channel="${channelId}"]`);
   if (AXIS[channelId]) flashArm(channelId);
-  if (!ok) signalWrong('fa');
+  if (!ok && !quiet) signalWrong('fa');
   if (cfg.feedback !== 'off' && btn) {
     btn.classList.add(ok ? 'hit' : 'miss');
     setTimeout(() => btn.classList.remove('hit', 'miss'), 260);
@@ -195,8 +329,9 @@ function pressFeedback(channelId, ok, trial) {
     traceMove(trial);
 }
 
-function press(channelId) {
-  if (!state.running) return;
+/* Returns whether the press was right, or null when it was not taken at all. */
+function press(channelId, quiet) {
+  if (!state.running) return null;
 
   /* Tested before the `cued` guard: on a retro-cue trial the window for the NEW
      trial is still shut, but a late answer to the trial that just closed is
@@ -214,12 +349,12 @@ function press(channelId) {
       t: snap.trial, ch: channelId, ok, late: true,
       rt: snap.stimAt ? Math.round(performance.now() - snap.stimAt) : null,
     });
-    pressFeedback(channelId, ok, snap.trial_);
-    return;
+    pressFeedback(channelId, ok, snap.trial_, quiet);
+    return ok;
   }
 
-  if (state.presses.has(channelId)) return;
-  if (!state.cued) return;        // retro-cue trial: no answering before the cue
+  if (state.presses.has(channelId)) return null;
+  if (!state.cued) return null;   // retro-cue trial: no answering before the cue
   state.presses.add(channelId);
 
   const j = state.judgments.find(x => x.options.includes(channelId));
@@ -231,15 +366,40 @@ function press(channelId) {
     rt: state.stimAt ? Math.round(performance.now() - state.stimAt) : null,
   });
 
-  pressFeedback(channelId, ok, state.currentTrial);
+  pressFeedback(channelId, ok, state.currentTrial, quiet);
+  return ok;
+}
+
+/* Both halves of a diagonal from one tap. Each is pressed exactly as its own key
+   would be — scored, logged and flashed on that key — so a corner adds no judgement
+   of its own, and the half that was wrong is the key that lights red. What it does
+   add is one verdict on the corner itself and one buzz: two wrong halves are one
+   slip of the thumb, and two error sounds a frame apart read as a glitch. */
+function pressCorner(ids, btn) {
+  const said = ids.map(id => press(id, true)).filter(ok => ok != null);
+  if (!said.length) return;
+  const ok = said.every(Boolean);
+  if (!ok) signalWrong('fa');
+  if (cfg.feedback !== 'off') {
+    btn.classList.add(ok ? 'hit' : 'miss');
+    setTimeout(() => btn.classList.remove('hit', 'miss'), 260);
+  }
 }
 
 function revealAnswers() {
   if (cfg.feedback !== 'reveal') return;
+  const correct = new Set();
   state.judgments.forEach(j => j.correct.forEach(id => {
+    correct.add(id);
     const btn = deckEl.querySelector(`[data-channel="${id}"]`);
     if (btn) { btn.classList.add('reveal'); setTimeout(() => btn.classList.remove('reveal'), 500); }
     if (AXIS[id]) flashArm(id);
   }));
+  /* A corner was the answer when both of its halves were. */
+  deckEl.querySelectorAll('[data-combo]').forEach(btn => {
+    if (!btn.dataset.combo.split(' ').every(id => correct.has(id))) return;
+    btn.classList.add('reveal');
+    setTimeout(() => btn.classList.remove('reveal'), 500);
+  });
 }
 

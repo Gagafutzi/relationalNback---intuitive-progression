@@ -6,9 +6,37 @@
   .rbtn .kbd { display: none; }
   /* No hover state to lose, so the key can travel a little further on a tap. */
   .rbtn:active, .rbtn.down { transform: translateY(3px); }
+  /* The keys already drop the double-tap-zoom wait, but the gutters between them
+     and the cube above them did not: two quick answers that landed a few pixels
+     wide zoomed the page in mid-block. Pinch zoom and scrolling are untouched. A
+     long press on a gutter no longer selects the group titles either. */
+  .scene { touch-action: manipulation; }
+  .dock { user-select: none; -webkit-user-select: none; }
 }
 
-@media (max-width: 700px) {
+/* The compass is three keys tall where the row was one, and on a desktop-sized
+   screen the stage keeps its fixed size — so here the cube gives back the height
+   the pad takes, rather than the dock running off the bottom of a tablet held
+   sideways. Only ever a ceiling: on a tall screen the old size still wins. */
+@media (min-width: 701px) and (min-height: 501px) {
+  :root.pad-compass {
+    --cube-size: calc(min(34vmin, 240px, max(120px, (100vh - 352px) / var(--stage-k)))
+                      * var(--cube-scale));
+  }
+}
+@supports (height: 1svh) {
+  @media (min-width: 701px) and (min-height: 501px) {
+    :root.pad-compass {
+      --cube-size: calc(min(34vmin, 240px, max(120px, (100svh - 352px) / var(--stage-k)))
+                        * var(--cube-scale));
+    }
+  }
+}
+
+/* A phone either way up. A phone on its side is wider than 700px but has a third
+   of the height, and fell through to the desktop layout: the deck ran off the
+   bottom and the Start button was off the screen entirely. */
+@media (max-width: 700px), (orientation: landscape) and (max-height: 500px) {
   /* Sized the other way round from desktop: pick the footprint the phone can give
      the stage, then divide by --stage-k for the lattice. 32vmin was reading off the
      375px WIDTH of a portrait phone, so the cube came out at 120px — a quarter of
@@ -44,6 +72,18 @@
   .rbtn { min-width: 52px; padding: 10px 6px; font-size: 15px; }
   .rbtn .glyph { font-size: 17px; }
 
+  /* A key is as wide as the screen can share out among the pads' columns, and no
+     taller than a slice of the height, so a pad never eats the cube. The column
+     count comes from buildDeck: a compass is three, plus one per pair of opposites
+     beside it, summed over every compass on the deck. */
+  .deck-group .btns.pad {
+    --pad-gap: 7px;
+    --pad-key: clamp(34px,
+      min((100vw - 44px - (var(--pad-cols, 4) - 1) * var(--pad-gap)) / var(--pad-cols, 4),
+          9vh),
+      76px);
+  }
+
   /* The HUD becomes a wrapping header strip. As a 210px floating column it sat on
      top of the cube on anything narrower than a tablet. */
   .hud {
@@ -66,15 +106,93 @@
   .settings-btn, .discord-btn { padding: 7px 9px; font-size: 12px; }
   .top-left .btn-label { display: none; }
   .scene { padding: 78px 4px 12px; }
-  .dock { gap: 9px; }
-  .controls { padding: 5px; }
+  /* The answer keys take the bottom edge, where the thumb already rests, and the
+     run controls go above them. Under the keys, Stop sat exactly where a thumb
+     lands when it reaches for the bottom row — and a Stop pressed by accident
+     throws away the block. Above, it is past the top row, which is the reach a
+     thumb makes least. The wider gap is the same insurance. */
+  .dock { gap: 14px; }
+  .controls { order: -1; padding: 5px; }
   .controls button { padding: 10px 18px; }
   .glyph-legend { bottom: 8px; left: 8px; font-size: 10px; }
+}
+
+/* On its side the phone is all width, so the cube and the keys stand next to each
+   other instead of on top of each other: the stage on the left, the dock down the
+   right edge under the HUD, where the right thumb is. */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root { --stage-budget: min(56vw, 92vh); }
+  .scene {
+    flex-direction: row; align-items: stretch; column-gap: 10px;
+    padding: 8px 10px 8px 8px;
+  }
+  .cube-stage { margin: auto; }
+  /* Capped, or a deck of several groups would lay itself out on one line at its
+     full width and leave the stage nothing. */
+  .dock {
+    width: auto; max-width: 60vw; flex: none; justify-content: flex-end;
+    gap: 9px; margin: 0;
+  }
+  /* Three keys tall has to fit under the HUD strip with the controls on top, and
+     every pad on the deck has to fit in about half the width. */
+  .deck-group .btns.pad {
+    --pad-key: clamp(34px,
+      min((100vh - 200px) / 3, (50vw - 24px) / var(--pad-cols, 4) - 10px), 64px);
+  }
+  /* Just the right-hand column, so the strip sits over the dock and not the cube. */
+  .hud { left: auto; width: min(46vw, 360px); }
 }
 
 /* dvh so the address bar sliding in cannot push the deck off the bottom. Kept
    behind @supports: a custom property holding an unknown unit fails at
    computed-value time, which would leave --cube-size with no value at all. */
 @supports (height: 1svh) {
-  @media (max-width: 700px) { :root { --stage-budget: min(96vw, 50svh); } }
+  @media (max-width: 700px) {
+    :root { --stage-budget: min(96vw, 50svh); }
+    .deck-group .btns.pad {
+      --pad-key: clamp(34px,
+        min((100vw - 44px - (var(--pad-cols, 4) - 1) * var(--pad-gap)) / var(--pad-cols, 4),
+            9svh),
+        76px);
+    }
+  }
+  @media (orientation: landscape) and (max-height: 500px) {
+    :root { --stage-budget: min(56vw, 92svh); }
+    .deck-group .btns.pad {
+      --pad-key: clamp(34px,
+        min((100svh - 200px) / 3, (50vw - 24px) / var(--pad-cols, 4) - 10px), 64px);
+    }
+  }
+}
+
+/*
+ * The stage takes whatever the dock leaves.
+ *
+ * Everything above budgets the stage as a fraction of the screen and hopes the
+ * dock fits in the rest — which it did for one row of keys and stops doing for a
+ * compass, two frames' worth of keys, or a stream or three beside them. Here the
+ * dock takes its natural height at the bottom edge and the stage is the flexible
+ * part, so the cube is as big as the room left over, whatever the deck holds.
+ *
+ * The stage is a size container and the lattice is sized off it. --cube-size is
+ * re-declared on the stage, so the wrapper and the lag numeral inside it read
+ * the container's units while the stage itself is sized by the flex layout — and
+ * the --cube-scale slider still multiplies it, unclamped, as on every other
+ * screen. Behind @supports because without container units the declaration
+ * would have no size to give, and the budgets above are the better fallback.
+ */
+@supports (container-type: size) {
+  @media (max-width: 700px), (orientation: landscape) and (max-height: 500px) {
+    .cube-stage {
+      container-type: size;
+      flex: 1 1 0; align-self: stretch;
+      width: auto; height: auto; min-width: 0; min-height: 150px;
+      max-width: none; max-height: none; margin: 0;
+      --cube-size: calc(min(100cqw, 100cqh) / var(--stage-k) * var(--cube-scale));
+    }
+    .dock { margin: 8px 0 0; }
+  }
+  @media (orientation: landscape) and (max-height: 500px) {
+    .dock { margin: 0; }
+  }
 }

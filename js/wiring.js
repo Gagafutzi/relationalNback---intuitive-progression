@@ -325,6 +325,10 @@ $('slotReadout').onchange = e => {
   refreshReadout();
   saveProgress();
 };
+$('padLayout').onchange = e => {
+  cfg.pad = e.target.value;
+  buildDeck(); renderPadHint(); saveProgress();
+};
 $('dailyGoal').oninput = e => {
   cfg.dailyGoal = Math.max(0, +e.target.value || 0);
   renderDailyTimer(); saveProgress();

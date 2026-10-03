@@ -429,6 +429,21 @@
     <summary>Display</summary>
     <div class="sect-body">
     <div class="setting-group">
+      <label>Answer pad</label>
+      <select id="padLayout">
+        <option value="auto">Auto — compass on a touch screen</option>
+        <option value="row">Row — one key per direction</option>
+        <option value="compass">Compass — 3×3, diagonals in one tap</option>
+      </select>
+      <div class="hint" id="padLayoutHint"></div>
+      <div class="hint">The compass puts each direction where it points &mdash; North
+        on top, West to the left &mdash; and a corner between each pair. A move runs
+        on every axis at once, so north-west is answered with North <em>and</em>
+        West; the <b>NW</b> corner presses both in one tap, and each half is still
+        scored and lit on its own key. Above and Below stand beside it as a column,
+        as do the poles of any extra axis.</div>
+    </div>
+    <div class="setting-group">
       <label>Slot visibility</label>
       <select id="cellVis">
         <option value="lattice">Lattice — every cell drawn</option>

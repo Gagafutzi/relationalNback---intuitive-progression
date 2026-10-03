@@ -103,6 +103,13 @@ const cfg = {
    * instead of making it easier.
    */
   slotReadout: 'off',
+  /*
+   * How the answer keys are laid out. 'row' is one key per direction in a line;
+   * 'compass' puts them where they point, with a corner for each diagonal that
+   * presses both of its axes. 'auto' is the compass on a touch screen and the row
+   * wherever there is a keyboard to match it.
+   */
+  pad: 'auto',
   layout: 'dense',
   cubeScale: 1,
   dailyGoal: 20,
