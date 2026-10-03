@@ -444,6 +444,14 @@
         as do the poles of any extra axis.</div>
     </div>
     <div class="setting-group">
+      <label><input type="checkbox" id="hudCompact" style="width:auto"> Compact
+        readout</label>
+      <div class="hint">Folds the readout in the top-right corner to one line &mdash;
+        N and the trial count, plus the focus cue when there is one &mdash; and on a
+        phone gives the height it took back to the cube. Tapping the readout does
+        the same, at any time, mid-block included.</div>
+    </div>
+    <div class="setting-group">
       <label>Slot visibility</label>
       <select id="cellVis">
         <option value="lattice">Lattice — every cell drawn</option>
@@ -691,10 +699,12 @@
   </div><!-- /.settings-body -->
 </aside>
 
-<div class="hud">
+<!-- Tapping it folds it to the one row marked hud-core (and the focus cue, which
+     is an instruction rather than a readout). See applyHudCompact. -->
+<div class="hud" id="hud">
   <div class="mode-name" id="hudMode">—</div>
   <div class="row"><b id="hudRC">RC 3</b><span id="hudRCName">ternary</span></div>
-  <div class="row"><span>N</span><b id="hudN">1</b><span>·</span><span id="hudSpinLabel">still</span><span>·</span><span>trial</span><b id="hudTrial">0/20</b></div>
+  <div class="row hud-core"><span>N</span><b id="hudN">1</b><span>·</span><span id="hudSpinLabel">still</span><span>·</span><span>trial</span><b id="hudTrial">0/20</b></div>
   <div class="row"><span>block</span><b id="hudAcc">—</b></div>
   <div class="row" id="hudPriority" style="display:none"></div>
   <div class="row"><span>today</span><b id="hudToday">0m</b><span id="hudGoal"></span></div>

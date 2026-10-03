@@ -597,6 +597,11 @@ const ACTIONS = [
          'cannot buy thinking time mid-trial.' },
   { id:'settings', key:'c',      label:'Open / close settings',
     hint:'Toggles the panel, wherever you are. Does not stop a running block.' },
+  /* Unbound: a default key would come out of the pool the deck falls back on, and
+     move some existing player's answer key for the sake of a display toggle. */
+  { id:'hud',      key:null,     label:'Compact / full readout',
+    hint:'Unbound by default. The same as tapping the readout in the top-right ' +
+         'corner.' },
 ];
 const ACTION_BY_ID = Object.fromEntries(ACTIONS.map(a => [a.id, a]));
 

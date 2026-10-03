@@ -80,9 +80,13 @@
     --pad-gap: 7px;
     --pad-key: clamp(34px,
       min((100vw - 44px - (var(--pad-cols, 4) - 1) * var(--pad-gap)) / var(--pad-cols, 4),
-          9vh),
+          8vh),
       76px);
   }
+  /* A compass is its own label. With nothing else on the deck, "Position" over
+     it is a line of height the cube can have instead; with two groups or more
+     the titles say which is which and stay. */
+  :root.pad-compass .deck-group:only-child > .title { display: none; }
 
   /* The HUD becomes a wrapping header strip. As a 210px floating column it sat on
      top of the cube on anything narrower than a tablet. */
@@ -100,6 +104,12 @@
   /* Mid-block the phone needs the pixels for the cube; the hint is only actionable
      between blocks anyway. */
   body.running .hud .next { display: none; }
+  /* Folded, it is one line level with the icon buttons, padded out to their
+     height so the tap target is as tall as they are — and the stage starts right
+     under them instead of under three lines of readout. */
+  body.hud-compact .hud { padding-top: 7px; padding-bottom: 7px; }
+  body.hud-compact .hud::after { top: 7px; }
+  body.hud-compact .scene { padding-top: 46px; }
 
   .top-left { top: 8px; left: 8px; gap: 6px; }
   /* Icons only on a phone: the HUD strip starts right after them. */
@@ -122,7 +132,7 @@
    right edge under the HUD, where the right thumb is. */
 @media (orientation: landscape) and (max-height: 500px) {
   :root { --stage-budget: min(56vw, 92vh); }
-  .scene {
+  .scene, body.hud-compact .scene {
     flex-direction: row; align-items: stretch; column-gap: 10px;
     padding: 8px 10px 8px 8px;
   }
@@ -139,6 +149,12 @@
     --pad-key: clamp(34px,
       min((100vh - 200px) / 3, (50vw - 24px) / var(--pad-cols, 4) - 10px), 64px);
   }
+  /* The stage already has the full height on its side, so a folded readout
+     hands its room to the keys instead. */
+  body.hud-compact .deck-group .btns.pad {
+    --pad-key: clamp(34px,
+      min((100vh - 160px) / 3, (50vw - 24px) / var(--pad-cols, 4) - 10px), 64px);
+  }
   /* Just the right-hand column, so the strip sits over the dock and not the cube. */
   .hud { left: auto; width: min(46vw, 360px); }
 }
@@ -152,7 +168,7 @@
     .deck-group .btns.pad {
       --pad-key: clamp(34px,
         min((100vw - 44px - (var(--pad-cols, 4) - 1) * var(--pad-gap)) / var(--pad-cols, 4),
-            9svh),
+            8svh),
         76px);
     }
   }
@@ -161,6 +177,10 @@
     .deck-group .btns.pad {
       --pad-key: clamp(34px,
         min((100svh - 200px) / 3, (50vw - 24px) / var(--pad-cols, 4) - 10px), 64px);
+    }
+    body.hud-compact .deck-group .btns.pad {
+      --pad-key: clamp(34px,
+        min((100svh - 160px) / 3, (50vw - 24px) / var(--pad-cols, 4) - 10px), 64px);
     }
   }
 }

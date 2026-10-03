@@ -110,6 +110,9 @@ const cfg = {
    * wherever there is a keyboard to match it.
    */
   pad: 'auto',
+  /* The top-right readout folded to its one line of N and trial count. On a phone
+     the stage is sized from what is left, so folding it is cube. */
+  hudCompact: false,
   layout: 'dense',
   cubeScale: 1,
   dailyGoal: 20,

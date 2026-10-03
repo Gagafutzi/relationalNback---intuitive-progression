@@ -266,3 +266,22 @@ function armAutoAdvance() {
      between blocks, so nothing is competing for the frame. */
   state.autoTimer = setInterval(paint, 100);
 }
+
+/* The readout folded to its one line, or all of it. A body class rather than a
+   rebuild: the hidden rows keep updating, so unfolding shows them current. On a
+   phone the stage is sized from the room the readout leaves, and the cube follows
+   through the ResizeObserver in wiring.js, which repaints a trial already on
+   screen — so folding it mid-block costs nothing. */
+function applyHudCompact() {
+  document.body.classList.toggle('hud-compact', !!cfg.hudCompact);
+  const hud = $('hud');
+  if (hud) hud.title = cfg.hudCompact ? 'Show the full readout' : 'Fold the readout to one line';
+  const box = $('hudCompact');
+  if (box) box.checked = !!cfg.hudCompact;
+}
+
+function toggleHudCompact() {
+  cfg.hudCompact = !cfg.hudCompact;
+  applyHudCompact();
+  saveProgress();
+}

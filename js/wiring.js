@@ -325,6 +325,11 @@ $('slotReadout').onchange = e => {
   refreshReadout();
   saveProgress();
 };
+$('hud').addEventListener('click', toggleHudCompact);
+$('hudCompact').onchange = e => {
+  cfg.hudCompact = e.target.checked;
+  applyHudCompact(); saveProgress();
+};
 $('padLayout').onchange = e => {
   cfg.pad = e.target.value;
   buildDeck(); renderPadHint(); saveProgress();
@@ -406,6 +411,7 @@ const ACTION_RUN = {
   pause:    () => { if (state.paused) resumeFromPause();
                     else if (state.running) pauseBlock(PAUSE_WHY.manual); },
   settings: () => toggleSettings(),
+  hud:      () => toggleHudCompact(),
 };
 
 /* Bare modifiers make useless bindings — a shortcut on Shift would fire every time

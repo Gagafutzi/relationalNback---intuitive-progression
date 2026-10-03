@@ -27,3 +27,21 @@
 .hud .next { margin-top: 6px; font-size: 11px; color: var(--muted); max-width: 240px; }
 .hud .next b { color: var(--hi, #8ab4ff); font-weight: 600; }
 
+
+/* ---------- FOLDING ----------
+   The readout is a tap target: it folds to the one row a player needs mid-block,
+   and back. The chevron in its corner says it can; on a desktop the cursor does
+   too. The focus cue survives the fold because it is an instruction to hold for
+   the whole block, not a statistic. */
+.hud {
+  cursor: pointer; padding-right: 16px;
+  user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.hud::after {
+  content: '▴'; position: absolute; top: 0; right: 0;
+  font-size: 11px; line-height: 1.6; color: var(--muted); opacity: .7;
+}
+body.hud-compact .hud::after { content: '▾'; }
+@media (hover: hover) { .hud:hover::after { opacity: 1; color: var(--text); } }
+body.hud-compact .hud > :not(.hud-core):not(#hudPriority) { display: none; }

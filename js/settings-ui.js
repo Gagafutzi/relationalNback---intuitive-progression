@@ -372,6 +372,7 @@ function syncSettingsUI() {
   $('slotReadout').value = cfg.slotReadout || 'off';
   $('padLayout').value = cfg.pad || 'auto';
   renderPadHint();
+  applyHudCompact();
   $('cubeLayout').value = cfg.layout;
   $('layoutHint').textContent = LAYOUT_HINT[cfg.layout] || '';
   $('dailyGoal').value = cfg.dailyGoal || 0;
@@ -511,6 +512,7 @@ function importJSON(text) {
     cfg.cellFill = progress.display.cellFill || cfg.cellFill;
     cfg.slotReadout = progress.display.slotReadout || cfg.slotReadout;
     cfg.pad = progress.display.pad || cfg.pad;
+    cfg.hudCompact = !!progress.display.hudCompact;
     cfg.spinPath = progress.display.spinPath || cfg.spinPath;
     cfg.voiceSet = progress.display.voiceSet || cfg.voiceSet;
   }
