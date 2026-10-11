@@ -31,7 +31,7 @@
    wrappers dissolve, each key falls back into the row at the `order` buildDeck
    gave it, and the corners — taps for two keys a keyboard already chords — are
    not drawn. */
-.btns.compass .pad, .btns.compass .pair { display: contents; }
+.btns.compass .pad, .btns.compass .pair, .btns.compass .tray { display: contents; }
 .rbtn.corner { display: none; }
 
 /* Keys, not rectangles: tinted in the channel's own colour so a button and the axis

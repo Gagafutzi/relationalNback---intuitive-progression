@@ -116,6 +116,12 @@ function applyKeyLayout() {
   const pref = appearance.keys || 'auto';
   const pad = pref === 'pad' || (pref === 'auto' && !!(PAD_MEDIA && PAD_MEDIA.matches));
   document.documentElement.classList.toggle('keys-pad', pad);
+  /* The switch on the main screen and the select in the panel say the same thing. */
+  if (typeof document.getElementById !== 'function') return;
+  const sw = document.getElementById('padToggle');
+  if (sw) sw.setAttribute('aria-pressed', String(pad));
+  const sel = document.getElementById('keyLayout');
+  if (sel) sel.value = pref;
 }
 if (PAD_MEDIA) {
   if (PAD_MEDIA.addEventListener) PAD_MEDIA.addEventListener('change', applyKeyLayout);

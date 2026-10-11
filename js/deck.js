@@ -203,9 +203,10 @@ function buildDeck() {
     if (pad) {
       anyCompass = true;
       btns.classList.add('compass');
-      /* How many pairs stand beside the pad, so the columns can narrow to keep them
-         on one line (responsive.css) rather than orphan the last one underneath. */
-      btns.style.setProperty('--pairs', pad.pairs.length);
+      /* How many pairs stand in the pad's own row — at most two, one either side,
+         the rest in the tray below — so the columns can narrow to keep that row on
+         one line (responsive.css). */
+      btns.style.setProperty('--pairs', Math.min(pad.pairs.length, 2));
       const chan = Object.fromEntries(g.channels.map(c => [c.id, c]));
       const grid = document.createElement('div');
       grid.className = 'pad';
@@ -234,13 +235,31 @@ function buildDeck() {
         wireKey(b, () => pressCombo(ids, b));
         grid.appendChild(b);
       });
-      btns.appendChild(grid);
-      pad.pairs.forEach(ids => {
+      /* Where the pairs stand. One pair — the third axis on its own — sits on the
+         pad's right, as it always has. With extra axes the pad is flanked: the third
+         axis on the left, the first extra axis on the right, so ternary + glyph
+         reads A/B · pad · +/− and both thumbs share the work; every pair after that
+         goes to a tray under the row, centred. Stacking them all on the right
+         squeezed the columns to the floor and left the last of them orphaned on a
+         line of their own. */
+      const pairEl = ids => {
         const col = document.createElement('div');
         col.className = 'pair';
         ids.forEach(id => col.appendChild(made[id]));
-        btns.appendChild(col);
-      });
+        return col;
+      };
+      const flank = pad.pairs.length >= 2;
+      if (flank) btns.appendChild(pairEl(pad.pairs[0]));
+      btns.appendChild(grid);
+      const right = flank ? pad.pairs.slice(1, 2) : pad.pairs;
+      right.forEach(ids => btns.appendChild(pairEl(ids)));
+      const rest = flank ? pad.pairs.slice(2) : [];
+      if (rest.length) {
+        const tray = document.createElement('div');
+        tray.className = 'tray';
+        rest.forEach(ids => tray.appendChild(pairEl(ids)));
+        btns.appendChild(tray);
+      }
     }
     group.appendChild(btns);
     deckEl.appendChild(group);

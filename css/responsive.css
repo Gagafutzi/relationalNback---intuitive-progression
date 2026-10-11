@@ -116,6 +116,12 @@
 :root.keys-pad .btns.compass .rbtn { min-width: 0; padding-left: 4px; padding-right: 4px; }
 :root.keys-pad .rbtn.corner { display: block; }
 :root.keys-pad .rbtn.corner .glyph { font-size: 15px; letter-spacing: -.02em; }
+/* The extra axes past the first, under the pad's row and centred on it, each
+   still a pair, above over below, at the same column width as the row. */
+:root.keys-pad .btns.compass .tray {
+  display: flex; flex-basis: 100%; justify-content: center; flex-wrap: wrap; gap: 7px;
+}
+:root.keys-pad .btns.compass .tray .pair .rbtn { min-height: 44px; }
 /* The diagonal arrows are drawn smaller than the flat ones in every monospace
    face tried, so the same size reads as a lesser key. */
 :root.keys-pad .rbtn.corner.arrow .glyph { font-size: 23px; line-height: .8; }
@@ -147,5 +153,19 @@
     :root.deck-compass {
       --stage-budget: max(36vw, min(96vw, 50svh, 100svh - var(--dock-h, 260px) - 100px));
     }
+  }
+}
+
+/* The same allowance off a phone. The pad can be forced on a wide screen now
+   (Answer keys: Pad, or the switch), and with every extra axis its tray makes
+   the dock tall enough to push Start below the bottom of a laptop's window. The
+   desktop size stays what it was until the dock actually needs the room: the
+   third term only binds when the viewport less the dock — and the scene's 54 +
+   18 of padding, the dock's gap and the stage's margin, 100 in all — is shorter
+   than the stage. The floor is the phone's, for the same reason. */
+@media (min-width: 701px) {
+  :root.keys-pad.deck-compass {
+    --cube-size: calc(max(120px, min(34vmin, 240px,
+                     (100vh - var(--dock-h, 260px) - 100px) / var(--stage-k))) * var(--cube-scale));
   }
 }

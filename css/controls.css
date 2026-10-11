@@ -55,3 +55,28 @@ body.running #stopBtn {
   border-color: rgba(255, 107, 107, .5);
 }
 body.running #stopBtn:hover { background: rgba(255, 107, 107, .26); }
+
+/* The pad's on/off switch, on the main screen beside the run controls so the
+   layout can be flipped without opening the panel. Only shown when the deck has
+   a group the pad applies to, and locked mid-block: a different layout is a
+   different dock height, which resizes the cube under a live trial. */
+.controls .pad-toggle {
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px;
+}
+.pad-toggle .sw {
+  position: relative; width: 26px; height: 14px; flex: none;
+  border-radius: var(--radius); background: var(--border-inner);
+  transition: background .14s;
+}
+.pad-toggle .sw::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px;
+  border-radius: var(--radius); background: var(--muted);
+  transition: transform .14s, background .14s;
+}
+.pad-toggle[aria-pressed="true"] { color: var(--text); }
+.pad-toggle[aria-pressed="true"] .sw { background: var(--accent, #8fbda4); }
+.pad-toggle[aria-pressed="true"] .sw::after {
+  transform: translateX(12px); background: var(--accent-ink, #fff);
+}
+:root:not(.deck-compass) .controls .pad-toggle { display: none; }
+body.running .controls .pad-toggle { opacity: .35; pointer-events: none; }

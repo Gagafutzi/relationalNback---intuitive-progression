@@ -69,6 +69,15 @@ $('accentCustom').oninput  = e => { appearance.accent = e.target.value; applyApp
 $('axisPalette').onchange  = e => { appearance.palette = e.target.value; applyAppearance(); saveAppearance(); };
 $('flatMode').onchange     = e => { appearance.flat = e.target.checked; applyAppearance(); saveAppearance(); };
 $('keyLayout').onchange    = e => { appearance.keys = e.target.value; applyKeyLayout(); saveAppearance(); };
+/* The switch beside Start block: whatever is drawn now, the other one, by name —
+   so it leaves Auto, which only the panel brings back. Blurred after, because a
+   focused button answers Space and Enter, and those belong to the session. */
+$('padToggle').onclick = e => {
+  if (state.running) return;
+  appearance.keys = document.documentElement.classList.contains('keys-pad') ? 'row' : 'pad';
+  applyKeyLayout(); saveAppearance();
+  e.currentTarget.blur();
+};
 $('bgDim').oninput         = e => {
   appearance.dim = +e.target.value;
   $('dimVal').textContent = appearance.dim;
