@@ -134,6 +134,8 @@ function startBlock() {
   state.running = true;
 
   if (cfg.streams.glyph === 'relational' && !state.glyphMap) ensureGlyphMap();
+  /* The alphabet the glyph axis is written in, one per block — see `glyphAxisChar`. */
+  state.glyphAxisSet = randInt(GLYPH_SET_KEYS.length);
 
   keepAwake();
   updateHUD();
@@ -610,6 +612,7 @@ function applyProgression() {
   prog.spinLevel = Math.min(Math.max(prog.spinLevel, minSpinLevel()), levels.length - 1);
   prog.streamCount = Math.min(prog.streamCount, PROG_STREAMS.length);
   prog.axisCount = Math.min(Math.max(prog.axisCount || 0, 0), maxAxisCount());
+  settleCap(prog);
   prog.capLevel = laddersAxes() && prog.capLevel ? 1 : 0;
   prog.n = Math.max(1, prog.n);
   prog.lureRate = Math.min(LURE_MAX, Math.max(LURE_MIN, prog.lureRate ?? 0.20));

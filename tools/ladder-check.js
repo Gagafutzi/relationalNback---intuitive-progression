@@ -302,8 +302,8 @@ ok('and downward too',
    g4(`cardinalId(cardinalOf({ cellIdx: idx(1,1,1), pitch: 2 },
                              { cellIdx: idx(1,1,1), pitch: 1 }))`) === 'pitch-down');
 
-/* Each of the four properties can be the coordinate, not just the tone. */
-['pitch', 'color', 'size', 'quantity'].forEach(k => {
+/* Every property with a pool can be the coordinate, not just the tone. */
+Object.keys(g4('COORD_POOLS')).forEach(k => {
   vm.runInContext(`cfg.coordAxes = ['${k}'];`, geo);
   const poles = g4(`coordPoles('${k}')`);
   ok(`${k} can be an axis of the move`,
@@ -418,10 +418,11 @@ ok('and four when the furthest step is three',
  * displacement feel different depending where it started.
  *
  * Ratios for the ones discrimination scales on — pitch and size — and
- * differences for quantity, which is counted exactly rather than estimated.
+ * differences for quantity and glyph rank, which are read exactly rather than
+ * estimated.
  * Colour is a hue sweep and neither, so it is left out.
  */
-[['pitch', 'ratio'], ['size', 'ratio'], ['quantity', 'diff']].forEach(([k, how]) => {
+[['pitch', 'ratio'], ['size', 'ratio'], ['quantity', 'diff'], ['glyph', 'diff']].forEach(([k, how]) => {
   [2, 3].forEach(cap => {
     const steps = g4(`(function () {
       var p = COORD_POOLS['${k}'][${cap}], out = [];
@@ -887,7 +888,9 @@ const deckIds = () => g4(`(function () {
   return g ? g.channels.map(function (c) { return c.id; }) : [];
 })()`);
 
-[[], ['pitch'], ['color', 'size', 'quantity']].forEach(list => {
+/* Glyph on its own and beside another: its stream has six channels, four of them
+   for a set map the axis does not have, so "nothing extra" is the case it fails. */
+[[], ['pitch'], ['color', 'size', 'quantity'], ['glyph'], ['pitch', 'glyph']].forEach(list => {
   vm.runInContext(`cfg.coordAxes = ${JSON.stringify(list)}; cfg.meta = false; cfg.frame = 'cube';`, geo);
   const ids = deckIds();
   const askable = g4('cardinalIds()').flat();
@@ -905,6 +908,203 @@ vm.runInContext("cfg.coordAxes = ['pitch', 'size']; cfg.meta = true; cfg.frame =
 ok('quaternary asks the same three questions however wide the space is',
    deckIds().length === 3, `${deckIds().length} buttons: ${deckIds().join(', ')}`);
 vm.runInContext("cfg.coordAxes = ['pitch']; cfg.meta = false;", geo);
+
+/* ------------------------------------------------------------------ *
+ * A step up an axis is answered the way its stream answers it        *
+ * ------------------------------------------------------------------ *
+ *
+ * The poles were the first two relational channels the stream listed, and
+ * colour lists Warmer first while its pool runs warm → cool — so a step up the
+ * colour axis, which is a step cooler, was scored as Warmer. The stream itself
+ * has always scored it Cooler. The two have to agree, or the same change of
+ * colour is right on one deck and wrong on the other.
+ *
+ * Read off the stream's own judgement rather than a table kept here: the stream
+ * is the older and better-tested half, and a copy of its answers would only be
+ * a second thing to be wrong.
+ */
+vm.runInContext("state.glyphMap = { '123': {x:0,y:0}, 'ABC': {x:1,y:0}, 'αβγ': {x:0,y:1}, 'IV': {x:1,y:1} };", geo);
+Object.keys(g4('COORD_POOLS')).forEach(k => {
+  const streamSays = g4(`(function () {
+    cfg.coordAxes = []; cfg.meta = false;
+    cfg.streams = { ${k}: 'relational' };
+    var a = ${k === 'glyph' ? '{ glyphSet: 0, glyphIdx: 0 }' : `{ ${k}: 0 }`};
+    var b = ${k === 'glyph' ? '{ glyphSet: 0, glyphIdx: 1 }' : `{ ${k}: 1 }`};
+    var js = buildJudgments(a, b).filter(function (j) { return j.correct.length; });
+    return js.length === 1 ? js[0].correct[0] : 'nothing';
+  })()`);
+  const axisSays = g4(`(function () {
+    cfg.coordAxes = ['${k}']; cfg.streams = { position: 'relational' };
+    return cardinalId(cardinalOf({ cellIdx: idx(1,1,1), ${k}: 0 },
+                                 { cellIdx: idx(1,1,1), ${k}: 1 }));
+  })()`);
+  ok(`a step up the ${k} axis is answered as the ${k} stream answers it`,
+     streamSays === axisSays,
+     `the stream says ${streamSays} and the axis says ${axisSays}`);
+});
+vm.runInContext("cfg.coordAxes = ['pitch']; cfg.streams = { position: 'relational' };", geo);
+
+/* ------------------------------------------------------------------ *
+ * The glyph axis, written and read                                   *
+ * ------------------------------------------------------------------ *
+ *
+ * The sampler writes a level under `glyph`, and the page draws it through
+ * `glyphAxisChar` — two files, one marker, and the recurring bug here is a
+ * marker written in one place and read in another where only one side was
+ * checked. So a block is drawn and every trial is put through the reader.
+ */
+{
+  const triSrc = fs.readFileSync(path.join(ROOT, 'js/trials.js'), 'utf8');
+  const at = triSrc.indexOf('function glyphAxisChar');
+  vm.runInContext(triSrc.slice(at, triSrc.indexOf('\n}', at) + 2), geo);
+
+  [2, 3].forEach(cap => {
+    Object.assign(geo.cfg, { coordAxes: ['glyph'], magnitudeCap: cap, n: 2, meta: false,
+                             lureRate: 0.2, varN: 0, retro: 0, gate: 0,
+                             streams: { position: 'relational' } });
+    geo.state.chain = []; geo.state.metaDrawn = null;
+    const bad = [];
+    for (let i = 0; i < 400 && bad.length < 3; i++) {
+      const t = M.sampleTrial();
+      geo.state.chain.push(t);
+      if (!(t.glyph >= 0 && t.glyph < geo.poolFor('glyph').length)) bad.push('level ' + t.glyph);
+      else if (!g4(`glyphAxisChar(${t.glyph})`)) bad.push('level ' + t.glyph + ' draws nothing');
+      if (t.glyphSet != null) bad.push('a glyph stream was drawn beside the axis');
+    }
+    ok(`every glyph level drawn is one the page can draw, at cap ${cap}`,
+       bad.length === 0, bad.join('; '));
+    /* And a step up is a later glyph in the set, in every set — the rank the
+       Rank up key names, not merely a different symbol. */
+    ok(`the glyph levels run in each set's own order, at cap ${cap}`,
+       g4(`(function () {
+         return GLYPH_SET_KEYS.every(function (k, s) {
+           state.glyphAxisSet = s;
+           var set = GLYPH_SETS[k], last = -1;
+           return poolFor('glyph').every(function (_, lv) {
+             var i = set.indexOf(glyphAxisChar(lv));
+             var up = i > last; last = i; return up;
+           });
+         });
+       })()`),
+       'a step up the axis drew an earlier glyph, or one from another set');
+  });
+  vm.runInContext("cfg.coordAxes = ['pitch']; cfg.magnitudeCap = 2; state.glyphAxisSet = 0;", geo);
+}
+
+/* ------------------------------------------------------------------ *
+ * The compass pad                                                    *
+ * ------------------------------------------------------------------ *
+ *
+ * On a phone a direction deck is a 3×3 pad: the flat directions where they
+ * point, the corners pressing both of theirs, the third axis as a pair beside
+ * it. `compassOf` decides that layout from the channel list alone, so what a
+ * phone would show is checkable here: every key on the pad once, every corner
+ * one vertical and one horizontal of its own frame, and nothing that is not a
+ * direction made into a pad.
+ */
+const padsFor = setup => {
+  vm.runInContext(setup, geo);
+  return g4(`deckGroups().map(function (g) {
+    return { key: g.key, ids: g.channels.map(function (c) { return c.id; }),
+             pad: compassOf(g.channels) };
+  })`);
+};
+const padProblems = (g, dirs) => {
+  const out = [];
+  if (!g || !g.pad) return ['no pad'];
+  const { cells, pairs } = g.pad;
+  const placed = [];
+  Object.values(cells).forEach(ids => { if (ids.length === 1) placed.push(ids[0]); });
+  pairs.forEach(p => placed.push(...p));
+  if (placed.length !== g.ids.length || !g.ids.every(id => placed.indexOf(id) >= 0))
+    out.push(`placed ${placed.join(',')} for ${g.ids.join(',')}`);
+  const combos = ['nw', 'ne', 'sw', 'se'].map(c => (cells[c] || []).join('+'));
+  const want = [dirs.n + '+' + dirs.w, dirs.n + '+' + dirs.e, dirs.s + '+' + dirs.w, dirs.s + '+' + dirs.e];
+  if (combos.join() !== want.join()) out.push(`corners ${combos.join(', ')}`);
+  if ((pairs[0] || []).join() !== [dirs.up, dirs.down].join())
+    out.push(`the pair beside the pad is ${(pairs[0] || []).join('/')}`);
+  return out;
+};
+
+{
+  const cube = { n: 'north', s: 'south', e: 'east', w: 'west', up: 'above', down: 'below' };
+  const g = padsFor("cfg.coordAxes = []; cfg.meta = false; cfg.frame = 'cube'; cfg.streams = { position: 'relational' };")[0];
+  const p = padProblems(g, cube);
+  ok('the cube deck is a compass, every key on it once', p.length === 0, p.join('; '));
+
+  const gs = padsFor("cfg.frame = 'both';");
+  const screen = gs.find(x => x.key === 'position2');
+  const ps = padProblems(screen, { n: 's-north', s: 's-south', e: 's-east', w: 's-west',
+                                   up: 's-near', down: 's-far' });
+  ok('and so is the screen frame, with toward and away beside it', ps.length === 0, ps.join('; '));
+  ok('both frames are two pads, never one mixing them',
+     gs.filter(x => x.pad).length === 2 &&
+     gs.every(x => !x.pad || Object.values(x.pad.cells).flat().every(id => x.ids.indexOf(id) >= 0)),
+     'a corner on one frame presses a key from the other');
+
+  const gl2 = padsFor("cfg.frame = 'cube'; cfg.streams = { position: 'relational', glyph: 'relational' };")
+    .find(x => x.key === 'glyph');
+  const pg = padProblems(gl2, { n: 'glyph-north', s: 'glyph-south', e: 'glyph-east',
+                                w: 'glyph-west', up: 'glyph-up', down: 'glyph-down' });
+  ok('the glyph set map is one too, rank beside it', pg.length === 0, pg.join('; '));
+
+  /* Each extra axis is one more up/down/neither, so one more pair, after the
+     third axis — and a pair is one axis's two poles, never one of each. */
+  const ga = padsFor("cfg.coordAxes = ['pitch', 'glyph']; cfg.streams = { position: 'relational' };")[0];
+  const pairs = ga.pad ? ga.pad.pairs.map(p => p.slice().sort().join('/')) : [];
+  const poles = ['pitch', 'glyph'].map(k => g4(`coordPoles('${k}')`).slice().sort().join('/'));
+  ok('every extra axis stands beside the pad as its own pair',
+     pairs.length === 3 && pairs[1] === poles[0] && pairs[2] === poles[1],
+     `pairs ${pairs.join(', ')}`);
+
+  /* The relation between two moves is not a direction, and neither is "same". */
+  const gm = padsFor("cfg.coordAxes = []; cfg.meta = true; cfg.streams = { position: 'relational', pitch: 'identity' };");
+  ok('a deck that names no direction gets no pad',
+     gm.length === 2 && gm.every(x => !x.pad),
+     gm.filter(x => x.pad).map(x => x.key).join(', ') + ' became a compass');
+  vm.runInContext("cfg.meta = false; cfg.streams = { position: 'relational' }; cfg.coordAxes = ['pitch'];", geo);
+}
+
+/*
+ * A corner is a shortcut on the glass and nothing else: it presses its two
+ * directions exactly as tapping both would, each logged and scored as its own
+ * press — and a corner wrong on both halves is one wrong tap, heard once.
+ * `press` is run for real, with the DOM it reaches for stood up as nothing.
+ */
+{
+  vm.runInContext(`
+    var buzzes = [];
+    var deckEl = { querySelector: function () { return null; },
+                   querySelectorAll: function () { return []; } };
+    var flashArm = function () {};
+    var signalWrong = function (k) { buzzes.push(k); };
+    cfg.coordAxes = []; cfg.meta = false; cfg.frame = 'cube'; cfg.feedback = 'off';
+    cfg.streams = { position: 'relational' };
+    var arm = function () {
+      buzzes.length = 0;
+      Object.assign(state, { running: true, cued: true, presses: new Set(), presses_log: [],
+                             lastSnap: null, tickAt: 0, stimAt: 0, trial: 1 });
+      /* North-east and level: the move a corner exists for. */
+      state.judgments = buildJudgments({ cellIdx: idx(1,1,1) }, { cellIdx: idx(2,0,1) });
+    };
+  `, geo);
+  const right = g4(`(function () {
+    arm(); pressCombo(['north', 'east'], null);
+    return { pressed: Array.from(state.presses).sort().join(','),
+             logged: state.presses_log.map(function (p) { return p.ch + ':' + p.ok; }).join(','),
+             buzzes: buzzes.length };
+  })()`);
+  ok('a corner presses both of its directions, logged as two presses',
+     right.pressed === 'east,north' && right.logged === 'north:true,east:true' && right.buzzes === 0,
+     JSON.stringify(right));
+  const wrong = g4(`(function () {
+    arm(); pressCombo(['south', 'west'], null);
+    return { logged: state.presses_log.length, buzzes: buzzes.length };
+  })()`);
+  ok('and a corner wrong on both halves is one wrong tap',
+     wrong.logged === 2 && wrong.buzzes === 1, JSON.stringify(wrong));
+  vm.runInContext("state.running = false; cfg.coordAxes = ['pitch'];", geo);
+}
 
 /* ------------------------------------------------------------------ *
  * Which mode owns the extra axes                                     *
@@ -1125,7 +1325,7 @@ ok('the ternary ladder is exactly the ladder it was',
    t3.maxAxis === 0 && t3.sawCap === false,
    'ternary picked up digits that only mean something at quaternary');
 ok('and quaternary climbs past the last stimulus into the axes',
-   t4.maxAxis === 4 && t4.sawCap === true && t4.rungs > t3.rungs,
+   t4.maxAxis === gl('PROG_AXES.length') && t4.sawCap === true && t4.rungs > t3.rungs,
    `quaternary ended at ${t4.maxAxis} axes, cap ${t4.sawCap}`);
 ok('every new digit gets a carry of its own',
    t4.kinds.indexOf('axis') >= 0 && t4.kinds.indexOf('cap') >= 0,
@@ -1140,6 +1340,32 @@ ok('the axes come in one at a time',
      return seen.slice(0, 1).join() === '1';
    })()`),
    'the first carry past the last stimulus was not a single axis');
+
+/* Glyph came last so that no rung anyone had reached changed meaning. What that
+   strands is a ladder finished before it existed — every old axis plus the cap,
+   a state the new ladder never visits — and `settleCap` puts it back on a rung
+   the climb does pass through, rather than somewhere `ladderPosition` cannot find. */
+ok('glyph is the last axis, so every rung below it means what it meant',
+   gl('PROG_AXES[PROG_AXES.length - 1]') === 'glyph' &&
+   gl("PROG_AXES.slice(0, 4).join()") === 'pitch,color,size,quantity',
+   `the axis order is ${gl('PROG_AXES.join()')}`);
+ok('and a ladder finished before it is put back on the ladder',
+   gl(`(function () {
+     rcTier = 4;
+     /* Where the old ladder put a player who cleared its last axis: the cap, at
+        full N and the slowest turn. */
+     var old = { streamCount: PROG_STREAMS.length, n: tune.nMax, spinLevel: 1,
+                 axisCount: PROG_AXES.length - 1, capLevel: 1 };
+     var key = function (q) { return [q.streamCount, q.n, q.spinLevel, q.axisCount, q.capLevel].join(); };
+     var seen = {};
+     var p = { streamCount:1, n:1, spinLevel:0, axisCount:0, capLevel:0 };
+     for (var i = 0; i < 20000; i++) { seen[key(p)] = true; if (!advanceLadder(p)) break; }
+     return !seen[key(old)] && seen[key(settleCap(old))];
+   })()`),
+   'a record that had finished the four-axis ladder lands nowhere on the five-axis one');
+ok('and the settling runs on the way into every ladder block',
+   /settleCap\(prog\)/.test(body(blk, 'applyProgression')),
+   'applyProgression clamps the axis count but leaves the stranded cap on it');
 
 /* Quinary never offers a still cube: with one, the screen relation is the cube
    relation and the tier's second judgement is the first one copied out. */

@@ -34,8 +34,14 @@ const PROG_STREAMS = [
  * as part of where the stimulus went", which is a step up on the same property.
  * Size and quantity are already relational and come last, where the trade buys
  * dimension rather than depth.
+ *
+ * Glyph is after them although it is an identity stream, because it arrived after
+ * them. Slotted in beside colour it would have turned the third axis from size
+ * into glyph under everybody already standing on it — the same rung, quietly
+ * about something else. At the end it changes no rung anyone has reached, and the
+ * one record it does strand, a finished ladder, is put back by `settleCap`.
  */
-const PROG_AXES = ['pitch', 'color', 'size', 'quantity'];
+const PROG_AXES = ['pitch', 'color', 'size', 'quantity', 'glyph'];
 
 /* Extra axes are a quaternary-and-up affair. At ternary an axis is one more
    independent up/down/neither and nothing else; the reason to want several is
@@ -353,6 +359,19 @@ function advanceLadder(p) {
   p.spinLevel = Math.max(p.spinLevel, minSpinLevel());
   p.interval = tune.startInterval;
   return true;
+}
+
+/*
+ * The cap is the ladder's last digit and only turns once every axis is in, so a
+ * cap with an axis still to come is a ladder finished before that axis was on it
+ * — a record from before the glyph axis that had climbed to the top. Taken back
+ * off, which lands on the last rung of the axes it holds, the rung the new axis
+ * now follows, rather than on a state the ladder never visits and
+ * `ladderPosition` cannot find.
+ */
+function settleCap(p) {
+  if (p.capLevel && (p.axisCount || 0) < maxAxisCount()) p.capLevel = 0;
+  return p;
 }
 
 function regressLadder(p) {

@@ -61,6 +61,17 @@ const COORD_POOLS = {
    * estimated — the one property here where a difference is the honest step.
    */
   quantity: { 2: [1, 3, 5], 3: [1, 2, 3, 4] },
+  /*
+   * Ranks in a glyph set — 1 to 5, A to E, α to ε, I to V — not the glyphs
+   * themselves, because which set is drawn is the block's (`state.glyphAxisSet`)
+   * and the axis is the rank whatever it is written in.
+   *
+   * Spread like quantity, and for the same reason: a rank is read exactly, so a
+   * difference is the honest step. Spread rather than packed because the sets are
+   * not equally legible packed — II beside III is the one pair here you have to
+   * look twice at, and three levels never need to put them side by side.
+   */
+  glyph: { 2: [0, 2, 4], 3: [0, 1, 2, 3] },
 };
 const COORD_KEYS = Object.keys(COORD_POOLS);
 
@@ -84,10 +95,29 @@ function poolFor(k, c) {
   return { color: COLORS, size: SIZES, quantity: COUNTS }[k];
 }
 
+/*
+ * The two channel ids each axis answers with: [positive, negative], where
+ * positive is a step UP the axis's own pool.
+ *
+ * Named rather than read off the first two relational channels, which is what
+ * this used to do, and which was wrong twice. Colour's pool runs warm → cool, so
+ * a step up it is a step cooler — the stream has always scored it that way — but
+ * the first channel listed is Warmer, and every colour axis was scored backwards.
+ * And the glyph stream's first two channels are the set map's left and right,
+ * which say nothing about rank; its axis is Rank up and Rank down.
+ */
+const COORD_POLES = {
+  pitch:    ['pitch-up',   'pitch-down'],
+  color:    ['color-cool', 'color-warm'],
+  size:     ['size-up',    'size-down'],
+  quantity: ['qty-up',     'qty-down'],
+  glyph:    ['glyph-up',   'glyph-down'],
+};
+
 /** The two channel ids this axis answers with: [positive, negative]. */
 function coordPoles(k) {
-  const rel = (STREAMS[k] || {}).relational || [];
-  return [rel[0] && rel[0].id, rel[1] && rel[1].id];
+  const p = COORD_POLES[k] || [];
+  return [p[0], p[1]];
 }
 
 /** Three cube axes plus one per coordinate, which is how many a move has. */
@@ -101,9 +131,17 @@ const dimCount = c => 3 + coordAxes(c).length;
  * the position judgement and the property's own stream is off (it cannot be
  * judged twice). Without them a coordinate move is asked and cannot be
  * answered, which reads as a run of misses on a stream the player never saw.
+ *
+ * Only the two poles. The glyph stream has six channels, four of them for a set
+ * map the axis does not have, and a button that can never be right is a button
+ * that can only be pressed by mistake. In the stream's own order, not the poles',
+ * so the one with the ↑ on it still comes first.
  */
 function coordChannels(c) {
-  return coordAxes(c).flatMap(k => ((STREAMS[k] || {}).relational || []));
+  return coordAxes(c).flatMap(k => {
+    const poles = coordPoles(k);
+    return ((STREAMS[k] || {}).relational || []).filter(ch => poles.indexOf(ch.id) >= 0);
+  });
 }
 
 /* Transform that maps the element's local +X onto each axis direction. */
@@ -280,7 +318,7 @@ const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
 /* Stamped into every block and into the export. Testers who pick the file up at
    different times will be on different snapshots, and without this you cannot tell
    which build produced which numbers. */
-const BUILD = '2026-09-21.1';
+const BUILD = '2026-10-11.1';
 
 /* ---- Relational complexity (Halford) ----
    Difficulty defined by how many variables are bound in one representation.

@@ -94,6 +94,21 @@ function refreshReadout() {
   });
 }
 
+/*
+ * The glyph a level on the glyph axis is drawn as: its rank, written in the
+ * block's set.
+ *
+ * One set for the whole block rather than one per trial. A set changing under
+ * the rank would make every step a translation first — C to IV, γ to 2 — which
+ * is a task of its own, and not the one an axis is for: an axis has to be read
+ * as a position, and a position has to be written the same way twice to be
+ * compared. A new set each block keeps any one alphabet from becoming the axis.
+ */
+function glyphAxisChar(level) {
+  const set = GLYPH_SETS[GLYPH_SET_KEYS[state.glyphAxisSet || 0]];
+  return set[poolFor('glyph')[level]];
+}
+
 function renderTrial(t) {
   clearCells();
   showLagCue(t);
@@ -105,7 +120,8 @@ function renderTrial(t) {
   positionGuides(t.cellIdx);
   const faces = cell.el.querySelectorAll('.cell-face');
 
-  const glyphChar = t.glyphSet != null ? GLYPH_SETS[GLYPH_SET_KEYS[t.glyphSet]][t.glyphIdx] : null;
+  const glyphChar = t.glyphSet != null ? GLYPH_SETS[GLYPH_SET_KEYS[t.glyphSet]][t.glyphIdx]
+    : t.glyph != null ? glyphAxisChar(t.glyph) : null;
 
   /* The SIZES ladder is tuned for a roomy cell; a 4³ cube (or a small viewport) makes
      cells small enough that the largest size plus a quantity row overflows the face.
