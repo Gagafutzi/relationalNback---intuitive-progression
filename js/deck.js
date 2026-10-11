@@ -89,8 +89,9 @@ const keyLabel = k => !k ? '—' : KEY_NAMES[k] || k.toUpperCase();
  *
  * The corners are taps, not channels. Each presses its two directions exactly as
  * tapping both would, so nothing is scored, stored or keyed differently — a
- * corner is a shortcut on the glass and nothing else. Off a phone the corners and
- * the pad's wrappers drop out in CSS and the row is the row it always was.
+ * corner is a shortcut on the glass and nothing else. Where the pad is not drawn
+ * (off a phone, or with Answer keys set to Row) the corners and the pad's
+ * wrappers drop out in CSS and the row is the row it always was.
  *
  * Every deck whose first-order judgement is a direction gets one: the cube frame,
  * the screen frame (toward and away from you in the pair), and the glyph stream's

@@ -68,6 +68,7 @@ $('feedbackMode').onchange = e => {
 $('accentCustom').oninput  = e => { appearance.accent = e.target.value; applyAppearance(); saveAppearance(); };
 $('axisPalette').onchange  = e => { appearance.palette = e.target.value; applyAppearance(); saveAppearance(); };
 $('flatMode').onchange     = e => { appearance.flat = e.target.checked; applyAppearance(); saveAppearance(); };
+$('keyLayout').onchange    = e => { appearance.keys = e.target.value; applyKeyLayout(); saveAppearance(); };
 $('bgDim').oninput         = e => {
   appearance.dim = +e.target.value;
   $('dimVal').textContent = appearance.dim;

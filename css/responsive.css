@@ -80,52 +80,53 @@
 }
 
 /* ---------- The compass pad (see deck.js) ----------
-   A finger, not a width, is the reason for it, so a coarse pointer gets it at any
-   size; a phone-width window gets it too, as it gets the phone's layout in
-   everything else in this file. The flat directions sit where they point, the corners between
-   them press both, and the third axis is a pair beside the pad, above over below.
+   Drawn wherever the root carries `keys-pad`, which appearance.js sets from the
+   Answer keys setting: on Auto that is a coarse pointer at any size, or a
+   phone-width window (a finger, not a width, is the reason for it, but a narrow
+   window gets the phone's layout in everything else in this file too); Pad and
+   Row force one or the other anywhere. The flat directions sit where they point,
+   the corners between them press both, and the third axis is a pair beside the
+   pad, above over below.
    Fixed columns rather than shares of the width: a pad stretched across a phone
    puts N a thumb's reach from S, and the room left over lets a one-key group —
    Tone =, Colour = — sit beside it instead of starting a row of its own. */
-@media (pointer: coarse), (max-width: 700px) {
-  /* Sixty px a column until the pairs would not fit beside the pad, then narrower,
-     down to 44 — the smallest key a fingertip still lands on. `--pairs` is set by
-     buildDeck; 40px is the deck's, the group's and the borders' share of the width,
-     with the gaps taken off each column. Past the floor the extra pairs wrap. */
-  .btns.compass {
-    --col: clamp(44px, calc((100vw - 40px) / (3 + var(--pairs, 1)) - 7px), 60px);
-    display: flex; flex-wrap: wrap; justify-content: center; align-items: stretch;
-    gap: 7px;
-  }
-  .btns.compass .pad {
-    display: grid; gap: 7px;
-    grid-template-columns: repeat(3, var(--col));
-    grid-template-areas: "nw n ne" "w hub e" "sw s se";
-  }
-  /* The empty middle, marked: a pad with a hole in it reads as a missing key, and
-     a pad with a hub reads as directions out from here. */
-  .btns.compass .pad::after {
-    content: ''; grid-area: hub; place-self: center;
-    width: 9px; height: 9px; transform: rotate(45deg);
-    border: 1px solid var(--border-outer); opacity: .6;
-  }
-  .btns.compass .pair { display: flex; flex-direction: column; gap: 7px; width: var(--col); }
-  .btns.compass .pair .rbtn { flex: 1; }
-  .btns.compass .rbtn { min-width: 0; padding-left: 4px; padding-right: 4px; }
-  .rbtn.corner { display: block; }
-  .rbtn.corner .glyph { font-size: 15px; letter-spacing: -.02em; }
-  /* The diagonal arrows are drawn smaller than the flat ones in every monospace
-     face tried, so the same size reads as a lesser key. */
-  .rbtn.corner.arrow .glyph { font-size: 23px; line-height: .8; }
-  .pad [data-slot="nw"] { grid-area: nw; }
-  .pad [data-slot="n"]  { grid-area: n; }
-  .pad [data-slot="ne"] { grid-area: ne; }
-  .pad [data-slot="w"]  { grid-area: w; }
-  .pad [data-slot="e"]  { grid-area: e; }
-  .pad [data-slot="sw"] { grid-area: sw; }
-  .pad [data-slot="s"]  { grid-area: s; }
-  .pad [data-slot="se"] { grid-area: se; }
+/* Sixty px a column until the pairs would not fit beside the pad, then narrower,
+   down to 44 — the smallest key a fingertip still lands on. `--pairs` is set by
+   buildDeck; 40px is the deck's, the group's and the borders' share of the width,
+   with the gaps taken off each column. Past the floor the extra pairs wrap. */
+:root.keys-pad .btns.compass {
+  --col: clamp(44px, calc((100vw - 40px) / (3 + var(--pairs, 1)) - 7px), 60px);
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: stretch;
+  gap: 7px;
 }
+:root.keys-pad .btns.compass .pad {
+  display: grid; gap: 7px;
+  grid-template-columns: repeat(3, var(--col));
+  grid-template-areas: "nw n ne" "w hub e" "sw s se";
+}
+/* The empty middle, marked: a pad with a hole in it reads as a missing key, and
+   a pad with a hub reads as directions out from here. */
+:root.keys-pad .btns.compass .pad::after {
+  content: ''; grid-area: hub; place-self: center;
+  width: 9px; height: 9px; transform: rotate(45deg);
+  border: 1px solid var(--border-outer); opacity: .6;
+}
+:root.keys-pad .btns.compass .pair { display: flex; flex-direction: column; gap: 7px; width: var(--col); }
+:root.keys-pad .btns.compass .pair .rbtn { flex: 1; }
+:root.keys-pad .btns.compass .rbtn { min-width: 0; padding-left: 4px; padding-right: 4px; }
+:root.keys-pad .rbtn.corner { display: block; }
+:root.keys-pad .rbtn.corner .glyph { font-size: 15px; letter-spacing: -.02em; }
+/* The diagonal arrows are drawn smaller than the flat ones in every monospace
+   face tried, so the same size reads as a lesser key. */
+:root.keys-pad .rbtn.corner.arrow .glyph { font-size: 23px; line-height: .8; }
+:root.keys-pad .pad [data-slot="nw"] { grid-area: nw; }
+:root.keys-pad .pad [data-slot="n"] { grid-area: n; }
+:root.keys-pad .pad [data-slot="ne"] { grid-area: ne; }
+:root.keys-pad .pad [data-slot="w"] { grid-area: w; }
+:root.keys-pad .pad [data-slot="e"] { grid-area: e; }
+:root.keys-pad .pad [data-slot="sw"] { grid-area: sw; }
+:root.keys-pad .pad [data-slot="s"] { grid-area: s; }
+:root.keys-pad .pad [data-slot="se"] { grid-area: se; }
 
 /* The pad is three rows where the row was one, so the stage gives the height back.
    The third term is the viewport less everything that is not the stage: the dock
