@@ -391,7 +391,8 @@ function createSampler(env) {
 
     if (on('glyph')) {
       if (rel('glyph')) {
-        t.glyphSet = randInt(GLYPH_SET_KEYS.length);
+        /* Rank only keeps the block's one set, so rank is the only thing that moves. */
+        t.glyphSet = glyphRankOnly() ? (state.glyphAxisSet || 0) : randInt(GLYPH_SET_KEYS.length);
         t.glyphIdx = randInt(5);
       } else {
         /* Glyph builds its value from two fields, so it can't use sampleIndex — it

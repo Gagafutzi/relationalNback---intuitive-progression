@@ -309,6 +309,19 @@
           interval to at least 1.30s so there is time to answer after the cue.</div>
       </div>
       <div class="setting-group">
+        <label>Relational glyphs</label>
+        <select id="glyphRelF">
+          <option value="map">Set map + rank</option>
+          <option value="rank">Rank only — simple</option>
+        </select>
+        <div class="hint">What the Glyph stream asks when it is set to Relational.
+          <b>Set map + rank</b>: four symbol sets on a 2×2 map; report how the symbol
+          moved across the map and whether its rank rose or fell. <b>Rank only</b>:
+          one set for the whole block (1&ndash;5, A&ndash;E, &alpha;&ndash;&epsilon;
+          or I&ndash;V); report only whether the rank went up (<b>+</b>) or down
+          (<b>&minus;</b>). No map to learn.</div>
+      </div>
+      <div class="setting-group">
         <label><input type="checkbox" id="fixedGlyphMap" style="width:auto"> Fixed symbol
           map</label>
         <div class="hint">Normally the 2×2 map of symbol sets reshuffles every session so

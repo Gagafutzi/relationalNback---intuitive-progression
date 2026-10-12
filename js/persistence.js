@@ -76,7 +76,7 @@ function resetInMemoryState() {
     coordAxes:[], magnitudeCap:2, pitchLoudness:false, toneCount:TONE_DEFAULT,
     frame:'cube', interval:2500, blockLength:20, feedback:'reveal',
     lureRate:0.20, meta:false, gate:0, retro:0, varN:0,
-    varPriority:true, fixedGlyphMap:false,
+    varPriority:true, fixedGlyphMap:false, glyphRel:'map',
   });
 }
 

@@ -223,6 +223,9 @@ function buildJudgments(a, b, extra) {
     if (gm === 'identity') {
       const same = a.glyphSet === b.glyphSet && a.glyphIdx === b.glyphIdx;
       push('glyph', ['glyph'], same ? ['glyph'] : []);
+    } else if (glyphRankOnly()) {
+      push('glyph', ['glyph-up','glyph-down'],
+        b.glyphIdx > a.glyphIdx ? ['glyph-up'] : b.glyphIdx < a.glyphIdx ? ['glyph-down'] : []);
     } else {
       const pa = state.glyphMap[GLYPH_SET_KEYS[a.glyphSet]];
       const pb = state.glyphMap[GLYPH_SET_KEYS[b.glyphSet]];

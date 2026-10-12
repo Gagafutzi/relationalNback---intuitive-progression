@@ -34,6 +34,9 @@ function deckGroups() {
       if (cfg.frame === 'screen' || both)
         groups.push({ key:'position2', label:'Position' + (both ? ' · screen' : ' · screen'),
                       color:'#9ccc65', channels: spec.relationalScreen });
+    } else if (k === 'glyph' && m === 'relational' && glyphRankOnly()) {
+      groups.push({ key:k, label:'Glyph rank ↔', color: spec.color,
+                    channels: spec.relational.filter(c => c.id === 'glyph-up' || c.id === 'glyph-down') });
     } else {
       groups.push({ key:k, label: spec.label + (m === 'relational' ? ' ↔' : ' ='),
                     color: spec.color, channels: spec[m] });

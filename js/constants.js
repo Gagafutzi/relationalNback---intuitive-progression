@@ -315,6 +315,17 @@ const GLYPH_SETS = {
 };
 const GLYPH_SET_KEYS = Object.keys(GLYPH_SETS);
 
+/*
+ * Relational glyphs come in two versions. The set map (the default, and the only
+ * one Progression uses) puts the four sets on a 2×2 map and asks how the symbol
+ * moved across it as well as how its rank moved. Rank only is the simple one:
+ * one set for the whole block, written exactly as the glyph axis is, and the only
+ * question is whether the rank went up or down — + and −, like Tone's higher and
+ * lower. No map, so nothing to memorise first and no intro.
+ */
+const glyphRankOnly = (c) => (c || cfg).glyphRel === 'rank';
+const glyphUsesMap = () => cfg.streams.glyph === 'relational' && !glyphRankOnly();
+
 /* Stamped into every block and into the export. Testers who pick the file up at
    different times will be on different snapshots, and without this you cannot tell
    which build produced which numbers. */

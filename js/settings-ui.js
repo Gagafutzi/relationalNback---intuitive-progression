@@ -354,6 +354,9 @@ function syncSettingsUI() {
           'asking one question.';
   $('varPriority').checked = !!freeCfg.varPriority;
   $('fixedGlyphMap').checked = !!freeCfg.fixedGlyphMap;
+  $('glyphRelF').value = freeCfg.glyphRel === 'rank' ? 'rank' : 'map';
+  /* The map does not exist in rank only, so neither does fixing it. */
+  $('fixedGlyphMap').disabled = freeCfg.glyphRel === 'rank';
   $('metaOn').checked = !!freeCfg.meta;
   $('gateOn').value = String(freeCfg.gate || 0);
   $('retroOn').value = String(freeCfg.retro || 0);

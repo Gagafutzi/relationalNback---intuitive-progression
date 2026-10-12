@@ -194,7 +194,7 @@ function glyphMapHTML() {
 
 function renderGlyphLegend() {
   const el = $('glyphLegend');
-  const show = state.glyphMap && cfg.streams.glyph === 'relational' && cfg.feedback === 'reveal';
+  const show = state.glyphMap && glyphUsesMap() && cfg.feedback === 'reveal';
   el.classList.toggle('show', !!show);
   if (!show) return;
   const grid = [null, null, null, null];

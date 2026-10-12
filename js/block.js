@@ -133,7 +133,7 @@ function startBlock() {
   state.activeMs = 0;
   state.running = true;
 
-  if (cfg.streams.glyph === 'relational' && !state.glyphMap) ensureGlyphMap();
+  if (glyphUsesMap() && !state.glyphMap) ensureGlyphMap();
   /* The alphabet the glyph axis is written in, one per block — see `glyphAxisChar`. */
   state.glyphAxisSet = randInt(GLYPH_SET_KEYS.length);
 
@@ -244,6 +244,9 @@ function blockRecord(completed, scored) {
          minor third apart are not the same stream, and the difference is
          invisible in the settings snapshot without this. */
       toneCount: toneCount(cfg),
+      /* Rank only and the set map are two different glyph tasks under one stream
+         name, so the record says which one was asked. */
+      glyphRel: cfg.streams.glyph === 'relational' ? (cfg.glyphRel || 'map') : undefined,
       /* An assist, so a score earned with it on is not the same score. */
       moveTrace: !!cfg.moveTrace,
       cellVis: cfg.cellVis,
@@ -648,7 +651,7 @@ function applyProgression() {
     /* Free Play only. Each of these changes how hard the task is, and a ladder has to
        mean the same thing at every rung — a fixed symbol map in particular makes the
        glyph stream markedly easier, which is exactly why it is opt-in. */
-    gate: 0, retro: 0, varN: 0, fixedGlyphMap: false,
+    gate: 0, retro: 0, varN: 0, fixedGlyphMap: false, glyphRel: 'map',
     varPriority: true,
     /* Extra axes widen the space a move lives in without adding an answer, which
        is what makes quaternary at a high N carry more. Below quaternary that buys
@@ -666,7 +669,7 @@ function applyProgression() {
     blockLength: tune.blockLength,
   });
 
-  if (cfg.streams.glyph === 'relational' && !state.glyphMap) ensureGlyphMap();
+  if (glyphUsesMap() && !state.glyphMap) ensureGlyphMap();
   /*
    * Before `onConfigChanged`, not after — which is the order `applyFree` has
    * always had and this one has always had backwards.
@@ -698,6 +701,7 @@ function applyFree() {
     feedback: freeCfg.feedback,
     meta, gate: freeCfg.gate, retro, varN,
     fixedGlyphMap: !!freeCfg.fixedGlyphMap,
+    glyphRel: freeCfg.glyphRel === 'rank' ? 'rank' : 'map',
     varPriority: !!freeCfg.varPriority,
     dim: freeCfg.dim,
     coordAxes: (freeCfg.coordAxes || []).slice(),

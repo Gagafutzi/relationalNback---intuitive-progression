@@ -126,6 +126,7 @@ const cfg = {
   varN: 0,            // 0 = fixed N, else the ± spread the per-trial lag is drawn in
   varPriority: true,  // cue one stream to prioritise per block
   fixedGlyphMap: false,   // live rule; Progression forces it off, see applyProgression
+  glyphRel: 'map',        // relational glyphs: 'map' (set map + rank) or 'rank' (rank only)
 };
 
 /* What Progression owns that the ladder does not decide for it. Symmetric with
@@ -152,7 +153,7 @@ const freeCfg = {
   lureRate: 0.20, meta: false, gate: 0, retro: 0, varN: 0,
   /* varPriority was missing here while cfg defaulted it on, so Free Play silently
      ran without the cue that progression uses. */
-  varPriority: true, fixedGlyphMap: false,
+  varPriority: true, fixedGlyphMap: false, glyphRel: 'map',
 };
 
 const TUNE_DEFAULTS = {

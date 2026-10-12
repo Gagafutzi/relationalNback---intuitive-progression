@@ -101,6 +101,11 @@ $('rcTier').onchange = e => {
   applyProgression(); syncSettingsUI(); updateHUD(); saveProgress();
 };
 
+$('glyphRelF').onchange = e => {
+  freeCfg.glyphRel = e.target.value === 'rank' ? 'rank' : 'map';
+  applyFree(); syncSettingsUI(); updateHUD(); renderGlyphLegend(); saveProgress();
+};
+
 $('fixedGlyphMap').onchange = e => {
   freeCfg.fixedGlyphMap = e.target.checked;
   cfg.fixedGlyphMap = e.target.checked;
@@ -383,7 +388,7 @@ $('cubeLayout').onchange = e => {
 /* --- run controls --- */
 $('startBtn').onclick = () => {
   setSettingsOpen(false);
-  if (cfg.streams.glyph === 'relational') showGlyphIntro(startBlock);
+  if (glyphUsesMap()) showGlyphIntro(startBlock);
   else startBlock();
 };
 $('stopBtn').onclick = () => stopBlock(false);
