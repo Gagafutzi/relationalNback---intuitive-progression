@@ -28,6 +28,50 @@ function renderStreamRows() {
   });
 }
 
+/*
+ * Progression's stimuli: the ladder's list in its order, each stream Off,
+ * Identity or Relational, the same three choices Free Play offers. Position is
+ * shown and fixed — see `progStreams`. A change lands on the ladder at once:
+ * the stimulus digit counts through the new list, and a stream count past its
+ * end comes down to it.
+ */
+function renderProgStreamRows() {
+  const wrap = $('progStreamRows');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const chosen = {};
+  progStreams().forEach(s => { chosen[s.key] = s.mode; });
+  PROG_CHOICES.forEach(s => {
+    const spec = STREAMS[s.key];
+    const row = document.createElement('div');
+    row.className = 'stream-row';
+    row.innerHTML = `<span class="swatch" style="background:${spec.color}"></span>
+      <span class="nm">${spec.label}</span>
+      <select data-prog-stream="${s.key}">
+        <option value="off">Off</option>
+        <option value="identity">Identity</option>
+        ${spec.idOnly ? '' : '<option value="relational">Relational</option>'}
+      </select>`;
+    const sel = row.querySelector('select');
+    sel.value = chosen[s.key] || 'off';
+    if (s.key === 'position') sel.disabled = true;
+    sel.onchange = () => {
+      const pick = {};
+      progStreams().forEach(x => { pick[x.key] = x.mode; });
+      PROG_CHOICES.forEach(x => { if (!pick[x.key]) pick[x.key] = 'off'; });
+      pick[s.key] = sel.value;
+      progCfg.streams = pick;
+      applyProgression(); updateHUD(); saveProgress();
+      renderProgStreamRows(); renderLadderState();
+    };
+    wrap.appendChild(row);
+  });
+  const glyph = progStreams().find(x => x.key === 'glyph');
+  $('progGlyphRelGroup').style.display = glyph && glyph.mode === 'relational' ? '' : 'none';
+  $('progGlyphRel').value = progCfg.glyphRel === 'rank' ? 'rank' : 'map';
+  $('progStreamsDefault').disabled = !progCfg.streams;
+}
+
 let capturingId = null;
 
 function renderKeybinds() {
@@ -148,7 +192,7 @@ function renderShortcuts() {
 
 function renderLadderState() {
   const levels = spinLevels();
-  const active = PROG_STREAMS.slice(0, prog.streamCount);
+  const active = progStreams().slice(0, prog.streamCount);
   const pos = ladderPosition();
   $('ladderState').innerHTML = `
     <div><span class="k">Milestone</span><b>${pos.index}</b> of ${pos.total}</div>
@@ -386,6 +430,7 @@ function syncSettingsUI() {
   applyCellVis();
 
   renderStreamRows();
+  renderProgStreamRows();
   renderLadderState();
   renderKeybinds();
   renderShortcuts();

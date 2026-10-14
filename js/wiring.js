@@ -285,6 +285,15 @@ document.querySelectorAll('#progCoordAxes input[data-coord]').forEach(box => {
 });
 $('progMagnitudeCap').onchange = e => { progCfg.magnitudeCap = Number(e.target.value); applyProgression(); updateHUD(); saveProgress(); };
 $('progPitchLoudness').onchange = e => { progCfg.pitchLoudness = e.target.checked; applyProgression(); saveProgress(); };
+$('progGlyphRel').onchange = e => {
+  progCfg.glyphRel = e.target.value === 'rank' ? 'rank' : 'map';
+  applyProgression(); updateHUD(); saveProgress();
+};
+$('progStreamsDefault').onclick = () => {
+  progCfg.streams = null;
+  applyProgression(); updateHUD(); saveProgress();
+  renderProgStreamRows(); renderLadderState();
+};
 $('pitchLoudness').onchange = e => { freeCfg.pitchLoudness = e.target.checked; applyFree(); saveProgress(); };
 /* `oninput` for the label, `onchange` for the audition: a drag across the range
    would otherwise start nine overlapping scales. */

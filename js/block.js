@@ -613,7 +613,7 @@ function applyProgression() {
   /* The floor is the tier's, not zero: quinary reads the cube against the screen,
      and with a still cube those are the same frame twice. */
   prog.spinLevel = Math.min(Math.max(prog.spinLevel, minSpinLevel()), levels.length - 1);
-  prog.streamCount = Math.min(prog.streamCount, PROG_STREAMS.length);
+  prog.streamCount = Math.max(1, Math.min(prog.streamCount, progStreams().length));
   prog.axisCount = Math.min(Math.max(prog.axisCount || 0, 0), maxAxisCount());
   settleCap(prog);
   prog.capLevel = laddersAxes() && prog.capLevel ? 1 : 0;
@@ -629,7 +629,7 @@ function applyProgression() {
 
   const streams = {};
   STREAM_KEYS.forEach(k => streams[k] = 'off');
-  PROG_STREAMS.slice(0, prog.streamCount).forEach(s => streams[s.key] = s.mode);
+  progStreams().slice(0, prog.streamCount).forEach(s => streams[s.key] = s.mode);
 
   /* One assign of the whole task, from the same field list applyFree writes. Setting
      them line by line is how cfg.feedback came to be written by one mode and not the
@@ -651,7 +651,10 @@ function applyProgression() {
     /* Free Play only. Each of these changes how hard the task is, and a ladder has to
        mean the same thing at every rung — a fixed symbol map in particular makes the
        glyph stream markedly easier, which is exactly why it is opt-in. */
-    gate: 0, retro: 0, varN: 0, fixedGlyphMap: false, glyphRel: 'map',
+    gate: 0, retro: 0, varN: 0, fixedGlyphMap: false,
+    /* Which relational glyph is asked is chosen with the stimuli, before the ladder
+       is climbed, so it is the same at every rung; the block record says which. */
+    glyphRel: progCfg.glyphRel === 'rank' ? 'rank' : 'map',
     varPriority: true,
     /* Extra axes widen the space a move lives in without adding an answer, which
        is what makes quaternary at a high N carry more. Below quaternary that buys

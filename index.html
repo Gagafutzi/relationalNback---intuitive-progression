@@ -58,6 +58,33 @@
     </div>
 
     <details class="sect">
+      <summary>Stimuli</summary>
+      <div class="sect-body">
+        <div class="setting-group">
+          <div id="progStreamRows"></div>
+          <div class="hint">The streams the ladder brings in, one at a time, in this
+          order &mdash; each <b>Off</b>, <b>Identity</b> ("same as N ago?") or
+          <b>Relational</b> ("which way did it move?"). Position is always first and
+          always relational. Chosen here, the list is the same at every rung; change it
+          and the ladder carries on through the new one.</div>
+        </div>
+        <div class="setting-group" id="progGlyphRelGroup">
+          <label>Relational glyphs</label>
+          <select id="progGlyphRel">
+            <option value="map">Set map + rank</option>
+            <option value="rank">Rank only &mdash; simple</option>
+          </select>
+          <div class="hint">What a relational Glyph stream asks. <b>Set map + rank</b>:
+          four symbol sets on a 2&times;2 map; report how the symbol moved across the map
+          and whether its rank rose or fell. <b>Rank only</b>: one set per block; report
+          whether the rank went up (<b>+</b>) or down (<b>&minus;</b>).</div>
+        </div>
+        <div class="setting-group">
+          <button class="rbtn" id="progStreamsDefault" type="button" style="width:100%;padding:6px">Back to the default list</button>
+        </div>
+      </div>
+    </details>
+    <details class="sect">
       <summary>Extra axes</summary>
       <div class="sect-body">
       <div class="setting-group">

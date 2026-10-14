@@ -1507,6 +1507,37 @@ ok('converting a stream into an axis is a step up, not sideways',
    load({ meta: true, streams: { position: 'relational' }, coordAxes: ['pitch'] }),
    'the axis digit would lower Load, so the ladder would climb into an easier block');
 
+/* The ladder's stimuli, as chosen in Progression. Untouched it has to be the old
+   fixed list exactly, so nobody's rung changes meaning without a choice being made;
+   chosen, it keeps the order, never lets position go, and is what the stimulus
+   digit counts through. */
+vm.runInContext('var progCfg = { streams: null };', ctx);
+vm.runInContext('Object.assign(tune, { spinStart: 100, spinEnd: 20, spinStep: 10, nAfterStimulus: 2 });', ctx);
+ok('with nothing chosen the ladder climbs the stimuli it always climbed',
+   g('progStreams() === PROG_STREAMS'));
+const chosen = g(`JSON.stringify(progStreams({ position: 'off', pitch: 'off', glyph: 'relational', size: 'off', timbre: 'relational' }))`);
+ok('the spoken letter can be chosen, and is never offered unasked',
+   g(`progStreams({ letter: 'identity' }).slice(-1)[0].key`) === 'letter' &&
+   !g(`progStreams().some(function (s) { return s.key === 'letter'; })`));
+ok('a choice keeps the order, drops what is off, and holds position relational',
+   chosen === JSON.stringify([
+     { key: 'position', mode: 'relational' }, { key: 'color', mode: 'identity' },
+     { key: 'glyph', mode: 'relational' }, { key: 'pan', mode: 'identity' },
+     { key: 'timbre', mode: 'relational' }, { key: 'quantity', mode: 'relational' },
+   ]), chosen);
+const rungs = () => g(`(function () {
+  var p = { streamCount: 1, n: 1, spinLevel: 0, axisCount: 0, capLevel: 0, interval: 5000 }, k = 0;
+  while (advanceLadder(p) && k < 5000) k++;
+  return { rungs: k, streams: p.streamCount };
+})()`);
+const full = rungs();
+vm.runInContext(`progCfg.streams = { pitch: 'off', color: 'off', pan: 'off', timbre: 'off' };`, ctx);
+const short = rungs();
+ok('the stimulus digit counts through the chosen list, and stops at its end',
+   full.streams === 8 && short.streams === 4 && short.rungs < full.rungs,
+   JSON.stringify({ full, short }));
+vm.runInContext('progCfg.streams = null;', ctx);
+
 console.log(bad ? `\n${bad} FAILED` : '\nall checks passed');
 
 process.exit(bad ? 1 : 0);

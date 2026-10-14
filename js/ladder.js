@@ -25,6 +25,38 @@ const PROG_STREAMS = [
 ];
 
 /*
+ * The streams the ladder actually introduces: the list above in its order, as
+ * the player has chosen it in Progression's Stimuli section — each stream on or
+ * off, identity or relational. `progCfg.streams` is null until somebody
+ * chooses, which is exactly the list above, so a ladder nobody has touched
+ * climbs what it always climbed.
+ *
+ * Chosen once, up front, and then the same at every rung: the stimulus digit
+ * still counts streams joining one at a time, only through this list rather
+ * than the fixed one. Position stays relational — it is the stream every block
+ * starts with, and the meta-relations that quaternary and quinary ask are
+ * relations between position moves.
+ */
+/* What can be chosen: the ladder's list, and after it the streams it never brings
+   in by itself — the spoken letter, identity only — off unless somebody turns them
+   on. Kept apart from PROG_STREAMS so a ladder nobody has touched gains no rung. */
+const PROG_CHOICES = [...PROG_STREAMS, { key:'letter', mode:'off' }];
+
+function progStreams(choice) {
+  const pick = choice !== undefined ? choice
+    : (typeof progCfg !== 'undefined' ? progCfg.streams : null);
+  if (!pick) return PROG_STREAMS;
+  const idOnly = k => typeof STREAMS !== 'undefined' && STREAMS[k] && STREAMS[k].idOnly;
+  return PROG_CHOICES
+    .map(s => {
+      if (s.key === 'position') return s;
+      const m = pick[s.key] || s.mode;
+      return { key: s.key, mode: m === 'relational' && idOnly(s.key) ? 'identity' : m };
+    })
+    .filter(s => s.mode === 'identity' || s.mode === 'relational');
+}
+
+/*
  * The properties the ladder turns into coordinate axes, in the order it does it.
  *
  * Identity streams first. Every one of these is also a stream on `PROG_STREAMS`,
@@ -294,7 +326,7 @@ function carryKind(p) {
   if (p.spinLevel === 0) return p.n < 2 ? 'n' : 'stimulus';   // rotation entering = major
   if (p.spinLevel < levels.length - 1) return 'spin';
   if (p.n < tune.nMax) return 'n';
-  if (p.streamCount < PROG_STREAMS.length) return 'stimulus';
+  if (p.streamCount < progStreams().length) return 'stimulus';
   if ((p.axisCount || 0) < maxAxisCount()) return 'axis';
   return 'cap';
 }
@@ -337,7 +369,7 @@ function advanceLadder(p) {
     p.spinLevel++;
   } else if (p.n < tune.nMax) {
     p.n++; p.spinLevel = 1;
-  } else if (p.streamCount < PROG_STREAMS.length) {
+  } else if (p.streamCount < progStreams().length) {
     p.streamCount++; p.n = Math.min(tune.nAfterStimulus, tune.nMax); p.spinLevel = 1;
   } else if ((p.axisCount || 0) < maxAxisCount()) {
     /*
@@ -411,8 +443,8 @@ function describeNext(p) {
     return { what: `rotation speeds up to ${levels[p.spinLevel + 1]}s per turn`, why: 'same N, less stable frame' };
   if (p.n < tune.nMax)
     return { what: `N rises to ${p.n + 1}`, why: 'rotation resets to slowest' };
-  if (p.streamCount < PROG_STREAMS.length) {
-    const nx = PROG_STREAMS[p.streamCount];
+  if (p.streamCount < progStreams().length) {
+    const nx = progStreams()[p.streamCount];
     return { what: `${STREAMS[nx.key].label} joins (${nx.mode})`,
              why: `N drops to ${Math.min(tune.nAfterStimulus, tune.nMax)}, rotation resets` };
   }

@@ -140,6 +140,9 @@ const progCfg = {
      were reaching a ladder run out of Free Play's settings, so a box ticked in one
      mode silently changed what the other mode's recorded ability was about. */
   coordAxes: [], magnitudeCap: 2, pitchLoudness: false,
+  /* The ladder's stimuli, as chosen — see `progStreams`. Null is the default list,
+     so a record written before the choice existed climbs what it always climbed. */
+  streams: null, glyphRel: 'map',
 };
 
 /* Free Play keeps its own settings so switching modes doesn't clobber either one. */
