@@ -1538,6 +1538,25 @@ ok('the stimulus digit counts through the chosen list, and stops at its end',
    JSON.stringify({ full, short }));
 vm.runInContext('progCfg.streams = null;', ctx);
 
+/* The axis digit converts only what the chosen list brings in. A stream switched
+   off used to come back at the top of a quaternary ladder as an axis, after being
+   kept out of every block below it. */
+vm.runInContext('var rcTier = 4;', ctx);
+const topAxes = () => g(`(function () {
+  var p = { streamCount: 1, n: 1, spinLevel: 1, axisCount: 0, capLevel: 0, interval: 5000 }, k = 0;
+  while (advanceLadder(p) && k < 5000) k++;
+  return progAxes().slice(0, p.axisCount).join();
+})()`);
+ok('untouched, the axis digit converts all five, in order',
+   topAxes() === 'pitch,color,size,quantity,glyph', topAxes());
+vm.runInContext(`progCfg.streams = { glyph: 'off', size: 'off' };`, ctx);
+ok('a stream switched off never comes back as an axis',
+   topAxes() === 'pitch,color,quantity', topAxes());
+vm.runInContext(`progCfg.streams = { glyph: 'relational' };`, ctx);
+ok('a relational glyph is still the last axis converted',
+   topAxes() === 'pitch,color,size,quantity,glyph', topAxes());
+vm.runInContext('progCfg.streams = null; rcTier = undefined;', ctx);
+
 console.log(bad ? `\n${bad} FAILED` : '\nall checks passed');
 
 process.exit(bad ? 1 : 0);

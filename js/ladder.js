@@ -75,12 +75,25 @@ function progStreams(choice) {
  */
 const PROG_AXES = ['pitch', 'color', 'size', 'quantity', 'glyph'];
 
+/*
+ * The axes this ladder actually converts: `PROG_AXES` in its order, keeping only
+ * the streams switched on in Progression's Stimuli. An axis is a stream turned
+ * into a direction of the move, so a stream that was turned off has nothing to
+ * convert — it used to come back anyway at the top of a quaternary ladder, as an
+ * axis, after being kept out of every block below it. The default list has all
+ * five on, so a ladder nobody has touched converts what it always did.
+ */
+function progAxes() {
+  const on = new Set(progStreams().map(s => s.key));
+  return PROG_AXES.filter(k => on.has(k));
+}
+
 /* Extra axes are a quaternary-and-up affair. At ternary an axis is one more
    independent up/down/neither and nothing else; the reason to want several is
    orthogonality, and only a second-order judgement ever asks about that. Below
    quaternary the boxes stay the player's own, exactly as they were. */
 const laddersAxes = () => typeof rcTier !== 'undefined' && rcTier >= 4;
-const maxAxisCount = () => laddersAxes() ? PROG_AXES.length : 0;
+const maxAxisCount = () => laddersAxes() ? progAxes().length : 0;
 
 /* Rotation is the whole of what separates the two frames at quinary: angles are
    rotation-invariant, so a still cube makes the screen relation a copy of the
@@ -449,7 +462,7 @@ function describeNext(p) {
              why: `N drops to ${Math.min(tune.nAfterStimulus, tune.nMax)}, rotation resets` };
   }
   if ((p.axisCount || 0) < maxAxisCount()) {
-    const nx = PROG_AXES[p.axisCount || 0];
+    const nx = progAxes()[p.axisCount || 0];
     const label = STREAMS[nx] ? STREAMS[nx].label : nx;
     return { what: `${label} becomes an axis of the move`,
              why: `no longer a stream beside it — one more direction to be ` +

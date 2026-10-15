@@ -599,7 +599,7 @@ function toneRatchet() {
  */
 function ladderCoordAxes(store) {
   if (!laddersAxes()) return (coordAxes(store) || []).slice();
-  return PROG_AXES.slice(0, prog.axisCount || 0);
+  return progAxes().slice(0, prog.axisCount || 0);
 }
 
 /* Same division: chosen below quaternary, the ladder's last digit above it. */
