@@ -183,6 +183,19 @@ function createSampler(env) {
     };
     walk([]);
 
+    /*
+     * The old moves, on request: one axis at a time.
+     *
+     * Before moves could combine axes, a quaternary move was a step on exactly
+     * one axis, so the relation to the previous move was always same, opposite
+     * or orthogonal — read off which axis moved and which way — and oblique
+     * never came up. Some players train on that version, so it stays a choice.
+     */
+    if (cfg.singleAxis) {
+      for (let i = offsets.length - 1; i >= 0; i--)
+        if (offsets[i].filter(c => c !== 0).length !== 1) offsets.splice(i, 1);
+    }
+
     /* A move has to land somewhere that exists — inside the lattice, and inside
        the pool on the axis that is heard. */
     const cellAt = {};

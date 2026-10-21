@@ -143,6 +143,8 @@ const progCfg = {
   /* The ladder's stimuli, as chosen — see `progStreams`. Null is the default list,
      so a record written before the choice existed climbs what it always climbed. */
   streams: null, glyphRel: 'map',
+  /* Quaternary moves one axis at a time (the old moves); off is diagonals too. */
+  singleAxis: false,
 };
 
 /* Free Play keeps its own settings so switching modes doesn't clobber either one. */
@@ -156,7 +158,7 @@ const freeCfg = {
   lureRate: 0.20, meta: false, gate: 0, retro: 0, varN: 0,
   /* varPriority was missing here while cfg defaulted it on, so Free Play silently
      ran without the cue that progression uses. */
-  varPriority: true, fixedGlyphMap: false, glyphRel: 'map',
+  varPriority: true, fixedGlyphMap: false, glyphRel: 'map', singleAxis: false,
 };
 
 const TUNE_DEFAULTS = {

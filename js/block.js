@@ -240,6 +240,9 @@ function blockRecord(completed, scored) {
       interval: cfg.interval, blockLength: cfg.blockLength, rotation: cfg.rotation,
       spin: cfg.spin, feedback: cfg.feedback, lureRate: cfg.lureRate,
       meta: cfg.meta, gate: cfg.gate, retro: cfg.retro, varN: cfg.varN,
+      /* One-axis moves only: no oblique relation can come up, so it is a
+         different quaternary block from one with diagonals. */
+      singleAxis: !!cfg.singleAxis,
       /* How finely the tones were cut. Four notes an octave apart and twelve a
          minor third apart are not the same stream, and the difference is
          invisible in the settings snapshot without this. */
@@ -662,6 +665,8 @@ function applyProgression() {
        is the last thing left to climb, so the ladder takes them. */
     coordAxes: ladderCoordAxes(progCfg),
     magnitudeCap: ladderMagnitudeCap(progCfg),
+    /* Quaternary's moves one axis at a time, as they were before diagonals. */
+    singleAxis: !!progCfg.singleAxis,
     pitchLoudness: !!progCfg.pitchLoudness,
     /* Earned, not chosen — see `toneRatchet`. Clamped on the way out so a record
        written before the digit existed lands on the starting pool. */
@@ -709,6 +714,7 @@ function applyFree() {
     dim: freeCfg.dim,
     coordAxes: (freeCfg.coordAxes || []).slice(),
     magnitudeCap: freeCfg.magnitudeCap === 3 ? 3 : 2,
+    singleAxis: !!freeCfg.singleAxis,
     pitchLoudness: !!freeCfg.pitchLoudness,
     toneCount: toneCount(freeCfg),
     frame: freeCfg.frame,

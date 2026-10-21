@@ -254,6 +254,8 @@ freeIn('rotationSpeed', v => freeCfg.spin = Math.max(5, v));
 
 freeIn('lureRateF',     v => freeCfg.lureRate = Math.min(LURE_MAX, Math.max(LURE_MIN, v / 100)));
 $('metaOn').onchange  = e => { freeCfg.meta = e.target.checked; applyFree(); syncSettingsUI(); updateHUD(); saveProgress(); };
+$('singleAxis').onchange = e => { freeCfg.singleAxis = e.target.checked; applyFree(); saveProgress(); };
+$('progSingleAxis').onchange = e => { progCfg.singleAxis = e.target.checked; applyProgression(); saveProgress(); };
 $('gateOn').onchange  = e => { freeCfg.gate = +e.target.value; applyFree(); updateHUD(); saveProgress(); };
 $('retroOn').onchange = e => { freeCfg.retro = +e.target.value; applyFree(); syncSettingsUI(); updateHUD(); saveProgress(); };
 $('varNBack').onchange = e => { freeCfg.varN = +e.target.value; applyFree(); syncSettingsUI(); updateHUD(); saveProgress(); };

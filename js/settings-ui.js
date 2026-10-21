@@ -402,6 +402,8 @@ function syncSettingsUI() {
   /* The map does not exist in rank only, so neither does fixing it. */
   $('fixedGlyphMap').disabled = freeCfg.glyphRel === 'rank';
   $('metaOn').checked = !!freeCfg.meta;
+  $('singleAxis').checked = !!freeCfg.singleAxis;
+  $('progSingleAxis').checked = !!progCfg.singleAxis;
   $('gateOn').value = String(freeCfg.gate || 0);
   $('retroOn').value = String(freeCfg.retro || 0);
   $('retroOn').disabled = !!freeCfg.meta;

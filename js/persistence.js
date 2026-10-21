@@ -68,7 +68,7 @@ function resetInMemoryState() {
   keyBinds = {};
   actionBinds = {};
   Object.assign(progCfg, { feedback: 'reveal', coordAxes: [], magnitudeCap: 2,
-    pitchLoudness: false, streams: null, glyphRel: 'map' });
+    pitchLoudness: false, streams: null, glyphRel: 'map', singleAxis: false });
   state.glyphMap = null;
   Object.assign(tune, TUNE_DEFAULTS);
   Object.assign(freeCfg, {
@@ -76,7 +76,7 @@ function resetInMemoryState() {
     coordAxes:[], magnitudeCap:2, pitchLoudness:false, toneCount:TONE_DEFAULT,
     frame:'cube', interval:2500, blockLength:20, feedback:'reveal',
     lureRate:0.20, meta:false, gate:0, retro:0, varN:0,
-    varPriority:true, fixedGlyphMap:false, glyphRel:'map',
+    varPriority:true, fixedGlyphMap:false, glyphRel:'map', singleAxis:false,
   });
 }
 

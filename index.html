@@ -55,6 +55,12 @@
         <option value="5">Quinary — the same relation in two frames</option>
       </select>
       <div class="hint" id="rcHint"></div>
+      <label class="row" id="progSingleAxisRow"><input type="checkbox" id="progSingleAxis">
+        One axis per move (the old quaternary moves)</label>
+      <div class="hint">Quaternary and up. Every move is a step along a single axis, as
+        it was before moves could combine axes: the relation to the previous move is
+        always same, opposite or orthogonal, and there are no diagonals or oblique
+        moves to work out.</div>
     </div>
 
     <details class="sect">
@@ -288,6 +294,8 @@
       <div class="setting-group">
         <label><input type="checkbox" id="metaOn" style="width:auto"> Meta-relations
           (2nd order)</label>
+        <label class="row"><input type="checkbox" id="singleAxis"> One axis per move —
+          no diagonals, so never "none of those"</label>
         <div class="hint">Report how this move relates to the move you reported N trials
           ago — <b>same</b>, <b>opposite</b>, <b>orthogonal</b>, or <b>none of
           those</b> — instead of which way it went. A move may run on several axes
